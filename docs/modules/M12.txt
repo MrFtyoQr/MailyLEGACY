@@ -1,0 +1,105 @@
+M12 — Audit Log
+===============
+
+PURPOSE
+  Immutable HIPAA-style audit trail for all significant actions on medical
+  data.  Every record is append-only — no UPDATE or DELETE is allowed on
+  the table.  Two years retention by default (configurable via
+  AUDIT_RETENTION_DAYS).
+
+MODELS
+  AuditLog (append-only)
+    id             UUID PK
+    actor          FK → User (SET_NULL on delete)
+    actor_role     str(20) snapshot
+    actor_email    email snapshot (persists after user deletion)
+    action         AuditAction choice (17 values)
+    resource_type  ResourceType choice (15 values)
+    resource_id    str(64) — UUID/PK of affected object
+    patient        FK → PatientProfile (SET_NULL) — data subject
+    ip_address     GenericIPAddressField (nullable)
+    user_agent     text
+    endpoint       str(255) — "METHOD /path"
+    http_status    uint16 (nullable)
+    changed_fields JSON list of field NAMES (never values)
+    note           text (max 500 chars)
+    created_at     datetime (auto, indexed)
+
+  Immutability enforced in:
+    AuditLog.save()   → raises ValueError if pk already exists
+    AuditLog.delete() → raises ValueError always
+    AdminAuditLogAdmin → has_add/change/delete all return False
+
+ACTIONS (AuditAction)
+  LOGIN, LOGOUT, CREATE, READ, UPDATE, DELETE,
+  MEDICATION_TAKEN, MEDICATION_SKIPPED,
+  LAB_UPLOADED, DOCUMENT_SHARED, DOCUMENT_REVOKED, EXPORT_PDF,
+  INSIGHT_GENERATED, PERMISSION_CHANGE, PLAN_CHANGE,
+  ACCESS_DENIED, TOKEN_REVOKED
+
+RESOURCE TYPES
+  USER, PATIENT, DOCTOR, MEDICATION, MEDICATION_HISTORY,
+  VITAL_SIGN, LAB_RESULT, LAB_PANEL, APPOINTMENT,
+  DOCUMENT, CHAT, SUBSCRIPTION, INSIGHT, EXPORT, OTHER
+
+PUBLIC API (logger.py)
+  audit(
+      request=None,           # DRF request — auto-extracts actor, IP, endpoint
+      actor=None,             # user object (for tasks / signals)
+      action=...,             # required
+      resource_type=...,
+      resource_id=...,
+      patient=...,
+      changed_fields=[...],
+      note='',
+      http_status=...,
+  ) -> AuditLog | None        # Never raises; failures are logged to stderr
+
+AUTOMATIC LOGGING
+  AuditMiddleware (added after AuthenticationMiddleware):
+    - Logs every POST/PUT/PATCH/DELETE request
+    - Logs any 4xx/5xx response
+    - Skips: /payments/webhook/, /auth/webhook/, /admin/, /health/, /static/
+
+  Signal receivers (signals.py, auto-connected via AppConfig.ready):
+    - MedicationHistory saved → MEDICATION_TAKEN / MEDICATION_SKIPPED
+    - DocumentShare saved    → DOCUMENT_SHARED / DOCUMENT_REVOKED
+    - Subscription saved     → PLAN_CHANGE (on plan_id update)
+    - HealthSummaryExport created → EXPORT_PDF
+
+ENDPOINTS (read-only)
+  GET /api/v1/audit/                    ADMIN only, filterable:
+                                          ?action=, ?resource_type=,
+                                          ?actor_email=, ?patient_id=,
+                                          ?date_from=, ?date_to=
+  GET /api/v1/audit/my/                 authenticated user — own actions only
+  GET /api/v1/audit/patient/<id>/       assigned doctor or ADMIN
+
+TASKS
+  purge_old_audit_logs()  — monthly; deletes entries older than
+                            AUDIT_RETENTION_DAYS (default 730 days)
+
+SETTINGS ADDED
+  AUDIT_RETENTION_DAYS = env.int('AUDIT_RETENTION_DAYS', default=730)
+  AuditMiddleware added to MIDDLEWARE stack
+
+FILES CREATED
+  apps/audit/__init__.py
+  apps/audit/apps.py           — AppConfig; imports signals in ready()
+  apps/audit/models.py
+  apps/audit/logger.py         — public audit() function
+  apps/audit/middleware.py     — AuditMiddleware (auto HTTP logging)
+  apps/audit/signals.py        — Django signal receivers
+  apps/audit/serializers.py
+  apps/audit/views.py
+  apps/audit/urls.py
+  apps/audit/tasks.py
+  apps/audit/admin.py          — read-only admin
+  apps/audit/tests/__init__.py
+  apps/audit/tests/test_audit.py
+
+TODO
+  [ ] M13 — Integrations (Apple Health / Google Fit)
+  [ ] Wire purge_old_audit_logs to Celery Beat (monthly schedule)
+  [ ] Consider TimescaleDB hypertable for audit_log table (high write volume)
+  [ ] SIEM export (send entries to Elasticsearch / Datadog)

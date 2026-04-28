@@ -1,0 +1,114 @@
+================================================================================
+MÓDULO: M09 — Payments / Subscriptions
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-22
+SPRINT: 4
+ESTADO: EN DESARROLLO
+DEPENDE DE: M01, M02, M07
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo de pagos y suscripciones. Gestiona los planes de membresía del modelo
+CAMSA usando Stripe como único proveedor (sin Conekta). Cubre checkout,
+portal de cliente, webhooks de Stripe y lógica de downgrade automático por
+falta de pago.
+
+--------------------------------------------------------------------------------
+PLANES
+--------------------------------------------------------------------------------
+FREE     →  $0 MXN/mes  · hasta 1 doctor · IA: OpenAI GPT-4o mini
+SILVER   → $99 MXN/mes  · hasta 2 doctores · IA: OpenAI GPT-4o
+GOLD     → $249 MXN/mes · hasta 3 doctores · IA: OpenAI GPT-4o
+PLATINUM → $499 MXN/mes · doctores ilimitados · IA: Claude (Anthropic)
+
+El tier del plan determina:
+  - Cuántos médicos puede tener asignados el paciente
+  - Qué modelo de IA usa para recomendaciones (M10 Analytics)
+  - Límites de historial de laboratorio y vitales exportable
+
+--------------------------------------------------------------------------------
+MODELOS (apps/payments/models.py)
+--------------------------------------------------------------------------------
+Plan          → definición de cada tier (price, stripe_price_id, features)
+Subscription  → suscripción activa del usuario (1:1 con User)
+PaymentEvent  → log de eventos Stripe recibidos por webhook (audit)
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+apps/payments/
+├── __init__.py
+├── apps.py
+├── models.py
+├── serializers.py
+├── views.py
+├── urls.py
+├── admin.py
+├── tasks.py        ← notify_payment_failed, downgrade_expired
+└── tests/
+    ├── __init__.py
+    └── test_payments.py
+
+config/settings/base.py   MODIFICADO — STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+config/urls.py            MODIFICADO — incluye payments urls
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+  GET    /api/v1/payments/plans/          → lista todos los planes
+  GET    /api/v1/payments/subscription/   → mi suscripción activa
+  POST   /api/v1/payments/checkout/       → crear sesión Stripe Checkout
+  POST   /api/v1/payments/portal/         → crear sesión Customer Portal
+  POST   /api/v1/payments/cancel/         → cancelar al fin del período
+  POST   /api/v1/payments/webhook/        → receptor de webhooks Stripe (sin auth)
+
+--------------------------------------------------------------------------------
+WEBHOOKS STRIPE MANEJADOS
+--------------------------------------------------------------------------------
+customer.subscription.created    → crear/activar Subscription
+customer.subscription.updated    → actualizar plan/status
+customer.subscription.deleted    → cancelar, downgrade a FREE
+invoice.payment_succeeded        → confirmar período activo
+invoice.payment_failed           → marcar PAST_DUE, notificar usuario
+checkout.session.completed       → asociar customer_id al usuario
+
+--------------------------------------------------------------------------------
+TAREAS CELERY
+--------------------------------------------------------------------------------
+notify_payment_failed(user_id)        → push + email al fallar pago
+downgrade_expired_subscriptions()     → diario: FREE a usuarios PAST_DUE > 7 días
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. Solo Stripe. Sin Conekta.
+2. Plan se define en DB (no hardcoded) para poder actualizar precios sin deploy.
+3. Subscription es 1:1 con User — cada cuenta tiene máximo una suscripción.
+4. Los webhooks se validan con stripe.WebhookSignature antes de procesar.
+5. PaymentEvent guarda el payload crudo para auditoría y re-procesamiento.
+6. Stripe idempotency key = stripe_event_id para evitar doble procesamiento.
+7. Grace period de 7 días en PAST_DUE antes de hacer downgrade a FREE.
+8. El webhook endpoint NO requiere autenticación Clerk (Stripe firma los eventos).
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-22 | CREACIÓN INICIAL
+           | - Modelos: Plan, Subscription, PaymentEvent
+           | - Checkout session, Customer Portal, cancelación
+           | - Webhook: created, updated, deleted, payment_succeeded, payment_failed
+           | - Celery: notify_payment_failed, downgrade_expired_subscriptions
+           | - Tests: checkout, webhook processing, downgrade, permisos
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Portal de administración de planes en Django Admin con sync a Stripe
+[ ] Facturas descargables (PDF de Stripe Invoice)
+[ ] Integración con M10 Analytics: features habilitadas según tier
+[ ] Webhooks de reembolso (charge.refunded)
+
+================================================================================

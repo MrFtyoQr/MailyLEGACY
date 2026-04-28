@@ -1,0 +1,99 @@
+================================================================================
+MÓDULO: M02 — Accounts & Profiles
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-21
+SPRINT: 1
+ESTADO: EN DESARROLLO
+DEPENDE DE: M01 (Auth & Security)
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Gestión completa de perfiles de usuario. Extiende los modelos de M01 añadiendo
+SpecialistProfile y PartnerProfile, implementa CRUD de todos los perfiles,
+manejo de foto de perfil (S3/R2) y la relación doctor-paciente (asignar,
+desasignar, listar).
+
+--------------------------------------------------------------------------------
+MODELOS (apps/accounts/models.py)
+--------------------------------------------------------------------------------
+User               → M01 (sin cambios)
+PatientProfile     → M01 + campos completos validados
+DoctorProfile      → M01 + campos completos validados
+DoctorPatient      → M01 (sin cambios)
+SpecialistProfile  → NUEVO: nutriólogos, fisioterapeutas
+PartnerProfile     → NUEVO: empresas externas (Cinepolis, farmacias, etc.)
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS / MODIFICADOS
+--------------------------------------------------------------------------------
+apps/accounts/
+├── models.py           MODIFICADO — añade SpecialistProfile, PartnerProfile
+├── serializers.py      MODIFICADO — serializers completos con validación
+├── views.py            MODIFICADO — CRUD perfiles + doctor-paciente
+├── urls.py             MODIFICADO — nuevas rutas
+└── tests/
+    └── test_profiles.py  NUEVO
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+Perfil paciente:
+  GET    /api/v1/auth/profiles/patient/          → ver mi perfil
+  PATCH  /api/v1/auth/profiles/patient/          → actualizar mi perfil
+  POST   /api/v1/auth/profiles/patient/photo/    → subir foto de perfil
+
+Perfil doctor:
+  GET    /api/v1/auth/profiles/doctor/           → ver mi perfil
+  PATCH  /api/v1/auth/profiles/doctor/           → actualizar mi perfil
+  POST   /api/v1/auth/profiles/doctor/photo/     → subir foto de perfil
+
+Perfil especialista:
+  GET    /api/v1/auth/profiles/specialist/       → ver mi perfil
+  PATCH  /api/v1/auth/profiles/specialist/       → actualizar mi perfil
+
+Perfil partner:
+  GET    /api/v1/auth/profiles/partner/          → ver mi perfil
+  PATCH  /api/v1/auth/profiles/partner/          → actualizar
+
+Doctor — gestión de pacientes:
+  GET    /api/v1/auth/doctor/patients/           → listar mis pacientes
+  POST   /api/v1/auth/doctor/patients/           → asignar paciente por email
+  GET    /api/v1/auth/doctor/patients/{pk}/      → ficha básica de un paciente
+  DELETE /api/v1/auth/doctor/patients/{pk}/      → desasignar paciente
+
+Admin:
+  GET    /api/v1/auth/admin/users/               → listar todos los usuarios
+  GET    /api/v1/auth/admin/users/{pk}/          → ver usuario
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. Foto de perfil: se sube a S3/R2 y se guarda solo la URL en la DB.
+2. Asignación doctor-paciente: el doctor busca al paciente por email.
+3. Desasignación: soft-delete (is_active=False en DoctorPatient).
+4. SpecialistProfile incluye specialty_type: NUTRITIONIST | PHYSIOTHERAPIST | OTHER.
+5. PartnerProfile incluye business_name, logo_url y contact_email.
+6. Validación de roles: un PATIENT no puede acceder a endpoints de DOCTOR.
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-21 | CREACIÓN INICIAL
+           | - SpecialistProfile y PartnerProfile añadidos a models.py
+           | - Serializers completos con validación de campos
+           | - CRUD de perfiles para los 4 roles no-admin
+           | - Endpoints de gestión doctor-paciente
+           | - Upload de foto de perfil (S3/R2)
+           | - Tests de perfiles y asignaciones
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Endpoint para que el doctor agregue clínicas/laboratorios (M14 Specialists)
+[ ] Paginación en listado de pacientes del doctor
+[ ] Integrar audit_logs cuando M10 esté listo
+
+================================================================================

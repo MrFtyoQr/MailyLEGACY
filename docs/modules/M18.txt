@@ -1,0 +1,66 @@
+M18 — Telemedicine
+==================
+
+PURPOSE
+  Consulta médica por video — Fase 1: link externo (Zoom / Meet / Teams).
+  El doctor pega la URL de la sala; MailyT-Cuida gestiona el flujo:
+  lista de verificación, sala de espera, timing y nota clínica post-sesión.
+
+ARCHITECTURE DECISION
+  Fase 1: link externo. Sin WebRTC propio.
+  Fase 2 (futura): integración con Daily.co / Twilio Video via webhook
+  que auto-crea la sala y embebe el video en la app.
+
+MODELS
+  VideoSession  (OneToOne con Appointment de tipo VIDEO)
+    id / appointment OneToOne
+    provider     ZOOM | MEET | TEAMS | WHEREBY | OTHER
+    meeting_url  URLField  — pegado por el doctor
+    meeting_id / meeting_password  (informativos)
+    status       SCHEDULED → WAITING → IN_PROGRESS → COMPLETED | CANCELLED | NO_SHOW
+    started_at / ended_at / duration_min  (calculado al completar)
+    checklist_completed  bool
+    tech_quality / patient_rating / patient_feedback  (post-sesión)
+
+  SessionCheckin  (OneToOne con VideoSession)
+    checked_in_at / pre_vitals JSON / device_info
+    Creado cuando el paciente pulsa "Estoy listo".
+
+  SessionNote  (OneToOne con VideoSession — solo COMPLETED)
+    subjective / objective / assessment / plan  (SOAP)
+    follow_up_days / prescriptions_issued / referrals_made
+
+STATUS FLOW
+  SCHEDULED → (patient checkin) → WAITING → (doctor starts) → IN_PROGRESS
+  → (doctor ends) → COMPLETED
+  Doctor puede marcar: CANCELLED, NO_SHOW en cualquier momento.
+
+ENDPOINTS
+  Doctor:
+    POST  /api/v1/telemedicine/sessions/               crear sesión
+    GET   /api/v1/telemedicine/sessions/               listar mis sesiones
+    GET   /api/v1/telemedicine/sessions/<id>/          detalle
+    PATCH /api/v1/telemedicine/sessions/<id>/link/     actualizar URL/provider
+    PATCH /api/v1/telemedicine/sessions/<id>/status/   cambiar estado
+    POST  /api/v1/telemedicine/sessions/<id>/note/     nota clínica post-sesión
+    GET   /api/v1/telemedicine/sessions/<id>/checkin/  ver si paciente está listo
+
+  Patient:
+    GET  /api/v1/telemedicine/sessions/mine/           mis sesiones
+    POST /api/v1/telemedicine/sessions/<id>/checkin/   check-in sala de espera
+    POST /api/v1/telemedicine/sessions/<id>/feedback/  calificar (1-5 tech + overall)
+
+NOTIFICATIONS ADDED (M07)
+  VIDEO_SESSION_READY  — push al paciente con el meeting_url
+  PATIENT_WAITING      — push al doctor cuando paciente hace check-in
+
+FILES CREATED
+  apps/telemedicine/__init__.py, apps.py, models.py, serializers.py
+  views.py, urls.py, admin.py
+  tests/__init__.py, tests/test_telemedicine.py  (10 tests)
+
+TODO (Fase 2)
+  [ ] Integrar Daily.co: POST /api/daily/webhook/ → auto-crea VideoSession
+  [ ] Grabación de sesión (con consentimiento explícito del paciente)
+  [ ] Timer en tiempo real via WebSocket (extiende M08 chat/routing)
+  [ ] Sala de espera virtual con chat previo doctor-paciente

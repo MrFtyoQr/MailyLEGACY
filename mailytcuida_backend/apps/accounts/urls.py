@@ -1,0 +1,35 @@
+from django.urls import path
+from .views import (
+    MeView, RoleView,
+    PatientProfileView, PatientPhotoView,
+    DoctorProfileView, DoctorPhotoView,
+    SpecialistProfileView, PartnerProfileView,
+    DoctorPatientListCreateView, DoctorPatientDetailView,
+    AdminUserListView, AdminUserDetailView,
+)
+from .webhooks.clerk_webhooks import ClerkWebhookView
+
+urlpatterns = [
+    # Clerk webhook
+    path('webhook/clerk/', ClerkWebhookView.as_view(), name='clerk-webhook'),
+
+    # Usuario autenticado
+    path('me/', MeView.as_view(), name='auth-me'),
+    path('me/role/', RoleView.as_view(), name='auth-role'),
+
+    # Perfiles por rol
+    path('profiles/patient/', PatientProfileView.as_view(), name='profile-patient'),
+    path('profiles/patient/photo/', PatientPhotoView.as_view(), name='profile-patient-photo'),
+    path('profiles/doctor/', DoctorProfileView.as_view(), name='profile-doctor'),
+    path('profiles/doctor/photo/', DoctorPhotoView.as_view(), name='profile-doctor-photo'),
+    path('profiles/specialist/', SpecialistProfileView.as_view(), name='profile-specialist'),
+    path('profiles/partner/', PartnerProfileView.as_view(), name='profile-partner'),
+
+    # Doctor — gestión de pacientes
+    path('doctor/patients/', DoctorPatientListCreateView.as_view(), name='doctor-patients'),
+    path('doctor/patients/<uuid:pk>/', DoctorPatientDetailView.as_view(), name='doctor-patient-detail'),
+
+    # Admin
+    path('admin/users/', AdminUserListView.as_view(), name='admin-users'),
+    path('admin/users/<uuid:pk>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
+]

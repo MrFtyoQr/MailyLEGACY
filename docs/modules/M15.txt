@@ -1,0 +1,73 @@
+M15 — Gamification
+==================
+
+PURPOSE
+  Sistema de puntos, rachas y badges que incentiva la adherencia al tratamiento.
+  Multiplicadores de puntos según plan de suscripción (FREE 1×, SILVER 2×,
+  GOLD 3×, PLATINUM 5×).
+
+MODELS
+  Badge  (catálogo estático — seed con `python manage.py seed_badges`)
+    id / code (unique) / name / description / category / icon_url
+    threshold     — valor que desbloquea el badge (semántica por categoría)
+    points_reward — puntos extra al ganar el badge
+    is_active
+
+  PlayerProfile  (estado del paciente — creado lazy al primer award)
+    id / patient (OneToOne)
+    total_points    int
+    current_streak  int  — días consecutivos con MEDICATION_TAKEN
+    longest_streak  int
+    last_activity_date date
+    level           1–10 (calculado por compute_level())
+
+  PointTransaction  (ledger inmutable)
+    id / player / source / base_points / multiplier / points / ref_id / note / created_at
+
+  PlayerBadge  (badges ganados — append-only, UNIQUE(player, badge))
+    id / player / badge / earned_at
+
+POINT SOURCES & BASE POINTS
+  MEDICATION_TAKEN 10 | VITAL_LOGGED 5 | LAB_UPLOADED 15
+  APPOINTMENT_KEPT 20 | STREAK_BONUS 25 | REFERRAL_COMPLETED 50
+  PROFILE_COMPLETED 30 | MANUAL_ADJUSTMENT 0
+
+PLAN MULTIPLIERS
+  FREE 1× | SILVER 2× | GOLD 3× | PLATINUM 5×
+
+LEVEL THRESHOLDS
+  1→0  2→200  3→500  4→1000  5→2000  6→4000  7→8000  8→15000  9→30000  10→∞
+
+ENGINE (engine.py)  — award_points()
+  Thread-safe (select_for_update). Nunca lanza excepción.
+  Streak: bonus automático en rachas 7/14/30/60/90 días.
+  Badges: revisa y otorga badges desbloqueados en cada award.
+
+SIGNAL RECEIVERS (signals.py)
+  MedicationHistory TAKEN → MEDICATION_TAKEN
+  VitalSign created       → VITAL_LOGGED
+  LabResult created       → LAB_UPLOADED
+  Appointment COMPLETED   → APPOINTMENT_KEPT
+  ReferralRequest COMPLETED → REFERRAL_COMPLETED
+
+BADGE CATALOG (19 badges — seed_badges command)
+  Adherencia: ADHERENCE_1/10/50/100/500
+  Rachas: STREAK_7/14/30/60/90
+  Vitales: VITALS_5/20/50
+  Hitos: POINTS_500/1000/5000/10000
+  Social: REFERRAL_1/5
+
+ENDPOINTS
+  GET /api/v1/gamification/me/
+  GET /api/v1/gamification/me/transactions/
+  GET /api/v1/gamification/badges/
+  GET /api/v1/gamification/leaderboard/
+  GET /api/v1/gamification/patient/<id>/   (doctor)
+
+NOTIFICATION ADDED: BADGE_EARNED
+
+FILES CREATED
+  apps/gamification/__init__.py, apps.py, models.py, engine.py
+  signals.py, serializers.py, views.py, urls.py, admin.py
+  management/commands/seed_badges.py
+  tests/__init__.py, tests/test_gamification.py  (18 tests)

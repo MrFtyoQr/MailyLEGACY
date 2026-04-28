@@ -1,0 +1,115 @@
+M11 — Documents & Medical Files
+================================
+
+PURPOSE
+  Central store for patient-uploaded medical documents (PDFs, images, lab
+  scans, prescriptions). Supports direct upload to R2 via presigned URLs,
+  async OCR, doctor sharing with per-document revocation, and PDF health-
+  summary exports.
+
+MODELS
+  MedicalDocument
+    id              UUID PK
+    patient         FK → PatientProfile
+    category        LAB_RESULT | PRESCRIPTION | IMAGING | CLINICAL_NOTE | INSURANCE | OTHER
+    title           str(255)
+    description     text (blank)
+    file_url        URLField(1024)  — R2 / S3 object URL
+    file_name       str(255, blank)
+    file_size       uint (bytes, nullable)
+    mime_type       str(100, blank)
+    status          PENDING | PROCESSING | READY | FAILED
+    ocr_text        text (blank) — populated async
+    ocr_data        JSON — structured OCR output
+    document_date   date (nullable) — date on the document, not upload date
+    is_active       bool (soft delete)
+    created_at      datetime (auto)
+    updated_at      datetime (auto)
+
+  DocumentShare
+    id          UUID PK
+    document    FK → MedicalDocument
+    doctor      FK → DoctorProfile
+    shared_at   datetime (auto)
+    revoked_at  datetime (nullable)
+    is_active   bool
+    UNIQUE(document, doctor)
+
+  HealthSummaryExport
+    id           UUID PK
+    patient      FK → PatientProfile
+    pdf_url      URLField (blank until generated)
+    status       PENDING | PROCESSING | READY | FAILED
+    sections     JSON list of section keys
+    error        text (blank)
+    created_at   datetime (auto)
+    completed_at datetime (nullable)
+
+ENDPOINTS
+  GET    /api/v1/documents/                        list patient docs (?category=)
+  POST   /api/v1/documents/                        register doc (post R2 upload)
+  GET    /api/v1/documents/<id>/                   detail
+  PATCH  /api/v1/documents/<id>/                   update title/description
+  DELETE /api/v1/documents/<id>/                   soft delete
+
+  POST   /api/v1/documents/upload-url/             presigned PUT URL for R2
+  POST   /api/v1/documents/<id>/ocr/               trigger OCR task → 202
+
+  GET    /api/v1/documents/<id>/shares/            list active shares
+  POST   /api/v1/documents/<id>/shares/            share with assigned doctor
+  DELETE /api/v1/documents/<id>/shares/<share_id>/ revoke share
+
+  GET    /api/v1/documents/shared-with-me/         doctor: docs shared with them
+
+  POST   /api/v1/documents/export/                 request PDF export → 202
+  GET    /api/v1/documents/exports/                list past exports
+
+TASKS (Celery)
+  generate_health_summary_pdf(export_id)
+    Builds PDF via ReportLab, uploads to R2, sets export status → READY | FAILED
+    Retries: 2 × 60 s
+
+  process_document_ocr(document_id)
+    OCR pipeline stub (PENDING → PROCESSING → READY | FAILED)
+    Retries: 1
+
+UPLOAD FLOW
+  1. Client calls POST /api/v1/documents/upload-url/ → gets presigned PUT URL
+  2. Client PUTs file bytes directly to R2 (no Django server involved)
+  3. Client calls POST /api/v1/documents/ with {file_url, file_name, …}
+  4. Server creates MedicalDocument and enqueues process_document_ocr()
+
+PDF BUILDER (pdf_builder.py)
+  Uses ReportLab (optional dep; missing raises ImportError caught by task).
+  Sections: medications, vitals, labs, appointments, insights
+  Each section queries last 30 / 90 days; max rows capped for readability.
+
+SHARING RULES
+  - Patient can only share with doctors linked via DoctorPatient (active).
+  - Doctor access is per-document, not per-patient.
+  - Revocation sets is_active=False + revoked_at timestamp.
+
+FILES CREATED
+  apps/documents/__init__.py
+  apps/documents/apps.py
+  apps/documents/models.py
+  apps/documents/serializers.py
+  apps/documents/storage.py          — presigned URL helper
+  apps/documents/pdf_builder.py      — ReportLab PDF generator
+  apps/documents/tasks.py
+  apps/documents/views.py
+  apps/documents/urls.py
+  apps/documents/admin.py
+  apps/documents/tests/__init__.py
+  apps/documents/tests/test_documents.py
+
+SETTINGS ADDED (config/settings/base.py)
+  OPENAI_API_KEY    = env('OPENAI_API_KEY', default='')    ← completes M10
+  ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='') ← completes M10
+
+TODO
+  [ ] Replace OCR stub with Google Vision / AWS Textract integration
+  [ ] Auto-create LabResult records from structured OCR output
+  [ ] Virus scan on upload (ClamAV / cloud provider)
+  [ ] Signed download URLs (time-limited) instead of public URLs
+  [ ] M12 — Audit Log

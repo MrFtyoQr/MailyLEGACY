@@ -1,0 +1,110 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mailyt_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mailytcuida
+      POSTGRES_USER: mailyt
+      POSTGRES_PASSWORD: mailyt_dev_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailyt -d mailytcuida"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: mailyt_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build:
+      context: ./mailytcuida_backend
+      dockerfile: Dockerfile
+    container_name: mailyt_web
+    restart: unless-stopped
+    env_file:
+      - ./mailytcuida_backend/.env.dev
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: mailyt
+      DB_PASSWORD: mailyt_dev_pass
+      DB_NAME: mailytcuida
+    volumes:
+      - ./mailytcuida_backend:/app
+      - static_files:/app/staticfiles
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python manage.py runserver 0.0.0.0:8000
+
+  celery:
+    build:
+      context: ./mailytcuida_backend
+      dockerfile: Dockerfile
+    container_name: mailyt_celery
+    restart: unless-stopped
+    env_file:
+      - ./mailytcuida_backend/.env.dev
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: mailyt
+      DB_PASSWORD: mailyt_dev_pass
+      DB_NAME: mailytcuida
+    volumes:
+      - ./mailytcuida_backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A config.celery worker --loglevel=info --concurrency=2
+    entrypoint: []
+
+  celery-beat:
+    build:
+      context: ./mailytcuida_backend
+      dockerfile: Dockerfile
+    container_name: mailyt_beat
+    restart: unless-stopped
+    env_file:
+      - ./mailytcuida_backend/.env.dev
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: mailyt
+      DB_PASSWORD: mailyt_dev_pass
+      DB_NAME: mailytcuida
+    volumes:
+      - ./mailytcuida_backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    entrypoint: []
+
+volumes:
+  postgres_data:
+  static_files:

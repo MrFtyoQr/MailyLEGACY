@@ -1,0 +1,106 @@
+M13 — Prescriptions (Patient-side storage)
+==========================================
+
+CONTEXT
+  MailyT-Cuida NO genera recetas. Las recetas las expide MailySoft (CRM
+  para doctores, producto hermano en planificación).
+  Este módulo hace dos cosas:
+    1. Permite al paciente guardar fotos / PDFs de sus recetas físicas.
+    2. Recibe recetas digitales expedidas por MailySoft vía webhook firmado.
+
+MODELS
+  Prescription
+    id                  UUID PK
+    patient             FK → PatientProfile
+    source              MANUAL | MAILYSOFT
+    file_url            URLField(1024, blank) — R2/S3 URL
+    file_name / mime_type / thumbnail_url
+    title               str(255, blank) — etiqueta del paciente
+    prescribed_by       str(255, blank)
+    clinic_name         str(255, blank)
+    prescribed_at       date (nullable)
+    expires_at          date (nullable)
+    notes               text (blank)
+    status              ACTIVE | EXPIRED | USED | UNKNOWN
+    medications_listed  JSON  — [{name, dose, instructions}, ...]
+    mailysoft_id        str(128, unique, null) — deduplicación idempotente
+    mailysoft_doctor_id str(128, blank)
+    mailysoft_clinic_id str(128, blank)
+    is_active           bool (soft delete)
+    created_at / updated_at
+
+  PrescriptionVerification  (solo para source=MAILYSOFT)
+    id                UUID PK
+    prescription      OneToOneField → Prescription
+    token             str(64, unique, indexed) — embebido en el QR
+    verification_url  URLField — URL pública del QR scan
+    issued_by_name / issued_by_license / clinic_name
+    signature         text — HMAC firmado por MailySoft (non-repudiation)
+    is_valid          bool
+    invalidated_at    datetime (nullable)
+    created_at
+
+ENDPOINTS
+  Paciente (Clerk JWT requerido):
+    GET    /api/v1/prescriptions/              list (?source=, ?status=)
+    POST   /api/v1/prescriptions/              subida manual (foto/PDF)
+    GET    /api/v1/prescriptions/<id>/         detail (incluye verification)
+    PATCH  /api/v1/prescriptions/<id>/         anotar: title, notes, status
+    DELETE /api/v1/prescriptions/<id>/         soft delete
+
+  Público (sin auth — escaneo de QR):
+    GET    /api/v1/prescriptions/verify/<token>/  devuelve is_valid + doctor + fecha
+
+  MailySoft webhooks (sin Clerk, firmados con HMAC-SHA256):
+    POST   /api/v1/prescriptions/webhook/receive/  recibe receta digital
+    POST   /api/v1/prescriptions/webhook/revoke/   invalida receta
+
+WEBHOOK CONTRACT (receive)
+  Header:  X-MailySoft-Signature: sha256=<hex>
+  Body: {
+    mailysoft_prescription_id, mailysoft_doctor_id, mailysoft_clinic_id,
+    patient_clerk_id,   ← usado para localizar al paciente en MailyT-Cuida
+    doctor_name, doctor_license, clinic_name,
+    prescribed_at, expires_at,
+    file_url, thumbnail_url,
+    medications: [{name, dose, instructions}],
+    notes,
+    verification_token, verification_url, signature
+  }
+  Idempotencia: si mailysoft_prescription_id ya existe → 200 "already_processed"
+  Paciente no encontrado → 404 (el doctor debe invitar al paciente a la app)
+
+WEBHOOK CONTRACT (revoke)
+  Body: { mailysoft_prescription_id }
+  Efecto: Prescription.status → EXPIRED, Verification.is_valid → False
+
+SECURITY
+  webhook.py — verify_mailysoft_signature():
+    - Verifica HMAC-SHA256 con MAILYSOFT_WEBHOOK_SECRET
+    - En modo development permite skip si secret no está configurado
+    - En producción rechaza sin secret → 401
+
+NOTIFICATION
+  Al recibir receta vía webhook → notify(user, 'PRESCRIPTION_RECEIVED', ...)
+  Fallo de notificación NO revierte la transacción.
+
+SETTINGS ADDED
+  MAILYSOFT_WEBHOOK_SECRET = env('MAILYSOFT_WEBHOOK_SECRET', default='')
+
+FILES CREATED
+  apps/prescriptions/__init__.py
+  apps/prescriptions/apps.py
+  apps/prescriptions/models.py
+  apps/prescriptions/serializers.py
+  apps/prescriptions/webhook.py        — HMAC signature verification
+  apps/prescriptions/views.py
+  apps/prescriptions/urls.py
+  apps/prescriptions/admin.py
+  apps/prescriptions/tests/__init__.py
+  apps/prescriptions/tests/test_prescriptions.py  (20 tests)
+
+TODO (integración futura con MailySoft)
+  [ ] Agregar PRESCRIPTION_RECEIVED a NotificationCode en M07
+  [ ] MailySoft registra su webhook URL en el panel de CAMSA admin
+  [ ] Rotación de MAILYSOFT_WEBHOOK_SECRET con overlap de 24h
+  [ ] Endpoint de prueba de conexión: GET /api/v1/prescriptions/webhook/ping/

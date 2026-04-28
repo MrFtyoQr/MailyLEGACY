@@ -1,0 +1,125 @@
+================================================================================
+MÓDULO: M03 — Medications
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-22
+SPRINT: 2
+ESTADO: EN DESARROLLO
+DEPENDE DE: M01, M02
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo CORE de la app. Gestiona el ciclo completo de medicamentos por paciente:
+catálogo, patrones de frecuencia, horarios (absolutos y relativos a comidas),
+historial de tomas (TimescaleDB hypertable) y tareas Celery para recordatorios
+y monitoreo de adherencia.
+
+--------------------------------------------------------------------------------
+MODELOS (apps/medications/models.py)
+--------------------------------------------------------------------------------
+Medication          → catálogo de medicamentos del paciente
+MedicationPattern   → frecuencia: DAILY|WEEKLY|CUSTOM|SPECIFIC_DAYS
+MedicationSchedule  → hora exacta o relativa a comida + recordatorio
+MealSchedule        → horarios de comidas del paciente
+MedicationHistory   → registro de cada toma (TimescaleDB hypertable)
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+apps/medications/
+├── __init__.py
+├── apps.py
+├── models.py
+├── serializers.py
+├── views.py
+├── urls.py
+├── admin.py
+├── tasks.py              ← Celery: recordatorios + adherencia
+└── tests/
+    ├── __init__.py
+    ├── test_medications.py
+    └── test_history.py
+
+config/settings/base.py   MODIFICADO — añade apps.medications
+config/urls.py            MODIFICADO — incluye medications urls
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+Medicamentos:
+  GET    /api/v1/medications/                         → listar mis medicamentos
+  POST   /api/v1/medications/                         → crear medicamento
+  GET    /api/v1/medications/{id}/                    → detalle
+  PATCH  /api/v1/medications/{id}/                    → actualizar
+  DELETE /api/v1/medications/{id}/                    → desactivar (soft)
+
+Patrones:
+  GET    /api/v1/medications/{id}/patterns/           → patrones del med
+  POST   /api/v1/medications/{id}/patterns/           → crear patrón
+  PATCH  /api/v1/medications/{id}/patterns/{pid}/     → actualizar patrón
+  DELETE /api/v1/medications/{id}/patterns/{pid}/     → desactivar patrón
+
+Horarios:
+  GET    /api/v1/medications/{id}/schedules/          → horarios del med
+  POST   /api/v1/medications/{id}/schedules/          → crear horario
+  PATCH  /api/v1/medications/{id}/schedules/{sid}/    → actualizar
+  DELETE /api/v1/medications/{id}/schedules/{sid}/    → desactivar
+
+Comidas:
+  GET    /api/v1/meal-schedules/                      → horarios de comidas
+  POST   /api/v1/meal-schedules/                      → crear horario comida
+  PATCH  /api/v1/meal-schedules/{id}/                 → actualizar
+  DELETE /api/v1/meal-schedules/{id}/                 → eliminar
+
+Historial:
+  GET    /api/v1/medications/history/                 → historial paginado (?from=&to=)
+  GET    /api/v1/medications/history/today/           → tomas de hoy
+  POST   /api/v1/medications/history/{id}/take/       → marcar como tomada
+  POST   /api/v1/medications/history/{id}/skip/       → marcar como omitida
+  POST   /api/v1/medications/history/{id}/postpone/   → posponer
+
+Doctor — vista de paciente:
+  GET    /api/v1/medications/patient/{patient_id}/    → meds del paciente (doctor)
+  GET    /api/v1/medications/patient/{patient_id}/history/ → historial (doctor)
+
+--------------------------------------------------------------------------------
+TAREAS CELERY
+--------------------------------------------------------------------------------
+send_medication_reminder(history_id)    → push/email al paciente (15 min antes)
+check_medication_adherence()            → cada hora, detecta baja adherencia
+generate_daily_history_entries()        → cada día a medianoche, genera entradas PENDING
+alert_doctor_low_adherence(patient_id)  → notifica al doctor si adherencia < 70%
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. medications_history es candidata a TimescaleDB hypertable (scheduled_at).
+2. El historial se pre-genera cada medianoche como entradas PENDING.
+3. El paciente marca TAKEN/SKIPPED/POSTPONED desde la app.
+4. medication_name se desnormaliza en historial para preservar datos históricos
+   aunque se cambie el nombre del medicamento.
+5. Soft delete en Medication (is_active=False), no hard delete.
+6. Los doctores pueden ver el historial de sus pacientes asignados.
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-22 | CREACIÓN INICIAL
+           | - Modelos: Medication, MedicationPattern, MedicationSchedule,
+           |   MealSchedule, MedicationHistory
+           | - CRUD completo con permisos por rol
+           | - Historial con filtros por fecha
+           | - Acciones: take, skip, postpone
+           | - Tareas Celery: recordatorios y monitoreo de adherencia
+           | - Tests: creación, patrones, historial, acciones
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Convertir medications_history a hypertable TimescaleDB en producción
+[ ] Vista doctor del historial integrada con M08 Dashboard
+[ ] Adherencia calculada en M09 Analytics (vistas materializadas)
+
+================================================================================

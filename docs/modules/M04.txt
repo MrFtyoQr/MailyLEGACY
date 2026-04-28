@@ -1,0 +1,119 @@
+================================================================================
+MÓDULO: M04 — Vitals
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-22
+SPRINT: 2
+ESTADO: EN DESARROLLO
+DEPENDE DE: M01, M02
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo de signos vitales. Registra, almacena y analiza lecturas de signos vitales
+por paciente. Candidato a TimescaleDB hypertable (recorded_at). Incluye metas
+por rango normal y alertas automáticas cuando una lectura cae fuera del rango.
+
+--------------------------------------------------------------------------------
+MODELOS (apps/vitals/models.py)
+--------------------------------------------------------------------------------
+VitalSign    → lectura individual de un signo vital (TimescaleDB hypertable)
+VitalGoal    → rango objetivo (min/max) por tipo de vital, asignado por doctor o paciente
+
+Tipos de vital (VitalType):
+  BLOOD_PRESSURE  → value=sistólica, secondary_value=diastólica  [mmHg]
+  HEART_RATE      → pulsaciones por minuto                        [bpm]
+  GLUCOSE         → glucosa en sangre                             [mg/dL]
+  WEIGHT          → peso                                          [kg]
+  HEIGHT          → talla                                         [cm]
+  TEMPERATURE     → temperatura corporal                          [°C]
+  OXYGEN_SAT      → saturación de oxígeno                        [%]
+  RESPIRATORY     → frecuencia respiratoria                       [rpm]
+  WAIST           → perímetro de cintura                          [cm]
+  BMI             → índice de masa corporal                       [kg/m²]
+
+Fuentes de lectura (VitalSource):
+  MANUAL          → ingreso manual por el paciente
+  DEVICE          → dispositivo conectado (smartwatch, glucómetro, etc.)
+  INTEGRATION     → integración externa (Apple Health, Google Fit)
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+apps/vitals/
+├── __init__.py
+├── apps.py
+├── models.py
+├── serializers.py
+├── views.py
+├── urls.py
+├── admin.py
+├── tasks.py              ← Celery: check_abnormal_vitals, generate_vitals_summary
+└── tests/
+    ├── __init__.py
+    └── test_vitals.py
+
+config/settings/base.py   MODIFICADO — añade apps.vitals
+config/urls.py            MODIFICADO — incluye vitals urls
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+Lecturas:
+  GET    /api/v1/vitals/                              → listar lecturas (?type=&from=&to=)
+  POST   /api/v1/vitals/                              → registrar lectura
+  GET    /api/v1/vitals/{id}/                         → detalle
+  DELETE /api/v1/vitals/{id}/                         → eliminar lectura
+
+Vistas agregadas:
+  GET    /api/v1/vitals/latest/                       → última lectura por tipo
+  GET    /api/v1/vitals/summary/                      → min/max/avg por período
+
+Metas:
+  GET    /api/v1/vitals/goals/                        → metas activas del paciente
+  POST   /api/v1/vitals/goals/                        → crear meta
+  PATCH  /api/v1/vitals/goals/{id}/                   → actualizar meta
+  DELETE /api/v1/vitals/goals/{id}/                   → desactivar meta
+
+Doctor — vista de paciente:
+  GET    /api/v1/vitals/patient/{patient_id}/         → lecturas del paciente
+  GET    /api/v1/vitals/patient/{patient_id}/latest/  → últimas lecturas del paciente
+
+--------------------------------------------------------------------------------
+TAREAS CELERY
+--------------------------------------------------------------------------------
+check_abnormal_vitals(vital_id)   → verifica si la lectura está fuera del rango meta
+                                     y genera notificación a paciente/doctor
+generate_vitals_summary()         → semanal, genera resumen estadístico por paciente
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. vitals_vital_sign es candidata a TimescaleDB hypertable (recorded_at).
+2. secondary_value maneja presión arterial (diastólica) sin tabla extra.
+3. VitalGoal puede ser creada por el doctor asignado o por el propio paciente.
+4. No hay soft-delete en VitalSign — borrado real, dado que es serie de tiempo.
+5. Los BMI pueden ingresarse directamente o calcularse en el cliente.
+6. source (MANUAL/DEVICE/INTEGRATION) facilita futura integración con wearables.
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-22 | CREACIÓN INICIAL
+           | - Modelos: VitalSign, VitalGoal
+           | - CRUD lecturas con filtros por tipo y fecha
+           | - Vistas agregadas: latest, summary
+           | - Gestión de metas por rango
+           | - Alertas Celery al registrar lectura anormal
+           | - Doctor puede ver vitales de pacientes asignados
+           | - Tests: CRUD, filtros, resumen, metas, alertas
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Convertir vitals_vital_sign a hypertable TimescaleDB en producción
+[ ] Integración Apple Health / Google Fit (M10 Integrations)
+[ ] Gráficas de tendencia integradas con M08 Dashboard
+
+================================================================================

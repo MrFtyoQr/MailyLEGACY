@@ -1,0 +1,110 @@
+================================================================================
+MÓDULO: M07 — Notifications
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-22
+SPRINT: 3
+ESTADO: EN DESARROLLO
+DEPENDE DE: M01, M02
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo de notificaciones. Infraestructura central de comunicación con el usuario.
+Cubre push (FCM Android + APNs iOS), email (SendGrid/AWS SES) y notificaciones
+in-app. Desbloquea los TODOs pendientes en M03, M04 y M06.
+
+Cualquier otro módulo despacha una notificación llamando a:
+  notify(user, code, context)   ← función síncrona (encola tarea Celery)
+
+--------------------------------------------------------------------------------
+CÓDIGOS DE NOTIFICACIÓN
+--------------------------------------------------------------------------------
+MEDICATION_REMINDER          → recordatorio de toma (M03)
+MEDICATION_LOW_ADHERENCE     → adherencia < 70% notificada al doctor (M03)
+APPOINTMENT_CONFIRMED        → cita confirmada por el doctor (M06)
+APPOINTMENT_REMINDER_24H     → recordatorio 24h antes (M06)
+APPOINTMENT_REMINDER_1H      → recordatorio 1h antes (M06)
+APPOINTMENT_CANCELLED        → cita cancelada (M06)
+APPOINTMENT_RESCHEDULED      → cita reagendada (M06)
+VITAL_ABNORMAL               → signo vital fuera de rango (M04)
+LAB_RESULT_ABNORMAL          → resultado de laboratorio anormal (M05)
+WELCOME                      → bienvenida al registrarse (M01)
+DOCTOR_MESSAGE               → mensaje nuevo del doctor (M08 Chat)
+
+--------------------------------------------------------------------------------
+MODELOS (apps/notifications/models.py)
+--------------------------------------------------------------------------------
+DeviceToken   → token FCM/APNs del dispositivo del usuario
+Notification  → registro de cada notificación enviada o in-app
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+apps/notifications/
+├── __init__.py
+├── apps.py
+├── models.py
+├── serializers.py
+├── views.py
+├── urls.py
+├── admin.py
+├── service.py          ← notify(), send_push(), send_email()
+├── tasks.py            ← dispatch_notification, mark_stale_failed
+└── tests/
+    ├── __init__.py
+    └── test_notifications.py
+
+config/settings/base.py   MODIFICADO — añade apps.notifications + FCM/email config
+config/urls.py            MODIFICADO — incluye notifications urls
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+  GET    /api/v1/notifications/                   → mis notificaciones (paginadas)
+  GET    /api/v1/notifications/unread-count/      → conteo para badge
+  POST   /api/v1/notifications/{id}/read/         → marcar como leída
+  POST   /api/v1/notifications/read-all/          → marcar todas como leídas
+
+Dispositivos:
+  POST   /api/v1/notifications/device-token/      → registrar token FCM/APNs
+  DELETE /api/v1/notifications/device-token/{id}/ → eliminar token (logout)
+
+--------------------------------------------------------------------------------
+TAREAS CELERY
+--------------------------------------------------------------------------------
+dispatch_notification(notification_id)   → envía push / email según canal
+mark_stale_notifications_failed()        → diario, limpia notificaciones PENDING > 24h
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. notify() es la única API que otros módulos deben usar — encola dispatch_notification.
+2. Canal seleccionado según preferencias del usuario (futuro) y tipo de notificación.
+3. Los tokens de dispositivo son multi-dispositivo por usuario (tablet + celular).
+4. PUSH usa firebase-admin (FCM v1 API) para Android y APNs via FCM para iOS.
+5. EMAIL usa SendGrid como proveedor principal; SES como fallback (configurable via env).
+6. Las notificaciones IN_APP se guardan siempre en la base de datos; PUSH y EMAIL
+   solo si el usuario tiene token o email verificado.
+7. Soft retry en dispatch_notification: hasta 3 reintentos con backoff exponencial.
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-22 | CREACIÓN INICIAL
+           | - Modelos: DeviceToken, Notification
+           | - service.py: notify(), send_push(), send_email()
+           | - Celery: dispatch_notification, mark_stale_notifications_failed
+           | - CRUD notificaciones in-app + gestión de tokens
+           | - Tests: dispatch, mark read, token CRUD, stale cleanup
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Preferencias de notificación por usuario (silenciar ciertos tipos, horario)
+[ ] Templates de email con HTML (SendGrid Dynamic Templates)
+[ ] Integración Apple Push Notification via firebase-admin
+[ ] WebSocket push para notificaciones in-app en tiempo real (M08 Chat)
+
+================================================================================

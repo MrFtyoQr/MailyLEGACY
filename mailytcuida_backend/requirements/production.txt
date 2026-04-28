@@ -1,0 +1,4 @@
+-r base.txt
+
+# Production server
+uvicorn[standard]==0.32.1

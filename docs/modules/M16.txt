@@ -1,0 +1,89 @@
+M16 — Partner Portal
+=====================
+
+PURPOSE
+  Portal corporativo para empresas clientes de CAMSA. Una organización
+  (empresa, aseguradora, RR.HH.) contrata el servicio, inscribe a sus
+  empleados como pacientes y recibe métricas agregadas (anónimas) del
+  estado de salud de su fuerza laboral.
+
+PRIVACY RULES
+  - Los partners NUNCA ven datos individuales (nombres, diagnósticos,
+    medicamentos).
+  - Todos los datos expuestos son agregados de grupo.
+  - Cohorts < 10 miembros se marcan como `is_suppressed=True` y no
+    deben renderizarse en el frontend.
+  - El paciente debe aceptar el enrollment (consent=True) antes de que
+    su información (anonimizada) cuente para los reportes.
+
+MODELS
+  PartnerOrganization
+    id / name / rfc / industry / logo_url
+    contact_name / contact_email / contact_phone / address
+    status          ACTIVE | SUSPENDED | CANCELLED
+    agreement_start / agreement_end / max_members / monthly_fee_mxn
+    preferred_doctors  M2M → DoctorProfile
+    created_at / updated_at
+
+  PartnerAdmin
+    id / organization FK / user FK / is_primary
+    UNIQUE(organization, user)
+
+  MemberEnrollment
+    id / organization FK / patient FK / employee_id
+    consent          bool  — paciente acepta inclusión en reportes
+    consent_at       datetime (nullable)
+    is_active        bool
+    enrolled_at
+    UNIQUE(organization, patient)
+
+  PartnerHealthSnapshot  (generado semanalmente por Celery)
+    id / organization FK / period_start / period_end
+    consenting_members   int
+    active_members       int  (≥1 actividad en la semana)
+    avg_adherence_pct    decimal
+    low_adherence_count  int  (adherencia < 70%)
+    avg_vitals           JSON {"GLUCOSE": 98.2, ...}
+    is_suppressed        property → consenting_members < 10
+    UNIQUE(organization, period_start)
+
+ENDPOINTS
+  ADMIN:
+    GET/POST /api/v1/partners/organizations/
+    GET/PATCH /api/v1/partners/organizations/<id>/
+    POST     /api/v1/partners/organizations/<id>/enroll/
+    DELETE   /api/v1/partners/organizations/<id>/members/<mid>/
+
+  PARTNER role (org admin):
+    GET /api/v1/partners/dashboard/
+    GET /api/v1/partners/members/        (lista anonimizada)
+    GET /api/v1/partners/snapshots/
+
+  PATIENT:
+    GET  /api/v1/partners/my-enrollments/
+    POST /api/v1/partners/my-enrollments/<id>/consent/
+
+TASKS
+  compute_partner_snapshots()  — semanal (lunes); calcula métricas
+    agregadas por organización. Usa calculate_adherence() de M10 y
+    VitalSign aggregates. Respeta mínimo de cohort.
+
+NOTIFICATION ADDED (M07)
+  PARTNER_ENROLLED — push al paciente cuando lo inscriben
+
+ADMIN FEATURES
+  - Acción de inscripción validada contra max_members.
+  - PartnerAdmin inline en OrganizationAdmin.
+  - MemberEnrollment inline con nombre real (solo visible para ADMIN).
+  - Para PARTNER role, patient_name se anonimiza como "Miembro #XXXX".
+
+FILES CREATED
+  apps/partners/__init__.py, apps.py, models.py, serializers.py
+  views.py, urls.py, admin.py, tasks.py
+  tests/__init__.py, tests/test_partners.py  (10 tests)
+
+TODO
+  [ ] Exportación CSV de snapshot para el partner (Excel-friendly)
+  [ ] Alertas automáticas si avg_adherence_pct < 60%
+  [ ] Integración con Stripe: facturación mensual por seats usados
+  [ ] Página de landing pública del programa para empleados

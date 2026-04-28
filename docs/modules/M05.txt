@@ -1,0 +1,146 @@
+================================================================================
+MÓDULO: M05 — Lab Results
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-22
+SPRINT: 2
+ESTADO: EN DESARROLLO
+DEPENDE DE: M01, M02
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo de resultados de laboratorio clínico. Permite al paciente registrar los
+valores de sus análisis de laboratorio (sangre, orina, hormonas, etc.) de forma
+individual o como panel completo. Cada parámetro se guarda por separado para
+permitir guardado parcial. Incluye rangos de referencia, marcado automático de
+valores anormales, recomendaciones de estilo de vida basadas en los resultados,
+y un placeholder para OCR de PDF/imagen de laboratorio (futura integración).
+
+--------------------------------------------------------------------------------
+FILOSOFÍA DE DISEÑO
+--------------------------------------------------------------------------------
+- GUARDADO INDIVIDUAL: cada LabResult es un registro independiente; el paciente
+  puede guardar solo triglicéridos hoy y hemoglobina la semana que viene.
+- PANEL OPCIONAL: los resultados pueden agruparse en un LabPanel (visita al lab)
+  o existir sin panel (entrada rápida).
+- RETROALIMENTACIÓN: recomendaciones basadas en valores anormales, generadas por
+  reglas fijas o futuro LLM (M09 Analytics / IA).
+- OCR PLACEHOLDER: endpoint /scan/ recibe PDF o imagen; en producción delegará
+  al pipeline de visión de M10 Integrations.
+
+--------------------------------------------------------------------------------
+PARÁMETROS CUBIERTOS (no exhaustivo)
+--------------------------------------------------------------------------------
+Hematología:
+  Hemoglobina, Hematocrito, Eritrocitos, Leucocitos, Plaquetas,
+  Neutrófilos, Linfocitos, VCM, HCM, CHCM
+
+Química sanguínea:
+  Glucosa en ayuno, Glucosa postprandial, HbA1c,
+  Colesterol total, HDL, LDL, VLDL, Triglicéridos,
+  Creatinina, Urea, BUN, Ácido úrico,
+  ALT/TGP, AST/TGO, Bilirrubina total/directa/indirecta,
+  Fosfatasa alcalina, GGT, Proteínas totales, Albúmina,
+  Sodio, Potasio, Cloro, Calcio, Magnesio, Fósforo,
+  TSH, T3 libre, T4 libre
+
+Orina:
+  pH, Densidad, Proteínas, Glucosa, Cetonas, Hemoglobina, Nitritos
+
+--------------------------------------------------------------------------------
+MODELOS (apps/lab_results/models.py)
+--------------------------------------------------------------------------------
+LabPanel     → agrupación opcional (visita al laboratorio)
+LabResult    → resultado individual; puede existir sin panel
+LabRec       → recomendación generada por resultado anormal
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+apps/lab_results/
+├── __init__.py
+├── apps.py
+├── models.py
+├── serializers.py
+├── views.py
+├── urls.py
+├── admin.py
+├── recommendations.py  ← reglas de retroalimentación por parámetro
+├── tasks.py            ← Celery: generate_lab_recommendations
+└── tests/
+    ├── __init__.py
+    └── test_lab_results.py
+
+config/settings/base.py   MODIFICADO — añade apps.lab_results
+config/urls.py            MODIFICADO — incluye lab_results urls
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+Paneles:
+  GET    /api/v1/labs/                            → listar paneles
+  POST   /api/v1/labs/                            → crear panel
+  GET    /api/v1/labs/{id}/                       → detalle panel + resultados
+  PATCH  /api/v1/labs/{id}/                       → actualizar panel
+  DELETE /api/v1/labs/{id}/                       → eliminar panel y resultados
+
+Resultados individuales (dentro o sin panel):
+  POST   /api/v1/labs/results/                    → entrada rápida (sin panel)
+  GET    /api/v1/labs/results/                    → todos los resultados (?param=&from=&to=)
+  PATCH  /api/v1/labs/results/{id}/               → actualizar resultado
+  DELETE /api/v1/labs/results/{id}/               → eliminar resultado
+  POST   /api/v1/labs/{id}/results/               → añadir resultado a panel existente
+
+Vistas útiles:
+  GET    /api/v1/labs/summary/                    → último valor por parámetro
+  GET    /api/v1/labs/abnormal/                   → solo resultados anormales
+
+OCR (placeholder):
+  POST   /api/v1/labs/scan/                       → sube PDF/imagen → retorna valores detectados
+
+Doctor:
+  GET    /api/v1/labs/patient/{patient_id}/       → paneles del paciente
+  GET    /api/v1/labs/patient/{patient_id}/summary/ → resumen por parámetro
+
+--------------------------------------------------------------------------------
+TAREAS CELERY
+--------------------------------------------------------------------------------
+generate_lab_recommendations(result_id)  → genera recomendaciones al guardar resultado anormal
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. LabResult puede existir SIN panel — guardado individual siempre permitido.
+2. Los parámetros son texto libre + código estandarizado opcional (no enum).
+3. Los rangos de referencia (ref_min, ref_max) se guardan con cada resultado
+   (vienen del laboratorio) y pueden diferir por edad/sexo.
+4. El status NORMAL/ABNORMAL_LOW/ABNORMAL_HIGH/CRITICAL se calcula automáticamente
+   si existen ref_min/ref_max, o puede setearse manualmente.
+5. Las recomendaciones son basadas en reglas fijas (recommendations.py) —
+   futuro: LLM con M09 Analytics para pacientes PLATINUM.
+6. El OCR endpoint es un stub — en producción se integrará con visión (M10).
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-22 | CREACIÓN INICIAL
+           | - Modelos: LabPanel, LabResult, LabRec
+           | - CRUD completo con guardado individual
+           | - Cálculo automático de status por rangos
+           | - Recomendaciones por parámetros comunes
+           | - Celery: generación asíncrona de recomendaciones
+           | - Vista resumen: último valor por parámetro
+           | - OCR endpoint placeholder
+           | - Tests: CRUD, guardado individual, recomendaciones, resumen
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] OCR real con visión (M10 Integrations / Anthropic Vision para PLATINUM)
+[ ] Recomendaciones LLM para planes GOLD/PLATINUM (M09 Analytics)
+[ ] Gráficas de tendencia por parámetro integradas con M08 Dashboard
+[ ] Rangos de referencia dinámicos por edad/sexo del paciente
+
+================================================================================

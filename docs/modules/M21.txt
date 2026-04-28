@@ -1,0 +1,154 @@
+══════════════════════════════════════════════════════════════════
+M21 — WELLNESS (Bienestar mental y físico)
+MailyT-Cuida Backend · Django 5 / DRF
+══════════════════════════════════════════════════════════════════
+
+PROPÓSITO
+─────────
+Programas de bienestar estructurados (meditación, ejercicio, sueño,
+manejo del estrés). Registro diario de ánimo y sueño. Check-in diario
+automático que agrega ambos. Seguimiento del progreso por actividad
+con integración con el motor de gamificación.
+
+MODELOS
+───────
+ProgramCategory (TextChoices)
+  MENTAL_HEALTH | STRESS | SLEEP | EXERCISE | MINDFULNESS | CHRONIC | CUSTOM
+
+ActivityType (TextChoices)
+  VIDEO | AUDIO | ARTICLE | EXERCISE | BREATHING | JOURNALING | QUIZ
+
+MoodLabel (TextChoices)
+  EXCELLENT | GOOD | NEUTRAL | LOW | ANXIOUS | STRESSED | SAD | ANGRY
+
+SleepQuality (TextChoices)
+  GREAT | GOOD | FAIR | POOR | INSOMNIA
+
+WellnessProgram
+  id · title · description · category · duration_days · thumbnail_url
+  created_by (FK SET_NULL) · is_active · created_at
+
+WellnessActivity  (nested en programa)
+  id · program (FK CASCADE) · order · day_number
+  title · activity_type · content_url · body
+  duration_min · points_reward
+  ordering: [day_number, order]
+
+ProgramEnrollment
+  id · program (FK) · patient (FK PatientProfile) · enrolled_by (FK SET_NULL)
+  status: ACTIVE | PAUSED | COMPLETED | ABANDONED
+  start_date · completed_at · created_at
+  unique_together: (program, patient)
+
+ActivityCompletion  (inmutable — no delete)
+  id · enrollment (FK) · activity (FK)
+  completed_at (auto) · note
+  unique_together: (enrollment, activity)
+
+MoodEntry
+  id · patient (FK) · logged_at · score (1-10) · label · tags (JSON list) · note · created_at
+  Index: [patient, -logged_at]
+
+SleepEntry
+  id · patient (FK) · sleep_date · bedtime · wake_time
+  duration_hours · quality · interruptions · note · created_at
+  unique_together: (patient, sleep_date)
+
+DailyCheckin  (calculado automáticamente, no ingresado directamente)
+  id · patient (FK) · date
+  mood_score · mood_label · sleep_hours · sleep_quality
+  activities_completed · updated_at (auto_now)
+  unique_together: (patient, date)
+
+ENDPOINTS
+─────────
+GET    /api/v1/wellness/programs/                  Listar programas activos
+POST   /api/v1/wellness/programs/                  Crear programa (staff)
+GET    /api/v1/wellness/programs/<uuid>/            Detalle
+PATCH  /api/v1/wellness/programs/<uuid>/            Editar (staff)
+DELETE /api/v1/wellness/programs/<uuid>/            Soft-delete (staff)
+
+GET    /api/v1/wellness/programs/<uuid>/activities/          Listar actividades
+POST   /api/v1/wellness/programs/<uuid>/activities/          Agregar (staff)
+GET    /api/v1/wellness/programs/<uuid>/activities/<uuid>/   Detalle
+PATCH  /api/v1/wellness/programs/<uuid>/activities/<uuid>/   Editar (staff)
+DELETE /api/v1/wellness/programs/<uuid>/activities/<uuid>/   Borrar (staff)
+
+GET    /api/v1/wellness/enrollments/               Mis inscripciones / todas (staff)
+POST   /api/v1/wellness/enrollments/               Inscribir paciente (staff)
+GET    /api/v1/wellness/enrollments/<uuid>/         Detalle + progreso
+PATCH  /api/v1/wellness/enrollments/<uuid>/         Cambiar status (staff)
+POST   /api/v1/wellness/enrollments/<uuid>/complete-activity/
+       Body: { "activity": "<uuid>", "note": "..." }
+       → marca actividad como completada, otorga puntos, verifica programa completo
+
+GET    /api/v1/wellness/mood/                      Mis entradas de ánimo
+POST   /api/v1/wellness/mood/                      Registrar ánimo
+GET    /api/v1/wellness/mood/<uuid>/               Detalle
+PATCH  /api/v1/wellness/mood/<uuid>/               Editar (propia)
+DELETE /api/v1/wellness/mood/<uuid>/               Borrar (propia)
+
+GET    /api/v1/wellness/sleep/                     Mis registros de sueño
+POST   /api/v1/wellness/sleep/                     Registrar sueño
+GET    /api/v1/wellness/sleep/<uuid>/              Detalle
+PATCH  /api/v1/wellness/sleep/<uuid>/              Editar (propia)
+DELETE /api/v1/wellness/sleep/<uuid>/              Borrar (propia)
+
+GET    /api/v1/wellness/checkins/                  Mis check-ins (?patient= para staff)
+GET    /api/v1/wellness/checkins/<uuid>/            Detalle de check-in
+
+SERVICES (apps/wellness/services.py)
+────────────────────────────────────
+upsert_daily_checkin(patient, entry_date)
+  Llamado automáticamente al crear MoodEntry o SleepEntry.
+  Hace update_or_create en DailyCheckin con los datos más recientes del día.
+
+complete_activity(enrollment, activity, note='')
+  Idempotente — si ya existe ActivityCompletion la devuelve tal cual.
+  Si es nuevo:
+    1. Crea ActivityCompletion.
+    2. Llama award_points() si activity.points_reward > 0.
+    3. Si todas las actividades del programa están done → marca enrollment COMPLETED.
+    4. Notifica paciente WELLNESS_PROGRAM_COMPLETED.
+    5. Llama upsert_daily_checkin.
+
+GAMIFICACIÓN
+────────────
+Cada WellnessActivity tiene `points_reward`. Al marcarla completa,
+complete_activity() llama award_points() con MANUAL_ADJUSTMENT source
+y la recompensa definida en la actividad.
+
+VALIDACIONES
+────────────
+MoodEntry.score → 1-10 (ValidationError si fuera de rango)
+SleepEntry.duration_hours → 0 < x ≤ 24
+SleepEntry → unique_together (patient, sleep_date): un registro por noche
+ProgramEnrollment → unique_together (program, patient): una inscripción activa
+
+NOTIFICACIONES
+──────────────
+WELLNESS_PROGRAM_ENROLLED  → al inscribir paciente
+WELLNESS_PROGRAM_COMPLETED → al completar todas las actividades del programa
+
+FILTROS
+───────
+GET /mood/?patient=<uuid>       (staff)
+GET /sleep/?patient=<uuid>      (staff)
+GET /checkins/?patient=<uuid>   (staff)
+
+ARCHIVOS
+────────
+apps/wellness/models.py
+apps/wellness/serializers.py
+apps/wellness/views.py
+apps/wellness/urls.py
+apps/wellness/admin.py
+apps/wellness/services.py
+apps/wellness/tests/test_wellness.py
+
+SETTINGS / URLS WIRED
+─────────────────────
+LOCAL_APPS  → 'apps.wellness'
+urls.py     → path('api/v1/wellness/', include('apps.wellness.urls'))
+Notification codes añadidos: WELLNESS_PROGRAM_ENROLLED, WELLNESS_PROGRAM_COMPLETED
+══════════════════════════════════════════════════════════════════

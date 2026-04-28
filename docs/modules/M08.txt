@@ -1,0 +1,113 @@
+================================================================================
+MÓDULO: M08 — Chat
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-22
+SPRINT: 3
+ESTADO: EN DESARROLLO
+DEPENDE DE: M01, M02, M07
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Mensajería en tiempo real entre doctor y paciente usando Django Channels
+(WebSocket) con Redis como channel layer. REST endpoints para historial y
+fallback HTTP. Solo pueden conversar doctor y paciente que tengan una relación
+activa en DoctorPatient. Integrado con M07 para notificar push al destinatario.
+
+--------------------------------------------------------------------------------
+MODELOS (apps/chat/models.py)
+--------------------------------------------------------------------------------
+Conversation  → canal 1:1 entre doctor y paciente (unique por par)
+Message       → mensaje dentro de una conversación
+
+Tipos de mensaje (MessageType):
+  TEXT   → texto plano
+  IMAGE  → imagen (URL en R2/S3)
+  FILE   → archivo adjunto (URL en R2/S3)
+
+--------------------------------------------------------------------------------
+WEBSOCKET
+--------------------------------------------------------------------------------
+URL de conexión: ws://<host>/ws/chat/<conversation_id>/
+Autenticación:   token Clerk en query param → ?token=<jwt>
+Room group:      chat_<conversation_id>
+
+Eventos entrantes (cliente → servidor):
+  { "type": "message", "text": "..." }
+  { "type": "read" }           → marca mensajes como leídos
+
+Eventos salientes (servidor → cliente):
+  { "type": "message", "message": {...} }
+  { "type": "read",    "reader_id": "..." }
+  { "type": "error",   "detail": "..." }
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+apps/chat/
+├── __init__.py
+├── apps.py
+├── models.py
+├── serializers.py
+├── views.py
+├── urls.py
+├── admin.py
+├── consumers.py        ← ChatConsumer (Django Channels)
+├── routing.py          ← WebSocket URL patterns
+└── tests/
+    ├── __init__.py
+    └── test_chat.py
+
+config/settings/base.py   MODIFICADO — CHANNEL_LAYERS (Redis), añade apps.chat
+config/urls.py            MODIFICADO — incluye chat urls
+config/asgi.py            MODIFICADO — añade WebSocket routing
+
+--------------------------------------------------------------------------------
+ENDPOINTS REST
+--------------------------------------------------------------------------------
+  GET    /api/v1/chat/                            → mis conversaciones
+  POST   /api/v1/chat/                            → iniciar conversación
+  GET    /api/v1/chat/{id}/                       → detalle + últimos mensajes
+  GET    /api/v1/chat/{id}/messages/              → historial paginado
+  POST   /api/v1/chat/{id}/messages/              → enviar mensaje (REST fallback)
+  POST   /api/v1/chat/{id}/read/                  → marcar mensajes como leídos
+  GET    /api/v1/chat/unread-count/               → total mensajes no leídos
+
+--------------------------------------------------------------------------------
+WEBSOCKET
+--------------------------------------------------------------------------------
+  ws://  /ws/chat/{conversation_id}/              → canal en tiempo real
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. Solo doctor y paciente con relación activa (DoctorPatient) pueden chatear.
+2. La conversación es única por par (doctor, patient) — UniqueConstraint.
+3. El WebSocket autentica via JWT Clerk en query param (?token=).
+4. Los mensajes se guardan siempre en DB (REST o WebSocket).
+5. Al recibir mensaje, se envía notificación push (M07) al destinatario
+   si no está conectado al WebSocket.
+6. is_read se marca en bulk al llamar /read/ o al recibir evento "read" por WS.
+7. Archivos (IMAGE/FILE) se suben vía REST a R2/S3 y se pasa la URL al mensaje.
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-22 | CREACIÓN INICIAL
+           | - Modelos: Conversation, Message
+           | - ChatConsumer: connect, disconnect, receive, broadcast
+           | - REST: lista, detalle, historial, envío, mark-read, unread-count
+           | - Integración M07: push al destinatario offline
+           | - Tests: REST CRUD, permisos, WebSocket básico
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Indicador "escribiendo..." (typing indicator via WebSocket)
+[ ] Subida de imágenes/archivos adjuntos directamente por chat
+[ ] Presencia (online/offline) via Redis
+[ ] Vista de conversaciones integrada en M09 Dashboard
+
+================================================================================

@@ -1,0 +1,54 @@
+M17 — Coupons
+=============
+
+PURPOSE
+  Códigos de descuento para planes de suscripción. Creados por ADMIN,
+  validados por el paciente antes de Checkout, registrados en Stripe
+  via stripe_promotion_id.
+
+MODELS
+  Coupon
+    id / code (unique, uppercase) / description
+    discount_type    PERCENT | FIXED
+    discount_value   decimal
+    valid_from / valid_until      ventana de vigencia (nullable = sin límite)
+    max_uses         int (nullable = ilimitado)
+    max_uses_per_user int (default 1)
+    uses_count       int (auto-incrementado — no editable)
+    allowed_plans    JSON ["SILVER","GOLD"] — vacío = todos
+    first_time_only  bool
+    stripe_coupon_id / stripe_promotion_id
+    is_active / created_by FK / created_at
+
+  CouponRedemption  (inmutable)
+    id / coupon FK / user FK
+    discount_type / discount_value (snapshot)
+    stripe_session_id / stripe_subscription_id
+    redeemed_at
+
+SERVICE (service.py)
+  validate_coupon(code, user, plan_tier) → Coupon | raises CouponError
+    Valida: activo, ventana de fechas, exhausto, plan, per-user cap, first_time_only.
+
+  redeem_coupon(coupon, user, stripe_session_id, stripe_subscription_id)
+    Atómico: crea CouponRedemption + incrementa uses_count con F().
+
+ENDPOINTS
+  ADMIN:
+    GET/POST /api/v1/coupons/
+    GET/PATCH /api/v1/coupons/<id>/
+    GET      /api/v1/coupons/<id>/redemptions/
+
+  Patient:
+    POST /api/v1/coupons/validate/         — verifica antes de Checkout, devuelve stripe_promotion_id
+    GET  /api/v1/coupons/my-redemptions/
+
+INTEGRATION WITH M09 (Payments)
+  CheckoutView debe llamar validate_coupon() y pasar el stripe_promotion_id
+  al crear la sesión de Stripe (discounts=[{"promotion_code": id}]).
+  Tras checkout exitoso, llamar redeem_coupon() desde el webhook handler.
+
+FILES CREATED
+  apps/coupons/__init__.py, apps.py, models.py, serializers.py
+  service.py, views.py, urls.py, admin.py
+  tests/__init__.py, tests/test_coupons.py  (11 tests)

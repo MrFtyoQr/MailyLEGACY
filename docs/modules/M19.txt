@@ -1,0 +1,120 @@
+══════════════════════════════════════════════════════════════════
+M19 — SURVEYS (Encuestas de salud)
+MailyT-Cuida Backend · Django 5 / DRF
+══════════════════════════════════════════════════════════════════
+
+PROPÓSITO
+─────────
+Cuestionarios de salud enviados por médicos o administradores
+a pacientes. Soporta seguimiento de síntomas, salud mental,
+estilo de vida, efecto de medicamentos y onboarding.
+
+MODELOS
+───────
+SurveyCategory (TextChoices)
+  SYMPTOM_TRACKING | MENTAL_HEALTH | LIFESTYLE |
+  MEDICATION_EFFECT | POST_APPOINTMENT | ONBOARDING | CUSTOM
+
+QuestionType (TextChoices)
+  TEXT | NUMBER | SCALE | SINGLE_CHOICE | MULTI_CHOICE | BOOLEAN
+
+Survey
+  id (UUID PK) · title · description · category
+  created_by → accounts.User (SET_NULL)
+  estimated_minutes · is_active · created_at
+  ordering: [-created_at]
+
+SurveyQuestion
+  id · survey (FK CASCADE) · order · text · question_type
+  options (JSONField — list, para SINGLE/MULTI_CHOICE)
+  is_required · scale_min_label · scale_max_label
+  ordering: [order]
+
+SurveyAssignment
+  id · survey (FK) · patient (FK PatientProfile)
+  assigned_by (FK User SET_NULL)
+  due_date (Date nullable) · completed · completed_at · created_at
+
+SurveyResponse
+  id · assignment (OneToOne) · submitted_at
+  score (Decimal nullable) · score_label
+  → QuestionAnswer (many)
+
+QuestionAnswer
+  id · response (FK) · question (FK)
+  value (JSONField — str | int | bool | list[str])
+  unique_together: (response, question)
+
+ENDPOINTS
+─────────
+GET    /api/v1/surveys/                        Listar encuestas activas
+POST   /api/v1/surveys/                        Crear encuesta (staff)
+GET    /api/v1/surveys/<uuid>/                 Detalle de encuesta
+PATCH  /api/v1/surveys/<uuid>/                 Editar encuesta (staff)
+DELETE /api/v1/surveys/<uuid>/                 Soft-delete → is_active=False (staff)
+
+GET    /api/v1/surveys/<uuid>/questions/       Listar preguntas
+POST   /api/v1/surveys/<uuid>/questions/       Agregar pregunta (staff)
+GET    /api/v1/surveys/<uuid>/questions/<uuid>/ Detalle de pregunta
+PATCH  /api/v1/surveys/<uuid>/questions/<uuid>/ Editar pregunta (staff)
+DELETE /api/v1/surveys/<uuid>/questions/<uuid>/ Borrar pregunta (staff)
+
+GET    /api/v1/surveys/assignments/            Mis asignaciones (paciente) / todas (staff)
+POST   /api/v1/surveys/assignments/            Asignar encuesta a paciente (staff)
+GET    /api/v1/surveys/assignments/<uuid>/     Detalle de asignación
+POST   /api/v1/surveys/assignments/<uuid>/submit/  Enviar respuestas (paciente)
+
+GET    /api/v1/surveys/responses/              Todas las respuestas (staff, filtrable ?survey= ?patient=)
+GET    /api/v1/surveys/responses/<uuid>/       Detalle de respuesta
+
+PERMISOS
+────────
+ADMIN / DOCTOR  → CRUD completo en surveys, questions, assignments.
+                  Lectura de todas las responses.
+PATIENT         → Lectura de sus propias asignaciones.
+                  POST submit/ una sola vez por asignación (409 si ya completó).
+
+VALIDACIONES
+────────────
+SINGLE_CHOICE / MULTI_CHOICE requieren ≥2 opciones en `options`.
+Preguntas is_required=True deben estar presentes en `answers`.
+Un paciente no puede responder otra asignación que no sea suya (404).
+Submit devuelve 409 si assignment.completed=True.
+
+NOTIFICACIONES DISPARADAS
+─────────────────────────
+SURVEY_ASSIGNED   → paciente al asignarle una encuesta
+SURVEY_COMPLETED  → (disponible, se puede disparar desde el staff/dashboard)
+
+FLUJO TÍPICO
+────────────
+1. Admin/doctor crea Survey con título, categoría, tiempo estimado.
+2. Agrega preguntas con tipos y orden definidos.
+3. Crea SurveyAssignment → paciente recibe notificación IN_APP.
+4. Paciente consulta sus assignments pendientes.
+5. Envía respuestas con POST submit/ → answers[] con {question, value}.
+6. Sistema crea SurveyResponse + QuestionAnswer(s), marca assignment.completed=True.
+7. Médico consulta /responses/?patient=<uuid> para ver resultados.
+
+SCORE / LABEL
+─────────────
+Los campos `score` y `score_label` en SurveyResponse están disponibles
+para cálculo automatizado (ej. PHQ-9, GAD-7). El cálculo no está
+incluido por defecto; debe implementarse en un servicio adicional
+que actualice estos campos post-submit.
+
+ARCHIVOS
+────────
+apps/surveys/models.py
+apps/surveys/serializers.py
+apps/surveys/views.py
+apps/surveys/urls.py
+apps/surveys/admin.py
+apps/surveys/tests/test_surveys.py
+
+SETTINGS / URLS WIRED
+─────────────────────
+LOCAL_APPS      → 'apps.surveys'
+urls.py         → path('api/v1/surveys/', include('apps.surveys.urls'))
+Notification codes añadidos: SURVEY_ASSIGNED, SURVEY_COMPLETED
+══════════════════════════════════════════════════════════════════

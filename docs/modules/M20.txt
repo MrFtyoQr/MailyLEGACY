@@ -1,0 +1,126 @@
+══════════════════════════════════════════════════════════════════
+M20 — NUTRITION (Nutrición y diario alimenticio)
+MailyT-Cuida Backend · Django 5 / DRF
+══════════════════════════════════════════════════════════════════
+
+PROPÓSITO
+─────────
+Planes nutricionales creados por staff/nutriólogo y asignados a
+pacientes. Diario alimenticio (food log) con macronutrientes por
+entrada. Resúmenes diarios calculados automáticamente via Celery.
+
+MODELOS
+───────
+MealType (TextChoices)
+  BREAKFAST | MID_MORNING | LUNCH | AFTERNOON | DINNER | SNACK
+
+NutritionGoal (TextChoices)
+  WEIGHT_LOSS | WEIGHT_GAIN | MAINTENANCE | MUSCLE_GAIN |
+  DIABETES_CTRL | HEART_HEALTH | CUSTOM
+
+NutritionPlan
+  id · title · description · goal
+  target_kcal · target_protein_g · target_carbs_g · target_fat_g
+  target_fiber_g · target_sodium_mg
+  duration_days · created_by (FK User SET_NULL)
+  is_active · created_at
+
+MealSlot   (nested en plan)
+  id · plan (FK CASCADE) · meal_type · day_number
+  name · description
+  kcal · protein_g · carbs_g · fat_g · fiber_g
+  ordering: [day_number, meal_type]
+
+NutritionPlanAssignment
+  id · plan (FK) · patient (FK PatientProfile)
+  assigned_by (FK User SET_NULL)
+  start_date · end_date (nullable) · is_active · notes · created_at
+
+FoodEntry  (diario del paciente)
+  id · patient (FK) · logged_at · meal_type · meal_slot (FK SET_NULL)
+  food_name · quantity_g
+  kcal · protein_g · carbs_g · fat_g · fiber_g · sodium_mg
+  note · created_at
+  Index: [patient, -logged_at]
+
+DailyNutritionSummary  (calculado, no ingresado por usuario)
+  id · patient (FK) · date (único por paciente+día)
+  total_kcal · total_protein_g · total_carbs_g · total_fat_g
+  total_fiber_g · total_sodium_mg · entry_count
+  plan_assignment (FK SET_NULL) · kcal_target · kcal_pct
+  computed_at (auto_now)
+  unique_together: (patient, date)
+
+ENDPOINTS
+─────────
+GET    /api/v1/nutrition/plans/                   Listar planes
+POST   /api/v1/nutrition/plans/                   Crear plan (staff)
+GET    /api/v1/nutrition/plans/<uuid>/            Detalle de plan
+PATCH  /api/v1/nutrition/plans/<uuid>/            Editar plan (staff)
+DELETE /api/v1/nutrition/plans/<uuid>/            Soft-delete (staff)
+
+GET    /api/v1/nutrition/plans/<uuid>/slots/      Slots del plan
+POST   /api/v1/nutrition/plans/<uuid>/slots/      Agregar slot (staff)
+GET    /api/v1/nutrition/plans/<uuid>/slots/<uuid>/ Detalle slot
+PATCH  /api/v1/nutrition/plans/<uuid>/slots/<uuid>/ Editar slot (staff)
+DELETE /api/v1/nutrition/plans/<uuid>/slots/<uuid>/ Borrar slot (staff)
+
+GET    /api/v1/nutrition/assignments/             Mis asignaciones / todas (staff)
+POST   /api/v1/nutrition/assignments/             Asignar plan (staff)
+GET    /api/v1/nutrition/assignments/<uuid>/      Detalle de asignación
+PATCH  /api/v1/nutrition/assignments/<uuid>/      Editar asignación (staff)
+
+GET    /api/v1/nutrition/entries/                 Diario: mis entradas (?date= ?meal_type=)
+POST   /api/v1/nutrition/entries/                 Registrar alimento
+GET    /api/v1/nutrition/entries/<uuid>/          Detalle entrada
+PATCH  /api/v1/nutrition/entries/<uuid>/          Editar entrada (propia)
+DELETE /api/v1/nutrition/entries/<uuid>/          Borrar entrada (propia)
+
+GET    /api/v1/nutrition/summaries/               Resúmenes diarios (?patient= para staff)
+GET    /api/v1/nutrition/summaries/<uuid>/        Detalle de resumen
+
+POST   /api/v1/nutrition/compute-summary/         Lanzar tarea Celery (staff, body: {date?})
+
+CELERY TASK
+───────────
+compute_daily_nutrition_summary(target_date_str?)
+  - Corre nada tras medianoche (configurar en beat schedule).
+  - Agrupa FoodEntry por paciente en esa fecha.
+  - Calcula totales con Sum() de Django ORM.
+  - Asocia NutritionPlanAssignment activo del día si existe.
+  - Calcula kcal_pct = total / objetivo × 100.
+  - Hace update_or_create en DailyNutritionSummary.
+  - Retry hasta 3 veces con 60s de espera.
+
+PERMISOS
+────────
+ADMIN / DOCTOR  → CRUD planes, slots, assignments. Lectura de entries/summaries de cualquier paciente.
+PATIENT         → Lectura de sus propias asignaciones. CRUD de sus propias FoodEntry. Lectura de sus summaries.
+
+NOTIFICACIONES DISPARADAS
+─────────────────────────
+NUTRITION_PLAN_ASSIGNED → paciente al asignarle un plan
+
+FILTROS DISPONIBLES
+───────────────────
+GET /entries/?date=YYYY-MM-DD       → entradas de ese día
+GET /entries/?meal_type=BREAKFAST   → por tipo de comida
+GET /summaries/?patient=<uuid>      → solo staff
+
+ARCHIVOS
+────────
+apps/nutrition/models.py
+apps/nutrition/serializers.py
+apps/nutrition/views.py
+apps/nutrition/urls.py
+apps/nutrition/admin.py
+apps/nutrition/tasks.py
+apps/nutrition/tests/test_nutrition.py
+
+SETTINGS / URLS WIRED
+─────────────────────
+LOCAL_APPS   → 'apps.nutrition'
+urls.py      → path('api/v1/nutrition/', include('apps.nutrition.urls'))
+Notification code añadido: NUTRITION_PLAN_ASSIGNED
+Beat schedule → añadir: compute_daily_nutrition_summary a las 23:59 diario
+══════════════════════════════════════════════════════════════════

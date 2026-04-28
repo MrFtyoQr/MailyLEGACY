@@ -1,0 +1,120 @@
+M14 — Specialists Marketplace
+==============================
+
+PURPOSE
+  Núcleo del modelo CAMSA: un médico arma su red de especialistas de confianza
+  (cardiólogos, laboratorios, clínicas, farmacias). Sus pacientes ven solo los
+  especialistas que el doctor ha añadido. El doctor refiere pacientes y el
+  sistema rastrea el ciclo de vida del referido (base de la comisión futura).
+
+MODELS
+  SpecialistProfile
+    id                   UUID PK
+    user                 OneToOneField → User (nullable — puede no tener cuenta)
+    specialist_type      DOCTOR | LAB | CLINIC | PHARMACY | OTHER
+    specialty_area       15 opciones (CARDIOLOGY, LABORATORY, IMAGING, etc.)
+    name                 str(255)  — nombre o razón social
+    license_number       str(128, blank)  — cédula / registro sanitario
+    bio / avatar_url / email / phone / address / city / state / website
+    consultation_fee_mxn decimal (nullable)
+    accepts_insurance    bool
+    languages            JSON ["es", "en"]
+    verification_status  PENDING | VERIFIED | REJECTED
+    verified_at          datetime (nullable)
+    verified_by          FK → User (admin que verificó)
+    is_active            bool
+
+  TeamMember
+    id         UUID PK
+    doctor     FK → DoctorProfile
+    specialist FK → SpecialistProfile
+    note       text (nota privada del doctor)
+    is_active  bool (soft remove)
+    added_at   datetime
+    UNIQUE(doctor, specialist)
+
+  ReferralRequest
+    id               UUID PK
+    doctor           FK → DoctorProfile
+    patient          FK → PatientProfile
+    specialist       FK → SpecialistProfile
+    status           PENDING | ACCEPTED | COMPLETED | CANCELLED | REJECTED
+    reason           text (razón clínica)
+    urgency          LOW | MEDIUM | HIGH
+    clinical_notes   text (notas del doctor — requiere patient_consent=True)
+    specialist_notes text (respuesta del especialista)
+    appointment      OneToOneField → Appointment (nullable, creado al aceptar)
+    patient_consent  bool
+    created_at / updated_at / accepted_at / completed_at
+
+  SpecialistReview
+    id         UUID PK
+    referral   OneToOneField → ReferralRequest  (solo referidos COMPLETED)
+    patient    FK → PatientProfile
+    specialist FK → SpecialistProfile
+    rating     1–5
+    comment    text (blank)
+    is_public  bool
+    created_at
+
+ENDPOINTS
+  Navegación (cualquier usuario autenticado):
+    GET  /api/v1/specialists/                     browse verificados (?specialty_area, ?specialist_type, ?city, ?q)
+    GET  /api/v1/specialists/<id>/                detalle + avg_rating + review_count
+    GET  /api/v1/specialists/<id>/reviews/        reseñas públicas
+
+  Doctor:
+    POST /api/v1/specialists/register/            registra nuevo especialista (PENDING)
+    GET  /api/v1/specialists/team/                lista mi equipo
+    POST /api/v1/specialists/team/                añadir especialista al equipo
+    DELETE /api/v1/specialists/team/<id>/         quitar (soft)
+    GET  /api/v1/specialists/referrals/           referidos enviados
+    POST /api/v1/specialists/referrals/           crear referido
+    GET  /api/v1/specialists/referrals/<id>/      detalle
+
+  Especialista (rol SPECIALIST):
+    GET  /api/v1/specialists/referrals/incoming/         referidos recibidos
+    PATCH /api/v1/specialists/referrals/<id>/status/     accept / reject / complete
+
+  Paciente:
+    GET  /api/v1/specialists/referrals/mine/             mis referidos
+    POST /api/v1/specialists/referrals/<id>/consent/     otorgar/revocar consentimiento
+    POST /api/v1/specialists/referrals/<id>/review/      reseña (solo COMPLETED)
+
+REGLAS DE NEGOCIO
+  - Doctor solo puede referir pacientes asignados (DoctorPatient activo).
+  - Doctor solo puede referir a especialistas de su equipo (TeamMember activo).
+  - Notas clínicas requieren patient_consent=True en el mismo request.
+  - Review solo posible si referral.status == COMPLETED; una por referido.
+  - Especialistas sin cuenta de plataforma pueden ser registrados manualmente;
+    cuando se registren, su user se vincula y su perfil se verifica.
+
+VERIFICACIÓN
+  - Nuevos perfiles inician como PENDING.
+  - Admin verifica desde Django Admin (acción masiva "Verificar seleccionados").
+  - Solo perfiles VERIFIED aparecen en el browse público.
+
+NOTIFICACIONES AÑADIDAS (M07)
+  REFERRAL_RECEIVED       — al especialista cuando recibe un referido
+  REFERRAL_STATUS_CHANGED — al doctor cuando el especialista cambia el estado
+
+FUTURO (comisiones)
+  ReferralRequest.status == COMPLETED es el trigger de comisión.
+  Integrar con M09 Payments: crear PaymentIntent al completarse el referido.
+
+FILES CREATED
+  apps/specialists/__init__.py
+  apps/specialists/apps.py
+  apps/specialists/models.py
+  apps/specialists/serializers.py
+  apps/specialists/views.py
+  apps/specialists/urls.py
+  apps/specialists/admin.py        — acción de verificación masiva
+  apps/specialists/tests/__init__.py
+  apps/specialists/tests/test_specialists.py  (16 tests)
+
+TODO
+  [ ] M15 — Gamification (puntos por adherencia, badges)
+  [ ] Comisión automática al completar ReferralRequest
+  [ ] Búsqueda geoespacial por proximidad (PostGIS)
+  [ ] Página pública de perfil de especialista (sin auth)

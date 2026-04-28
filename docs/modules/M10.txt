@@ -1,0 +1,107 @@
+================================================================================
+MÓDULO: M10 — Analytics & Dashboard
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-22
+SPRINT: 4
+ESTADO: EN DESARROLLO
+DEPENDE DE: M02, M03, M04, M05, M06, M09
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo de analítica y dashboard. Agrega datos de salud del paciente para
+presentar un resumen ejecutivo, calcular adherencia a medicamentos y generar
+insights inteligentes usando IA. El modelo de IA varía según el plan del
+paciente (M09 Payments):
+
+  FREE    → OpenAI gpt-4o-mini  (insights básicos)
+  SILVER  → OpenAI gpt-4o       (insights estándar)
+  GOLD    → OpenAI gpt-4o       (insights detallados)
+  PLATINUM→ Claude claude-sonnet-4-6 (análisis clínico avanzado)
+
+--------------------------------------------------------------------------------
+MODELOS (apps/analytics/models.py)
+--------------------------------------------------------------------------------
+AdherenceReport → snapshot semanal/mensual de adherencia por paciente
+HealthInsight   → insight generado por IA, asociado a un paciente
+
+Tipos de Insight (InsightType):
+  MEDICATION_ADHERENCE  → análisis de adherencia a medicamentos
+  VITAL_TREND           → tendencia de signos vitales
+  LAB_ANALYSIS          → análisis de resultados de laboratorio
+  GENERAL_HEALTH        → resumen general de salud
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+apps/analytics/
+├── __init__.py
+├── apps.py
+├── models.py
+├── serializers.py
+├── views.py
+├── urls.py
+├── admin.py
+├── engine.py       ← cálculo de adherencia + construcción de contexto IA
+├── ai_service.py   ← llamadas a OpenAI / Claude según plan
+├── tasks.py        ← generate_weekly_adherence_report, generate_patient_insights
+└── tests/
+    ├── __init__.py
+    └── test_analytics.py
+
+config/settings/base.py   MODIFICADO — OPENAI_API_KEY, ANTHROPIC_API_KEY
+config/urls.py            MODIFICADO — incluye analytics urls
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+Paciente:
+  GET  /api/v1/analytics/dashboard/          → resumen ejecutivo del paciente
+  GET  /api/v1/analytics/adherence/          → adherencia (?days=7|30|90)
+  GET  /api/v1/analytics/insights/           → insights generados
+  POST /api/v1/analytics/insights/generate/  → solicitar nuevo insight
+
+Doctor:
+  GET  /api/v1/analytics/patient/{id}/dashboard/  → dashboard del paciente
+
+--------------------------------------------------------------------------------
+TAREAS CELERY
+--------------------------------------------------------------------------------
+generate_weekly_adherence_report(patient_id)  → cada lunes, snapshot de la semana
+generate_patient_insights(patient_id)         → semanal, genera insights con IA
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. AdherenceReport es un snapshot periódico — no se recalcula en tiempo real.
+2. HealthInsight tiene TTL implícito: se genera uno nuevo por semana; los viejos
+   quedan en historial.
+3. El dashboard GET es síncrono y agrega datos en memoria (sin modelo extra).
+4. La IA recibe contexto anonimizado: sin nombres, solo métricas numéricas.
+5. Los costos de IA solo aplican a usuarios con plan activo SILVER+; FREE recibe
+   insights simplificados sin llamada externa.
+6. Prompt caching activado para Claude (Anthropic SDK) para reducir costos en
+   consultas frecuentes.
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-22 | CREACIÓN INICIAL
+           | - Modelos: AdherenceReport, HealthInsight
+           | - engine.py: calculate_adherence, build_health_context
+           | - ai_service.py: get_insight (OpenAI/Claude routing por plan)
+           | - Dashboard endpoint: vitales recientes, adherencia, próxima cita
+           | - Celery: snapshots semanales e insights automáticos
+           | - Tests: adherencia, dashboard, routing IA por plan
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Vistas materializadas TimescaleDB para adherencia (producción)
+[ ] Exportación PDF del resumen de salud (M11 Documents)
+[ ] Gráficas históricas de vitales y adherencia (frontend)
+[ ] Alertas proactivas si la IA detecta patrón preocupante
+
+================================================================================

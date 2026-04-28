@@ -1,0 +1,109 @@
+================================================================================
+MÓDULO: M06 — Appointments
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-22
+SPRINT: 3
+ESTADO: EN DESARROLLO
+DEPENDE DE: M01, M02
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo de citas médicas. Gestiona el ciclo completo de una cita entre paciente
+y doctor (o especialista): solicitud, confirmación, reagendado, cancelación y
+registro de notas clínicas post-consulta. El video se maneja con un enlace
+externo (Zoom/Google Meet) — sin integración Twilio.
+
+--------------------------------------------------------------------------------
+MODELOS (apps/appointments/models.py)
+--------------------------------------------------------------------------------
+Appointment      → cita médica (presencial o videoconsulta)
+AppointmentNote  → notas clínicas del doctor post-consulta (1:1)
+
+Tipos de cita (AppointmentType):
+  IN_PERSON  → presencial
+  VIDEO      → videoconsulta (link externo Zoom/Meet)
+
+Estados (Status):
+  PENDING     → solicitada por el paciente, pendiente de confirmación
+  CONFIRMED   → confirmada por el doctor
+  COMPLETED   → completada
+  CANCELLED   → cancelada (por paciente o doctor)
+  NO_SHOW     → paciente no se presentó
+  RESCHEDULED → reagendada (crea nueva cita, esta queda como RESCHEDULED)
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+apps/appointments/
+├── __init__.py
+├── apps.py
+├── models.py
+├── serializers.py
+├── views.py
+├── urls.py
+├── admin.py
+├── tasks.py              ← recordatorios 24h y 1h antes, detección NO_SHOW
+└── tests/
+    ├── __init__.py
+    └── test_appointments.py
+
+config/settings/base.py   MODIFICADO — añade apps.appointments
+config/urls.py            MODIFICADO — incluye appointments urls
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+Paciente:
+  GET    /api/v1/appointments/                        → mis citas (?status=&from=&to=)
+  POST   /api/v1/appointments/                        → solicitar cita
+  GET    /api/v1/appointments/{id}/                   → detalle
+  POST   /api/v1/appointments/{id}/cancel/            → cancelar cita
+
+Doctor:
+  GET    /api/v1/appointments/doctor/                 → citas del doctor (?status=&from=&to=)
+  POST   /api/v1/appointments/{id}/confirm/           → confirmar cita
+  POST   /api/v1/appointments/{id}/complete/          → marcar completada
+  PATCH  /api/v1/appointments/{id}/reschedule/        → reagendar (nueva scheduled_at + link)
+  GET    /api/v1/appointments/{id}/notes/             → ver notas clínicas
+  POST   /api/v1/appointments/{id}/notes/             → crear/actualizar notas clínicas
+
+--------------------------------------------------------------------------------
+TAREAS CELERY
+--------------------------------------------------------------------------------
+send_appointment_reminder(appt_id, hours_before)  → push/email 24h y 1h antes
+check_missed_appointments()                        → cada hora, marca NO_SHOW si ya pasó
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. Video = URL externa (Zoom/Meet). El doctor pega el link al confirmar.
+2. No hay Twilio; el video lo gestiona el doctor fuera de la plataforma.
+3. Reagendar crea una nueva Appointment y pone la actual en RESCHEDULED.
+4. Las notas clínicas (AppointmentNote) las escribe solo el doctor; son
+   visibles para el paciente como resumen, pero editables solo por el doctor.
+5. cancelled_by registra quién canceló (paciente o doctor) para estadísticas.
+6. NO_SHOW se detecta automáticamente por Celery si pasan 30 min desde
+   scheduled_at sin que el doctor marque COMPLETED o CANCELLED.
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-22 | CREACIÓN INICIAL
+           | - Modelos: Appointment, AppointmentNote
+           | - Flujo completo: solicitar → confirmar → completar / cancelar
+           | - Reagendado con nueva cita
+           | - Notas clínicas del doctor
+           | - Tareas Celery: recordatorios y detección de NO_SHOW
+           | - Tests: flujo completo, permisos, notas, NO_SHOW
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Disponibilidad del doctor (slots) — requiere calendario (M07 o extensión M06)
+[ ] Integración con M08 Dashboard para vista de agenda del doctor
+[ ] Notificaciones push via M11 cuando la cita es confirmada/cancelada
+
+================================================================================

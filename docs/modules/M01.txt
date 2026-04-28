@@ -1,0 +1,101 @@
+================================================================================
+MÓDULO: M01 — Auth & Security
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-04-21
+SPRINT: 1
+ESTADO: EN DESARROLLO
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo de autenticación y seguridad. Maneja identidad de usuarios via Clerk,
+sincronización local en PostgreSQL, control de roles, protección brute force,
+recuperación de contraseña y auditoría de accesos.
+
+--------------------------------------------------------------------------------
+STACK DEL MÓDULO
+--------------------------------------------------------------------------------
+- Clerk (JWT, MFA, Google Sign-In, recuperación contraseña)
+- Django REST Framework (endpoints de sincronización y perfil)
+- clerk-backend-api (Python SDK para verificación JWKS)
+- django-ratelimit (segunda capa anti brute force)
+- Sentry SDK (logging de errores de auth)
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS
+--------------------------------------------------------------------------------
+mailytcuida_backend/
+├── apps/accounts/
+│   ├── __init__.py
+│   ├── apps.py
+│   ├── models.py                   # User, PatientProfile, DoctorProfile, DoctorPatient
+│   ├── serializers.py              # UserSerializer, ProfileSerializer
+│   ├── views.py                    # WebhookView, ProfileView, MeView
+│   ├── urls.py                     # /api/v1/auth/...
+│   ├── admin.py
+│   ├── permissions.py              # IsDoctor, IsPatient, IsAdmin, IsSpecialist, IsPartner
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   └── clerk_auth.py           # Verifica JWT Clerk en cada request
+│   ├── webhooks/
+│   │   ├── __init__.py
+│   │   └── clerk_webhooks.py       # Sync user.created / user.updated / user.deleted
+│   └── tests/
+│       ├── __init__.py
+│       ├── test_auth.py
+│       └── test_brute_force.py
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. Clerk maneja: registro, login, MFA, Google Sign-In, recuperación de contraseña.
+2. Django solo almacena clerk_id como FK — datos médicos NUNCA tocan Clerk.
+3. Roles asignados en publicMetadata de Clerk al crear usuario vía webhook.
+4. Rate limiting: 5 intentos fallidos por IP en 15 min (django-ratelimit).
+5. JWT: 15 min access token / 7 días refresh (configurado en Clerk dashboard).
+6. Roles soportados: PATIENT | DOCTOR | SPECIALIST | PARTNER | ADMIN.
+7. Cada login/logout queda registrado en audit_logs_event.
+
+--------------------------------------------------------------------------------
+ENDPOINTS EXPUESTOS
+--------------------------------------------------------------------------------
+POST  /api/v1/auth/webhook/clerk/       → recibe eventos de Clerk (svix signature)
+GET   /api/v1/auth/me/                  → perfil del usuario autenticado
+PATCH /api/v1/auth/me/                  → actualizar datos básicos de perfil
+GET   /api/v1/auth/me/role/             → rol actual + permisos
+
+--------------------------------------------------------------------------------
+SEGURIDADES IMPLEMENTADAS
+--------------------------------------------------------------------------------
+[x] JWT verification via Clerk JWKS
+[x] Brute force: django-ratelimit (5/15min por IP)
+[x] CORS configurado (solo origins permitidos)
+[x] Webhook signature verification (Svix)
+[x] Sentry: before_send sanitiza PII antes de enviar
+[x] Roles en JWT claim verificados en cada request
+[x] IP logging en audit_logs_event
+[x] HTTPS only (forzado en Nginx config)
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-04-21 | CREACIÓN INICIAL
+           | - Estructura base del módulo definida
+           | - Modelos: User, PatientProfile, DoctorProfile, DoctorPatient
+           | - Middleware ClerkAuthMiddleware implementado
+           | - Webhooks de Clerk: user.created, user.updated, user.deleted
+           | - Permisos por rol: IsDoctor, IsPatient, IsAdmin, IsSpecialist, IsPartner
+           | - Rate limiting configurado (django-ratelimit)
+           | - Tests iniciales: autenticación y brute force
+           | - Requirements base.txt / development.txt / production.txt
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Integrar audit_logs_event cuando M10 esté listo
+[ ] Endpoint de listado de sesiones activas (Clerk Sessions API)
+[ ] Tests de integración con Clerk sandbox
+
+================================================================================
