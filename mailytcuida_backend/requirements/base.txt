@@ -14,6 +14,7 @@ requests==2.32.3
 # Rate limiting / Security
 django-ratelimit==4.1.0
 django-axes==7.0.1
+bleach==6.1.0
 
 # Database
 psycopg2-binary==2.9.10

@@ -27,7 +27,12 @@ def dispatch_notification(self, notification_id: str):
         success = False
 
         if notif.channel == Notification.Channel.PUSH:
-            success = send_push(notif.user, notif.title, notif.body, notif.data)
+            success = send_push(
+                notif.user, notif.title, notif.body, notif.data,
+                notification_id=str(notif.pk),
+                code=notif.code,
+                created_at=notif.created_at.isoformat(),
+            )
 
         elif notif.channel == Notification.Channel.EMAIL:
             success = send_email(notif.user, notif.title, notif.body)

@@ -1,9 +1,13 @@
 import json
 import logging
+import re
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 
 logger = logging.getLogger(__name__)
+
+MAX_MESSAGE_LENGTH = 5_000
+_NULL_BYTES = re.compile(r'\x00')
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -62,6 +66,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         text = data.get('text', '').strip()
         if not text:
             await self._send_error('El texto no puede estar vacío.')
+            return
+
+        # Strip null bytes
+        text = _NULL_BYTES.sub('', text)
+
+        # Enforce max length
+        if len(text) > MAX_MESSAGE_LENGTH:
+            await self._send_error(f'El mensaje excede el límite de {MAX_MESSAGE_LENGTH} caracteres.')
+            await self.close(code=4400)
             return
 
         msg = await self._save_message(text)

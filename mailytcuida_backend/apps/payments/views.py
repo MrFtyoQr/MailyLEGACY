@@ -6,10 +6,21 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
+from core.throttles import WebhookThrottle, CheckoutThrottle
 from .models import Plan, Subscription, PaymentEvent
 from .serializers import PlanSerializer, SubscriptionSerializer, CheckoutSerializer, PortalSerializer
 
 logger = logging.getLogger(__name__)
+
+_STRIPE_UNAVAILABLE = Response(
+    {'detail': 'El módulo de pagos no está habilitado en este ambiente.'},
+    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+)
+
+
+def _stripe_active() -> bool:
+    key = getattr(settings, 'STRIPE_SECRET_KEY', '')
+    return bool(key)
 
 
 # ── Plans ─────────────────────────────────────────────────────────────────────
@@ -43,8 +54,11 @@ class SubscriptionView(APIView):
 
 class CheckoutView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [CheckoutThrottle]
 
     def post(self, request):
+        if not _stripe_active():
+            return _STRIPE_UNAVAILABLE
         serializer = CheckoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         d = serializer.validated_data
@@ -84,8 +98,11 @@ class CheckoutView(APIView):
 
 class PortalView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [CheckoutThrottle]
 
     def post(self, request):
+        if not _stripe_active():
+            return _STRIPE_UNAVAILABLE
         serializer = PortalSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -122,6 +139,8 @@ class CancelView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        if not _stripe_active():
+            return _STRIPE_UNAVAILABLE
         try:
             sub = request.user.subscription
         except Subscription.DoesNotExist:
@@ -150,6 +169,7 @@ class CancelView(APIView):
 class StripeWebhookView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []  # No Clerk auth — Stripe signs these
+    throttle_classes = [WebhookThrottle]
 
     def post(self, request):
         payload    = request.body

@@ -1,0 +1,202 @@
+══════════════════════════════════════════════════════════════════
+M22 — FAMILY CARE (Cuidado familiar y monitoreo remoto)
+MailyT-Cuida Backend · Django 5 / DRF
+══════════════════════════════════════════════════════════════════
+
+PROPÓSITO
+─────────
+Permite que un cuidador (familiar) solicite acceso a los datos de salud
+de un paciente con su consentimiento explícito. El cuidador puede ver
+vitales, medicamentos y citas; configurar alertas de monitoreo por tipo
+de vital; recibir alertas automáticas cuando un vital está fuera de
+rango o no se ha registrado a tiempo; despachar al doctor asignado del
+paciente; y registrar pagos de medicamentos a nombre del familiar.
+
+El módulo implementa el modelo CAMSA (Caregiver-Assisted Medical
+Support Architecture): el cuidador actúa como intermediario, no como
+actor médico independiente.
+
+MODELOS
+───────
+FamilyCareLink
+  id · caregiver (FK User CASCADE) · patient (FK User CASCADE)
+  relationship_type: PARENT | CHILD | SPOUSE | SIBLING | OTHER
+  status: PENDING_CONSENT | ACTIVE | REVOKED  (db_index)
+  permissions (JSONField — claves de acceso granular)
+  requested_at · consent_at · revoked_at
+  unique_together: (caregiver, patient)
+  NOTA: ambos FK apuntan a User (no PatientProfile).
+        Para acceder a vitales/meds: patient__patient_profile o patient__user.
+
+VitalMonitorConfig
+  id · care_link (FK CASCADE) · vital_type (CharField max_length=20)
+  reminder_frequency_hours (PositiveIntegerField, default=24)
+  last_patient_reading_at · last_reminder_sent_at
+  is_active · created_at · updated_at
+  unique_together: (care_link, vital_type)
+
+CareAlert
+  id · care_link (FK CASCADE)
+  alert_type: VITAL_ABNORMAL | VITAL_OVERDUE | MEDICATION_MISSED  (db_index)
+  vital_sign (FK vitals.VitalSign SET_NULL nullable)
+  vital_type (CharField backup del tipo)
+  medication_history (FK medications.MedicationHistory SET_NULL nullable)
+  severity: LOW | MEDIUM | HIGH | CRITICAL  (db_index)
+  status: OPEN | DISPATCHED_DOCTOR | DISMISSED  (db_index)
+  dismissed_by (FK accounts.User SET_NULL nullable)
+  appointment (FK appointments.Appointment SET_NULL nullable)
+  notes · created_at · resolved_at
+  ordering: [-created_at]
+
+MedicationPayment
+  id · care_link (FK CASCADE)
+  prescription (FK prescriptions.Prescription SET_NULL nullable)
+  medication (FK medications.Medication SET_NULL nullable)
+  description · amount_mxn (DecimalField 10,2)
+  stripe_payment_intent_id · status: PENDING | PAID | FAILED | REFUNDED  (db_index)
+  paid_at · created_at
+  ordering: [-created_at]
+
+ENDPOINTS
+─────────
+── Gestión del vínculo ──────────────────────────────────────────
+GET    /api/v1/family-care/links/
+       Cuidador: sus propios vínculos.
+       Paciente: vínculos donde es el paciente.
+
+POST   /api/v1/family-care/links/
+       Cuidador solicita vincularse. Body: { patient_email, relationship_type }
+       Crea FamilyCareLink con status=PENDING_CONSENT.
+       Notifica al paciente: FAMILY_CARE_REQUEST.
+
+POST   /api/v1/family-care/links/<uuid>/accept/
+       PACIENTE acepta la solicitud → status=ACTIVE, consent_at=now().
+       Notifica al cuidador.
+
+POST   /api/v1/family-care/links/<uuid>/revoke/
+       PACIENTE o CAREGIVER revoca el vínculo → status=REVOKED, revoked_at=now().
+
+── Datos del paciente (solo si link ACTIVE) ─────────────────────
+GET    /api/v1/family-care/links/<uuid>/vitals/
+       Lista de vitales del paciente. Parámetros: ?vital_type=&days=30
+
+GET    /api/v1/family-care/links/<uuid>/vitals/frequency/
+       Resumen de frecuencia de lecturas por tipo de vital (últimos 30 días).
+       Incluye conteo, primera y última lectura, VitalMonitorConfig si existe.
+
+GET    /api/v1/family-care/links/<uuid>/medications/
+       Medicamentos activos del paciente + adherencia de 7 días.
+
+GET    /api/v1/family-care/links/<uuid>/appointments/
+       Próximas citas del paciente (desde hoy). Incluye nota clínica si existe.
+
+── Configuración de monitoreo ───────────────────────────────────
+GET    /api/v1/family-care/links/<uuid>/monitor-configs/
+       Lista de VitalMonitorConfig para el vínculo.
+
+POST   /api/v1/family-care/links/<uuid>/monitor-configs/
+       Crear config de monitoreo. Body: { vital_type, reminder_frequency_hours }
+
+GET    /api/v1/family-care/links/<uuid>/monitor-configs/<cfg_id>/
+PATCH  /api/v1/family-care/links/<uuid>/monitor-configs/<cfg_id>/
+DELETE /api/v1/family-care/links/<uuid>/monitor-configs/<cfg_id>/
+
+── Alertas ──────────────────────────────────────────────────────
+GET    /api/v1/family-care/links/<uuid>/alerts/
+       Listar alertas. Parámetros: ?status=OPEN&severity=HIGH
+
+POST   /api/v1/family-care/links/<uuid>/alerts/<alert_id>/dispatch-doctor/
+       Cuidador despacha al médico asignado del paciente.
+       → Crea Appointment urgente si el doctor tiene DoctorPatient activo.
+       → Cambia alert.status=DISPATCHED_DOCTOR.
+       → Notifica al doctor: FAMILY_DOCTOR_DISPATCHED.
+
+POST   /api/v1/family-care/links/<uuid>/alerts/<alert_id>/dismiss/
+       Cuidador descarta la alerta. Body: { notes? }
+       → alert.status=DISMISSED, dismissed_by=request.user, resolved_at=now().
+
+── Pagos de medicamentos ────────────────────────────────────────
+GET    /api/v1/family-care/links/<uuid>/payments/
+       Lista pagos del vínculo.
+
+POST   /api/v1/family-care/links/<uuid>/payments/
+       Registrar pago. Body: { description, amount_mxn, prescription?, medication? }
+       Notifica al paciente: FAMILY_PAYMENT_RECEIVED.
+
+PERMISOS
+────────
+FamilyCareLink:
+  - Cuidador: crear (POST links/), ver sus vínculos, revocar los propios.
+  - Paciente: ver donde es paciente, accept / revoke los que le pertenecen.
+  - Datos del paciente (vitals, meds, appointments): solo CAREGIVER
+    con link.status=ACTIVE y link.caregiver=request.user.
+  - Monitor configs, alerts, payments: CAREGIVER del vínculo ACTIVE.
+  - DOCTOR y ADMIN: no tienen acceso directo a este módulo.
+    El doctor recibe una notificación + cita urgente vía dispatch-doctor.
+
+NOTIFICACIONES DISPARADAS
+──────────────────────────
+FAMILY_CARE_REQUEST       → Paciente notificado cuando cuidador solicita vínculo
+FAMILY_VITAL_REMINDER     → Cuidador notificado por Celery cuando vital está vencido
+FAMILY_DOCTOR_DISPATCHED  → Doctor notificado cuando cuidador ejecuta dispatch-doctor
+FAMILY_PAYMENT_RECEIVED   → Paciente notificado al crear MedicationPayment
+
+SEÑALES (apps/family_care/signals.py)
+──────────────────────────────────────
+post_save → VitalSign → on_vital_sign_saved(sender, instance, created)
+  Solo en created=True:
+  1. _sync_monitor_configs(vital):
+     Actualiza last_patient_reading_at en todos los VitalMonitorConfig activos
+     que monitoreen el mismo vital_type para el mismo paciente.
+     ORM: care_link__patient=vital.patient.user  ← User FK, no PatientProfile
+  2. _check_and_alert(vital):
+     Busca VitalGoal del paciente para el vital_type.
+     Si el valor está fuera de rango (< min o > max del goal):
+       - Calcula severity: CRITICAL si desvío > 20%, HIGH si ≤ 20%.
+       - Encola notify_caregiver_vital_abnormal.delay(link_pk, vital_pk, severity)
+         para cada FamilyCareLink ACTIVE del paciente.
+
+TASKS CELERY (apps/family_care/tasks.py)
+─────────────────────────────────────────
+notify_caregiver_vital_abnormal(link_pk, vital_pk, severity)
+  - Recupera FamilyCareLink + VitalSign.
+  - Crea CareAlert con alert_type=VITAL_ABNORMAL.
+  - Notifica al cuidador con code=FAMILY_VITAL_REMINDER.
+
+check_vital_overdue  (periódica — cada hora via django-celery-beat)
+  - Itera VitalMonitorConfig activos donde last_patient_reading_at <
+    (now - reminder_frequency_hours) o es None.
+  - Crea CareAlert con alert_type=VITAL_OVERDUE.
+  - Actualiza last_reminder_sent_at=now().
+  - Notifica al cuidador.
+
+ARCHIVOS
+────────
+apps/family_care/models.py         — 4 modelos: FamilyCareLink, VitalMonitorConfig, CareAlert, MedicationPayment
+apps/family_care/serializers.py    — serializers por modelo + nested
+apps/family_care/views.py          — 14 vistas (list/detail/action)
+apps/family_care/urls.py           — 14 URL patterns bajo /family-care/links/<uuid>/...
+apps/family_care/signals.py        — post_save VitalSign → sync + alert
+apps/family_care/tasks.py          — notify_caregiver_vital_abnormal, check_vital_overdue
+apps/family_care/admin.py
+apps/family_care/apps.py           — ready() registra signals
+
+BUGS CORREGIDOS (esta sesión)
+──────────────────────────────
+- signals.py: care_link__patient=vital.patient → care_link__patient=vital.patient.user
+  (FamilyCareLink.patient es User FK; VitalSign.patient es PatientProfile FK)
+- views.py: VitalSign/Medication/Appointment queries usaban patient=link.patient
+  (User) → corregido a patient__user=link.patient
+- views.py: MedicationHistory.taken → status='TAKEN', taken_at → actual_taken_at
+- views.py: AppointmentNote fields subjective/objective/assessment/plan →
+  chief_complaint / diagnosis / treatment_plan
+- views.py: VitalSign.Type.choices → VitalSign.VitalType.choices
+- views.py: DoctorPatient importado de apps.appointments → apps.accounts.models
+
+SETTINGS / URLS WIRED
+──────────────────────
+LOCAL_APPS  → 'apps.family_care'
+urls.py     → path('api/v1/family-care/', include('apps.family_care.urls'))
+Notification codes: FAMILY_CARE_REQUEST, FAMILY_VITAL_REMINDER,
+                    FAMILY_DOCTOR_DISPATCHED, FAMILY_PAYMENT_RECEIVED
+══════════════════════════════════════════════════════════════════

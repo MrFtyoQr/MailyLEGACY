@@ -8,7 +8,10 @@ env = environ.Env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-environ.Env.read_env(BASE_DIR / '.env')
+for _env_file in [BASE_DIR / '.env.dev', BASE_DIR / '.env']:
+    if _env_file.exists():
+        environ.Env.read_env(_env_file)
+        break
 
 SECRET_KEY = env('SECRET_KEY')
 
@@ -30,6 +33,7 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'axes',
     'channels',
+    'django_celery_beat',
 ]
 
 LOCAL_APPS = [
@@ -53,6 +57,7 @@ LOCAL_APPS = [
     'apps.surveys',
     'apps.nutrition',
     'apps.wellness',
+    'apps.family_care',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -60,9 +65,11 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'core.middleware.csp.ContentSecurityPolicyMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'core.middleware.sanitize.InputSanitizationMiddleware',
     'apps.accounts.middleware.clerk_auth.ClerkAuthMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.audit.middleware.AuditMiddleware',
@@ -143,6 +150,18 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # ── Rate limiting ─────────────────────────────────────────────────────────
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon':         '30/min',    # anonymous (public endpoints)
+        'user':         '200/min',   # authenticated users
+        'webhook':      '5/min',     # Stripe webhook (by IP)
+        'checkout':     '10/min',    # Stripe checkout/portal (by user)
+        'photo_upload': '20/hour',   # profile photo uploads (by user)
+    },
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
     'PAGE_SIZE': 20,
     'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
@@ -198,7 +217,7 @@ STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
 EMAIL_PROVIDER     = env('EMAIL_PROVIDER', default='django')  # 'sendgrid' | 'django'
 SENDGRID_API_KEY   = env('SENDGRID_API_KEY', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@mailytcuida.com')
-FCM_CREDENTIALS_JSON = env('FCM_CREDENTIALS_JSON', default='')  # JSON string of service account
+# Notificaciones push vía WebSocket (Django Channels + Redis) — sin Firebase.
 
 # ── MailySoft integration ─────────────────────────────────────────────────────
 MAILYSOFT_WEBHOOK_SECRET = env('MAILYSOFT_WEBHOOK_SECRET', default='')

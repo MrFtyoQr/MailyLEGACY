@@ -1,10 +1,11 @@
 from rest_framework import serializers
+from core.serializers.sanitize import SanitizedOutputMixin
 from .models import User, PatientProfile, DoctorProfile, DoctorPatient, SpecialistProfile, PartnerProfile
 
 
 # ── Paciente ──────────────────────────────────────────────────────────────────
 
-class PatientProfileSerializer(serializers.ModelSerializer):
+class PatientProfileSerializer(SanitizedOutputMixin, serializers.ModelSerializer):
     class Meta:
         model = PatientProfile
         fields = [
@@ -50,7 +51,7 @@ class PatientProfilePublicSerializer(serializers.ModelSerializer):
 
 # ── Doctor ────────────────────────────────────────────────────────────────────
 
-class DoctorProfileSerializer(serializers.ModelSerializer):
+class DoctorProfileSerializer(SanitizedOutputMixin, serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
@@ -67,7 +68,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 # ── Especialista ──────────────────────────────────────────────────────────────
 
-class SpecialistProfileSerializer(serializers.ModelSerializer):
+class SpecialistProfileSerializer(SanitizedOutputMixin, serializers.ModelSerializer):
     class Meta:
         model = SpecialistProfile
         fields = [
@@ -80,7 +81,7 @@ class SpecialistProfileSerializer(serializers.ModelSerializer):
 
 # ── Partner ───────────────────────────────────────────────────────────────────
 
-class PartnerProfileSerializer(serializers.ModelSerializer):
+class PartnerProfileSerializer(SanitizedOutputMixin, serializers.ModelSerializer):
     class Meta:
         model = PartnerProfile
         fields = [

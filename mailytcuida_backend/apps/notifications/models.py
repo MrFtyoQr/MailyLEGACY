@@ -70,6 +70,10 @@ class Notification(models.Model):
         WELLNESS_PROGRAM_ENROLLED   = 'WELLNESS_PROGRAM_ENROLLED',   'Inscripción a programa de bienestar'
         WELLNESS_PROGRAM_COMPLETED  = 'WELLNESS_PROGRAM_COMPLETED',  'Programa de bienestar completado'
         WELCOME                  = 'WELCOME',                  'Bienvenida'
+        FAMILY_CARE_REQUEST      = 'FAMILY_CARE_REQUEST',      'Solicitud de cuidado familiar'
+        FAMILY_VITAL_REMINDER    = 'FAMILY_VITAL_REMINDER',    'Recordatorio de signo vital'
+        FAMILY_DOCTOR_DISPATCHED = 'FAMILY_DOCTOR_DISPATCHED', 'Médico despachado por familiar'
+        FAMILY_PAYMENT_RECEIVED  = 'FAMILY_PAYMENT_RECEIVED',  'Pago de medicamento recibido'
 
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user       = models.ForeignKey(

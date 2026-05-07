@@ -116,6 +116,23 @@ _TEMPLATES: dict[str, dict] = {
         'title': '¡Programa completado! 🎉',
         'body':  'Felicidades, has completado el programa "{program_title}".',
     },
+    # ── Cuidado Familiar ──────────────────────────────────────────────────────
+    'FAMILY_CARE_REQUEST': {
+        'title': 'Solicitud de cuidado familiar',
+        'body':  '{caregiver_email} quiere cuidarte como {relationship}. Acepta o rechaza en tu app.',
+    },
+    'FAMILY_VITAL_REMINDER': {
+        'title': 'Recordatorio de signo vital',
+        'body':  'Llevas más de {hours}h sin registrar tu {vital_type}. Tu familiar está pendiente de ti.',
+    },
+    'FAMILY_DOCTOR_DISPATCHED': {
+        'title': 'Tu familiar agendó una cita',
+        'body':  '{caregiver_email} agendó una cita con {doctor_name} para el {scheduled_at}.',
+    },
+    'FAMILY_PAYMENT_RECEIVED': {
+        'title': 'Pago de medicamento recibido',
+        'body':  'Tu familiar pagó {description}. Revisa los detalles en tu app.',
+    },
 }
 
 
@@ -162,42 +179,46 @@ def notify(user, code: str, context: dict | None = None,
 
 # ── Low-level senders ─────────────────────────────────────────────────────────
 
-def send_push(user, title: str, body: str, data: dict | None = None) -> bool:
+def send_push(user, title: str, body: str, data: dict | None = None,
+              notification_id: str = '', code: str = '', created_at: str = '') -> bool:
     """
-    Send FCM push notification to all active device tokens of the user.
-    Returns True if at least one token succeeded.
-    """
-    from .models import DeviceToken
-    tokens = DeviceToken.objects.filter(user=user, is_active=True).values_list('token', flat=True)
-    if not tokens:
-        logger.debug('send_push: no active tokens for user %s', user.pk)
-        return False
+    Envía notificación en tiempo real vía WebSocket (Django Channels).
 
+    El móvil mantiene una conexión persistente a ws://<host>/ws/notifications/
+    y recibe el payload aquí. El móvil decide cómo mostrarlo localmente
+    (notificación del sistema, badge, sonido) — sin Firebase.
+
+    Si el usuario no está conectado, la notificación queda en DB como PENDING
+    y se entrega en el próximo connect() del consumer.
+
+    Returns True si el channel layer aceptó el mensaje.
+    """
     try:
-        import firebase_admin
-        from firebase_admin import messaging
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        from .consumers import _group_name
 
-        if not firebase_admin._apps:
-            import json
-            from firebase_admin import credentials
-            cred_json = getattr(settings, 'FCM_CREDENTIALS_JSON', None)
-            if cred_json:
-                cred = credentials.Certificate(json.loads(cred_json))
-                firebase_admin.initialize_app(cred)
+        channel_layer = get_channel_layer()
+        if channel_layer is None:
+            logger.warning('send_push: channel layer no disponible (Redis caído?)')
+            return False
 
-        messages = [
-            messaging.Message(
-                notification=messaging.Notification(title=title, body=body),
-                data={k: str(v) for k, v in (data or {}).items()},
-                token=token,
-            )
-            for token in tokens
-        ]
-        resp = messaging.send_each(messages)
-        logger.info('FCM send_each: success=%d failure=%d', resp.success_count, resp.failure_count)
-        return resp.success_count > 0
+        async_to_sync(channel_layer.group_send)(
+            _group_name(user.pk),
+            {
+                'type':       'notification_push',
+                'id':         notification_id,
+                'code':       code,
+                'title':      title,
+                'body':       body,
+                'data':       data or {},
+                'created_at': created_at,
+            },
+        )
+        logger.debug('send_push (ws): entregado al grupo notif_%s', user.pk)
+        return True
     except Exception as exc:
-        logger.error('send_push failed: %s', exc)
+        logger.error('send_push (ws) falló para user %s: %s', user.pk, exc)
         return False
 
 

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 
@@ -24,4 +25,12 @@ urlpatterns = [
     path('api/v1/surveys/',        include('apps.surveys.urls')),
     path('api/v1/nutrition/',      include('apps.nutrition.urls')),
     path('api/v1/wellness/',       include('apps.wellness.urls')),
+    path('api/v1/family-care/',    include('apps.family_care.urls')),
 ]
+
+if settings.DEBUG:
+    try:
+        import debug_toolbar
+        urlpatterns = [path('__debug__/', include(debug_toolbar.urls))] + urlpatterns
+    except ImportError:
+        pass

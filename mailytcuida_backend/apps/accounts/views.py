@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.permissions import IsDoctor, IsPatient, IsSpecialist, IsPartner, IsAdmin
+from core.throttles import PhotoUploadThrottle
 from .models import User, PatientProfile, DoctorProfile, DoctorPatient, SpecialistProfile, PartnerProfile
 from .serializers import (
     MeSerializer, PatientProfileSerializer, DoctorProfileSerializer,
@@ -56,6 +57,7 @@ class PatientProfileView(generics.RetrieveUpdateAPIView):
 class PatientPhotoView(APIView):
     """POST /api/v1/auth/profiles/patient/photo/"""
     permission_classes = [permissions.IsAuthenticated, IsPatient]
+    throttle_classes = [PhotoUploadThrottle]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -82,6 +84,7 @@ class DoctorProfileView(generics.RetrieveUpdateAPIView):
 class DoctorPhotoView(APIView):
     """POST /api/v1/auth/profiles/doctor/photo/"""
     permission_classes = [permissions.IsAuthenticated, IsDoctor]
+    throttle_classes = [PhotoUploadThrottle]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
