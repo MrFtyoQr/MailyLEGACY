@@ -1,9 +1,24 @@
 from .base import *  # noqa
+import environ
+
+_env = environ.Env()
 
 DEBUG = False
 
+# ── Hosts ─────────────────────────────────────────────────────────────────────
+# Must be set in Sevalla env vars: ALLOWED_HOSTS=mailyt-cuidalegacy-iihlu.sevalla.app
+# Fallback covers the Sevalla domain so health probes never get 400.
+ALLOWED_HOSTS = _env.list('ALLOWED_HOSTS', default=[
+    'mailyt-cuidalegacy-iihlu.sevalla.app',
+    '.sevalla.app',
+    'localhost',
+    '127.0.0.1',
+])
+
 # ── Seguridad HTTP ────────────────────────────────────────────────────────────
 SECURE_SSL_REDIRECT = True
+# Kubernetes/Sevalla probes hit http://127.0.0.1:8000/health/ — exempt it from SSL redirect
+SECURE_REDIRECT_EXEMPT = [r'^health/$']
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True

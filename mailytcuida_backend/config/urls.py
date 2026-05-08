@@ -1,8 +1,16 @@
 from django.conf import settings
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import path, include
 
+
+def health_check(request):
+    """Kubernetes/Sevalla readiness probe — always 200."""
+    return JsonResponse({'status': 'ok'})
+
+
 urlpatterns = [
+    path('health/', health_check),
     path('admin/', admin.site.urls),
     path('api/v1/auth/', include('apps.accounts.urls')),
     path('api/v1/medications/', include('apps.medications.urls')),
