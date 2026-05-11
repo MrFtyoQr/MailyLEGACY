@@ -38,4 +38,18 @@ python manage.py collectstatic --noinput --clear
 echo "==> Seeding badges (idempotent)..."
 python manage.py seed_badges || true
 
+echo "==> Verifying ASGI application loads correctly..."
+python -c "
+import sys
+try:
+    import config.asgi
+    print('  ASGI OK — application type:', type(config.asgi.application).__name__, flush=True)
+except Exception as e:
+    import traceback
+    print('  ASGI LOAD FAILED:', flush=True)
+    traceback.print_exc()
+    sys.exit(1)
+"
+echo "==> ASGI check passed. Starting Daphne..."
+
 exec "$@"
