@@ -50,6 +50,10 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 "
-echo "==> ASGI check passed. Starting Daphne..."
+echo "==> ASGI check passed."
+
+echo "==> Server binary check..."
+which daphne && daphne --version || echo "  WARNING: daphne not found in PATH"
+echo "==> Starting server: $@"
 
 exec "$@"
