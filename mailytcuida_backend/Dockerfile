@@ -23,9 +23,10 @@ COPY . .
 COPY entrypoint.prod.sh /entrypoint.prod.sh
 RUN chmod +x /entrypoint.prod.sh
 
-EXPOSE 8000
+EXPOSE 8080
 
 ENTRYPOINT ["/entrypoint.prod.sh"]
 
 # Daphne = ASGI server con soporte WebSocket (Django Channels)
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
+# Sevalla routes to port 8080 by default
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8080", "config.asgi:application"]
