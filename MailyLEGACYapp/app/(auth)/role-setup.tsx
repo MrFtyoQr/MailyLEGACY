@@ -191,7 +191,7 @@ export default function RoleSetupScreen() {
           last_name:  data.lastName,
           birth_date: data.birthDate,
         })
-        router.replace('/(patient)/')
+        router.replace('/(patient)')
       },
     })
 
@@ -208,7 +208,7 @@ export default function RoleSetupScreen() {
           license_number: data.licenseNumber,
           specialty:      data.specialty,
         })
-        router.replace('/(doctor)/')
+        router.replace('/(doctor)')
       },
     })
 
@@ -225,7 +225,7 @@ export default function RoleSetupScreen() {
           specialty_type: data.specialtyType,
           license_number: data.licenseNumber,
         })
-        router.replace('/(specialist)/')
+        router.replace('/(specialist)')
       },
     })
 

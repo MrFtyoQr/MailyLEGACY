@@ -100,9 +100,9 @@ export default function SplashAnimatedScreen() {
       }
 
       const roleMap: Record<string, string> = {
-        PATIENT:    '/(patient)/',
-        DOCTOR:     '/(doctor)/',
-        SPECIALIST: '/(specialist)/',
+        PATIENT:    '/(patient)',
+        DOCTOR:     '/(doctor)',
+        SPECIALIST: '/(specialist)',
       }
       router.replace((roleMap[me.user.role] ?? '/(auth)/sign-in') as never)
     } catch {
