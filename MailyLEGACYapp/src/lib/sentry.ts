@@ -4,6 +4,8 @@
  * Inicialización de Sentry con filtros de PII médico.
  * Nunca enviamos: alergias, condiciones crónicas, signos vitales,
  * tipo de sangre, fechas de nacimiento, contactos de emergencia.
+ *
+ * Compatible con @sentry/react-native 8.x + SDK 54.
  */
 
 import * as Sentry from '@sentry/react-native'
@@ -30,9 +32,10 @@ export function initSentry() {
 
   Sentry.init({
     dsn: SENTRY_DSN,
-    tracesSampleRate: 0.2,
-    environment: __DEV__ ? 'development' : 'production',
-    debug: __DEV__,
+    tracesSampleRate:  0.2,
+    environment:       __DEV__ ? 'development' : 'production',
+    debug:             __DEV__,
+    attachStacktrace:  true,
 
     beforeSend(event) {
       // Strip PII del body de requests
