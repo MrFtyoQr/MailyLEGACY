@@ -53,8 +53,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       '@sentry/react-native/expo',
       {
-        organization: 'mailyt',
-        project: 'mailytcuida-mobile',
+        organization: 'rootkalis',
+        project:      'react-native',
       },
     ],
   ],

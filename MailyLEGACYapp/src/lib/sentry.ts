@@ -5,7 +5,7 @@
  * Nunca enviamos: alergias, condiciones crónicas, signos vitales,
  * tipo de sangre, fechas de nacimiento, contactos de emergencia.
  *
- * Compatible con @sentry/react-native 8.x + SDK 54.
+ * Compatible con @sentry/react-native 7.x + SDK 54.
  */
 
 import * as Sentry from '@sentry/react-native'
@@ -34,7 +34,7 @@ export function initSentry() {
     dsn: SENTRY_DSN,
     tracesSampleRate:  0.2,
     environment:       __DEV__ ? 'development' : 'production',
-    debug:             __DEV__,
+    debug:             false,          // evita spam de logs en consola
     attachStacktrace:  true,
 
     beforeSend(event) {

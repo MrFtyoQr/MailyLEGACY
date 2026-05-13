@@ -2,11 +2,8 @@
  * sign-in.tsx
  * -----------
  * Pantalla de inicio de sesión.
- * - Clerk useSignIn
- * - Validación Zod + sanitización
- * - Rate limit: 3 intentos / 30s
- * - Google OAuth
- * - Mensajes de error en español
+ * Solo OAuth: Google + Apple.
+ * Sin formulario de email/contraseña.
  */
 
 import React, { useState } from 'react'
@@ -15,216 +12,207 @@ import {
   Text,
   Image,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   Dimensions,
+  Platform,
 } from 'react-native'
 import { router } from 'expo-router'
-import { useSignIn, useOAuth } from '@clerk/clerk-expo'
+import { useOAuth } from '@clerk/clerk-expo'
 import * as WebBrowser from 'expo-web-browser'
+import * as Linking from 'expo-linking'
 
-import { ScreenWrapper }  from '@components/layout/ScreenWrapper'
-import { FormField }      from '@components/forms/FormField'
-import { ProtectedForm }  from '@components/forms/ProtectedForm'
-import { Button }         from '@components/ui/Button'
-import { useFormGuard }   from '@hooks/useFormGuard'
-import { createRateLimiter } from '@lib/security/rateLimiter'
-import { signInSchema, type SignInForm } from '@schemas/auth.schema'
-import { Colors }         from '@constants/colors'
+import { ScreenWrapper } from '@components/layout/ScreenWrapper'
+import { Colors }        from '@constants/colors'
 
 WebBrowser.maybeCompleteAuthSession()
 
 const { width } = Dimensions.get('window')
 
-// Rate limiter: 3 intentos por 30 segundos
-const signInLimiter = createRateLimiter({ maxAttempts: 3, windowMs: 30_000 })
-
 export default function SignInScreen() {
-  const { signIn, setActive, isLoaded } = useSignIn()
-  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' })
+  const { startOAuthFlow: googleFlow } = useOAuth({ strategy: 'oauth_google' })
+  const { startOAuthFlow: appleFlow  } = useOAuth({ strategy: 'oauth_apple'  })
+  const [loading, setLoading] = useState<'google' | 'apple' | null>(null)
 
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('')
-
-  const { submit, isSubmitting, formError, fieldErrors, clearErrors } =
-    useFormGuard<SignInForm, SignInForm>({
-      schema:      signInSchema,
-      rateLimiter: signInLimiter,
-      onSubmit: async (data) => {
-        if (!signIn) return
-        const result = await signIn.create({
-          identifier: data.email,
-          password:   data.password,
-        })
-        if (result.status === 'complete') {
-          await setActive!({ session: result.createdSessionId })
-          router.replace('/')
-        }
-      },
-    })
-
-  const handleGoogleAuth = async () => {
+  const handleOAuth = async (provider: 'google' | 'apple') => {
+    const flow = provider === 'google' ? googleFlow : appleFlow
+    setLoading(provider)
     try {
-      const { createdSessionId, setActive: setActiveOAuth } = await startOAuthFlow()
+      // redirectUrl es necesario en Expo Go (scheme exp://) y en builds de producción
+      const redirectUrl = Linking.createURL('/')
+      const { createdSessionId, setActive } = await flow({ redirectUrl })
       if (createdSessionId) {
-        await setActiveOAuth!({ session: createdSessionId })
+        await setActive!({ session: createdSessionId })
         router.replace('/')
       }
     } catch {
-      // El usuario canceló o hubo un error
+      // Usuario canceló o error de red — sin acción
+    } finally {
+      setLoading(null)
     }
   }
 
   return (
     <ScreenWrapper>
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {/* Header */}
+      <View style={styles.container}>
+
+        {/* ── Header / Marca ─────────────────────────────── */}
         <View style={styles.header}>
           <Image
             source={require('../../assets/images/logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.title}>Bienvenido de vuelta</Text>
-          <Text style={styles.subtitle}>Inicia sesión en tu cuenta</Text>
+          <Text style={styles.title}>Bienvenido a maily</Text>
+          <Text style={styles.subtitle}>
+            Tu salud y la de tu familia, siempre conectada
+          </Text>
         </View>
 
-        {/* Formulario */}
-        <ProtectedForm error={formError} isSubmitting={isSubmitting}>
-          <FormField
-            label="Correo electrónico"
-            placeholder="tu@correo.com"
-            value={email}
-            onChangeText={(t) => { clearErrors(); setEmail(t) }}
-            error={fieldErrors.email}
-            keyboardType="email-address"
-            autoComplete="email"
-            required
-          />
-          <FormField
-            label="Contraseña"
-            placeholder="••••••••"
-            value={password}
-            onChangeText={(t) => { clearErrors(); setPassword(t) }}
-            error={fieldErrors.password}
-            secureTextEntry
-            required
-          />
+        {/* ── Botones OAuth ──────────────────────────────── */}
+        <View style={styles.buttons}>
 
+          {/* Google */}
           <TouchableOpacity
-            style={styles.forgotWrap}
-            onPress={() => { /* TODO: forgot password */ }}
+            style={[styles.oauthBtn, loading === 'google' && styles.oauthBtnDisabled]}
+            onPress={() => handleOAuth('google')}
+            activeOpacity={0.85}
+            disabled={loading !== null}
           >
-            <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
+            <View style={styles.oauthIcon}>
+              {/* G de Google en colores */}
+              <Text style={styles.googleG}>G</Text>
+            </View>
+            <Text style={styles.oauthLabel}>
+              {loading === 'google' ? 'Conectando…' : 'Continuar con Google'}
+            </Text>
           </TouchableOpacity>
 
-          <Button
-            label="Iniciar sesión"
-            onPress={() => submit({ email, password } as never)}
-            loading={isSubmitting || !isLoaded}
-            fullWidth
-            size="lg"
-            style={styles.btnPrimary}
-          />
-        </ProtectedForm>
-
-        {/* Divider */}
-        <View style={styles.divider}>
-          <View style={styles.line} />
-          <Text style={styles.dividerText}>o continúa con</Text>
-          <View style={styles.line} />
+          {/* Apple — solo en iOS */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[styles.oauthBtn, styles.oauthBtnApple,
+                      loading === 'apple' && styles.oauthBtnDisabled]}
+              onPress={() => handleOAuth('apple')}
+              activeOpacity={0.85}
+              disabled={loading !== null}
+            >
+              <Text style={styles.appleIcon}></Text>
+              <Text style={[styles.oauthLabel, styles.oauthLabelApple]}>
+                {loading === 'apple' ? 'Conectando…' : 'Continuar con Apple'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Google OAuth */}
-        <Button
-          variant="secondary"
-          label="Google"
-          onPress={handleGoogleAuth}
-          fullWidth
-          size="lg"
-        />
+        {/* ── Footer legal ───────────────────────────────── */}
+        <Text style={styles.legal}>
+          Al continuar aceptas nuestros{' '}
+          <Text style={styles.legalLink}>Términos de uso</Text>
+          {' '}y{' '}
+          <Text style={styles.legalLink}>Política de privacidad</Text>
+        </Text>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>¿No tienes cuenta? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/sign-up')}>
-            <Text style={styles.footerLink}>Regístrate</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      </View>
     </ScreenWrapper>
   )
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flexGrow:          1,
-    paddingVertical:   32,
-    paddingHorizontal: 4,
+  container: {
+    flex:              1,
+    paddingHorizontal: 28,
+    justifyContent:    'space-between',
+    paddingVertical:   48,
   },
   header: {
-    alignItems:    'center',
-    marginBottom:  36,
-    gap:           8,
+    alignItems: 'center',
+    gap:         12,
+    marginTop:   16,
   },
   logo: {
-    width:        width * 0.45,
-    height:       80,
-    marginBottom: 8,
+    width:        width * 0.55,
+    height:       90,
+    marginBottom: 12,
   },
   title: {
     fontSize:   26,
     fontWeight: '700',
     color:      Colors.light.textPrimary,
+    textAlign:  'center',
   },
   subtitle: {
-    fontSize: 15,
-    color:    Colors.light.textSecondary,
+    fontSize:  15,
+    color:     Colors.light.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
-  forgotWrap: {
-    alignSelf:   'flex-end',
-    marginTop:   -8,
-    marginBottom: 20,
+
+  // ── Botones ───────────────────────────────────────────
+  buttons: {
+    gap:           14,
+    paddingBottom: 8,
   },
-  forgot: {
-    fontSize: 13,
-    color:    Colors.brand.primary,
-    fontWeight: '500',
+  oauthBtn: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius:    16,
+    borderWidth:     1.5,
+    borderColor:     Colors.light.border,
+    backgroundColor: Colors.light.surface,
+    gap:             14,
   },
-  btnPrimary: {
-    marginTop: 4,
+  oauthBtnApple: {
+    backgroundColor: '#000000',
+    borderColor:     '#000000',
   },
-  divider: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    marginVertical: 24,
-    gap:            12,
+  oauthBtnDisabled: {
+    opacity: 0.6,
   },
-  line: {
-    flex:            1,
-    height:          1,
-    backgroundColor: Colors.light.border,
+  oauthIcon: {
+    width:           32,
+    height:          32,
+    borderRadius:    16,
+    backgroundColor: '#FFF',
+    alignItems:      'center',
+    justifyContent:  'center',
+    borderWidth:     1,
+    borderColor:     Colors.light.border,
   },
-  dividerText: {
-    fontSize: 13,
-    color:    Colors.light.textMuted,
+  googleG: {
+    fontSize:   18,
+    fontWeight: '700',
+    color:      '#4285F4',
   },
-  footer: {
-    flexDirection:  'row',
-    justifyContent: 'center',
-    marginTop:      28,
+  appleIcon: {
+    fontSize:   22,
+    color:      '#FFFFFF',
+    lineHeight: 26,
+    width:      32,
+    textAlign:  'center',
   },
-  footerText: {
-    fontSize: 14,
-    color:    Colors.light.textSecondary,
-  },
-  footerLink: {
-    fontSize:   14,
-    color:      Colors.brand.primary,
+  oauthLabel: {
+    flex:       1,
+    fontSize:   16,
     fontWeight: '600',
+    color:      Colors.light.textPrimary,
+    textAlign:  'center',
+    marginRight: 32, // compensa el ícono para centrar visualmente
+  },
+  oauthLabelApple: {
+    color: '#FFFFFF',
+  },
+
+  // ── Legal ─────────────────────────────────────────────
+  legal: {
+    fontSize:  12,
+    color:     Colors.light.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  legalLink: {
+    color:      Colors.brand.primary,
+    fontWeight: '500',
   },
 })

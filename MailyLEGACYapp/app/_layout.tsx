@@ -23,6 +23,7 @@ import { Slot, SplashScreen } from 'expo-router'
 import { StyleSheet } from 'react-native'
 
 import { initSentry, SentryErrorBoundary } from '@lib/sentry'
+import * as Sentry from '@sentry/react-native'
 import { setTokenGetter } from '@lib/api/client'
 import { notificationSocket } from '@lib/ws/NotificationSocket'
 import { useWsStore } from '@store/ws.store'
@@ -31,6 +32,12 @@ import { EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY } from '@constants/config'
 
 // Inicializar Sentry lo antes posible
 initSentry()
+
+// Evento de prueba para confirmar que Sentry recibe eventos
+// (solo en desarrollo, aparece en Issues → no en Logs)
+if (__DEV__) {
+  Sentry.captureMessage('MailyT-Cuida: Sentry inicializado correctamente', 'info')
+}
 
 // Mantener el splash nativo hasta que estemos listos
 SplashScreen.preventAutoHideAsync()

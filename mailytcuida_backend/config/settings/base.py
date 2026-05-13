@@ -192,14 +192,19 @@ def _sanitize_medical_data(event, hint):
             event['request']['data'].pop(key, None)
     return event
 
+_SENTRY_DSN = env(
+    'SENTRY_DSN',
+    default='https://4453ac4b96020a50befb4866a1adb301@o4510988085624832.ingest.us.sentry.io/4511347423117312',
+)
+
 sentry_sdk.init(
-    dsn=env('SENTRY_DSN', default=''),
+    dsn=_SENTRY_DSN,
     integrations=[DjangoIntegration(), CeleryIntegration()],
     traces_sample_rate=0.2,
     profiles_sample_rate=0.1,
     send_default_pii=False,
     before_send=_sanitize_medical_data,
-    environment=env('ENVIRONMENT', default='development'),
+    environment=env('ENVIRONMENT', default='production'),
 )
 
 # ── Storage (S3 / Cloudflare R2) ─────────────────────────────────────────────

@@ -104,9 +104,18 @@ export default function SplashAnimatedScreen() {
         DOCTOR:     '/(doctor)',
         SPECIALIST: '/(specialist)',
       }
-      router.replace((roleMap[me.user.role] ?? '/(auth)/sign-in') as never)
-    } catch {
-      router.replace('/(auth)/sign-in')
+      router.replace((roleMap[me.user.role] ?? '/(auth)/role-setup') as never)
+    } catch (err: unknown) {
+      // Si el backend falla pero Clerk tiene sesión activa,
+      // mandamos a role-setup (mejor UX que volver a sign-in en bucle).
+      // Solo volvemos a sign-in si el error es 401 (token inválido).
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 401) {
+        router.replace('/(auth)/sign-in')
+      } else {
+        // Backend no disponible, red caída, etc. → intentar continuar
+        router.replace('/(auth)/role-setup')
+      }
     }
   }, [isLoaded, isSignedIn])
 

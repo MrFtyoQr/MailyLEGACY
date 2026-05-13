@@ -59,7 +59,7 @@ interface RoleCard {
 const ROLES: RoleCard[] = [
   {
     id:    'PATIENT',
-    emoji: '🧑‍🤝‍🧑',
+    emoji: '🙋',
     label: 'Paciente',
     desc:  'Gestiona tu salud y la de tu familia',
     color: Colors.role.patient,

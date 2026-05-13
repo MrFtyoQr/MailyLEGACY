@@ -38,4 +38,13 @@ python manage.py collectstatic --noinput --clear
 echo "==> Seeding badges (idempotent)..."
 python manage.py seed_badges || true
 
+echo "==> Notifying Sentry of deployment start..."
+python -c "
+import django, os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
+django.setup()
+import sentry_sdk
+sentry_sdk.capture_message('MailyT-Cuida backend: servidor iniciado correctamente', level='info')
+" || true
+
 exec "$@"
