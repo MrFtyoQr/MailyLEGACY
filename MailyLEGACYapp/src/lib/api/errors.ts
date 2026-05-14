@@ -24,7 +24,10 @@ export class ApiError extends Error {
 
 /** Extrae el mensaje de error del body de respuesta del backend */
 export function extractErrorMessage(data: unknown): string {
-  if (typeof data === 'string') return data
+  if (typeof data === 'string') {
+    if (data.trim().startsWith('<')) return ''   // HTML crudo (ej. Django 500) → usar httpErrorMessage
+    return data
+  }
   if (typeof data === 'object' && data !== null) {
     const d = data as Record<string, unknown>
     if (typeof d.detail === 'string') return d.detail
