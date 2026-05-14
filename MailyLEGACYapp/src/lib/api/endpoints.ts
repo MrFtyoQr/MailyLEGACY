@@ -99,9 +99,24 @@ export const EP = {
   familyCareAlertDispatch: (linkId: string, alertId: string) =>
     `/family-care/links/${linkId}/alerts/${alertId}/dispatch-doctor/`,
 
+  // ── Prescriptions ─────────────────────────────────────────────────────────
+  prescriptions:         '/prescriptions/',
+  prescriptionDetail: (id: string) => `/prescriptions/${id}/`,
+
+  // ── Wellness ──────────────────────────────────────────────────────────────
+  wellnessPrograms:      '/wellness/programs/',
+  wellnessProgram: (id: string) => `/wellness/programs/${id}/`,
+  wellnessEnrollments:   '/wellness/enrollments/',
+  wellnessEnrollment: (id: string) => `/wellness/enrollments/${id}/`,
+  wellnessMood:          '/wellness/mood/',
+  wellnessSleep:         '/wellness/sleep/',
+  wellnessCheckins:      '/wellness/checkins/',
+
   // ── Analytics ─────────────────────────────────────────────────────────────
   analyticsDashboard:    '/analytics/dashboard/',
   analyticsAdherence:    '/analytics/adherence/',
+  analyticsInsights:     '/analytics/insights/',
+  analyticsInsightsGenerate: '/analytics/insights/generate/',
 
   // ── Especialistas & Referidos ─────────────────────────────────────────────
   specialistsList:       '/specialists/',

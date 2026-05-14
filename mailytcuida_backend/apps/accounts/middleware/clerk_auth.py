@@ -65,11 +65,24 @@ class ClerkJWTAuthentication(BaseAuthentication):
         if not clerk_id:
             raise AuthenticationFailed('Token sin subject.')
 
-        from apps.accounts.models import User
+        from apps.accounts.models import User, PatientProfile
         try:
             user = User.objects.get(clerk_id=clerk_id, is_active=True)
         except User.DoesNotExist:
-            raise AuthenticationFailed('Usuario no encontrado.')
+            # Webhook no creó al usuario — lo creamos aquí como fallback.
+            email = payload.get('email') or f'{clerk_id}@pending.mailyt'
+            try:
+                user, _ = User.objects.get_or_create(
+                    clerk_id=clerk_id,
+                    defaults={'email': email, 'role': User.Role.PATIENT},
+                )
+                PatientProfile.objects.get_or_create(
+                    user=user,
+                    defaults={'first_name': '', 'last_name': ''},
+                )
+            except Exception as exc:
+                logger.error('Error auto-creando usuario Clerk %s: %s', clerk_id, exc)
+                raise AuthenticationFailed('Usuario no encontrado.')
 
         return (user, token)
 

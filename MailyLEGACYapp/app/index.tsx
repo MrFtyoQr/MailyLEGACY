@@ -14,7 +14,7 @@ import React, { useEffect, useCallback } from 'react'
 import { View, Image, Text, StyleSheet, Dimensions } from 'react-native'
 import { router } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useAuth, useUser } from '@clerk/clerk-expo'
+import { useAuth } from '@clerk/clerk-expo'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -25,17 +25,18 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated'
 
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useAuthStore }  from '@store/auth.store'
-import { get, post }    from '@lib/api/client'
+import { get }          from '@lib/api/client'
 import { EP }           from '@lib/api/endpoints'
 import { Colors }       from '@constants/colors'
+import { ONBOARDING_KEY } from './(auth)/onboarding'
 import type { MeResponse } from '@/types/api.types'
 
 const { width } = Dimensions.get('window')
 
 export default function SplashAnimatedScreen() {
   const { isLoaded, isSignedIn } = useAuth()
-  const { user: clerkUser }      = useUser()
   const setLoaded   = useAuthStore((s) => s.setLoaded)
   const setSignedIn = useAuthStore((s) => s.setSignedIn)
   const setUser     = useAuthStore((s) => s.setUser)
@@ -76,7 +77,12 @@ export default function SplashAnimatedScreen() {
     await SplashScreen.hideAsync()
 
     if (!isSignedIn) {
-      router.replace('/(auth)/sign-in')
+      const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY)
+      if (!onboardingDone) {
+        router.replace('/(auth)/onboarding')
+      } else {
+        router.replace('/(auth)/sign-in')
+      }
       return
     }
 
@@ -105,28 +111,11 @@ export default function SplashAnimatedScreen() {
     try {
       const me = await get<MeResponse>(EP.authMe)
       await handleMe(me)
-    } catch (err: unknown) {
-      // ApiError tiene .status directamente (no .response.status)
-      const httpStatus = (err as { status?: number }).status
-
-      if (httpStatus === 401) {
-        // El usuario existe en Clerk pero no en Django (webhook no llegó).
-        // Llamamos a /auth/init/ para crearlo, luego reintentamos.
-        try {
-          const email = clerkUser?.primaryEmailAddress?.emailAddress ?? ''
-          await post(EP.authInit, { email })
-          const me = await get<MeResponse>(EP.authMe)
-          await handleMe(me)
-        } catch {
-          // Si sigue fallando después del init, volver a login
-          router.replace('/(auth)/sign-in')
-        }
-      } else {
-        // Backend no disponible, red caída, etc. → role-setup
-        router.replace('/(auth)/role-setup')
-      }
+    } catch {
+      // Backend no disponible o error inesperado → role-setup para capturar datos
+      router.replace('/(auth)/role-setup')
     }
-  }, [isLoaded, isSignedIn, clerkUser])
+  }, [isLoaded, isSignedIn])
 
   useEffect(() => {
     // Secuencia de entrada del logo

@@ -1,11 +1,7 @@
 /**
  * onboarding.tsx
- * --------------
- * 3 slides horizontales con FlatList paginado.
- * - Dots animados con Reanimated interpolatedColor
- * - AsyncStorage flag: no repetir si ya se vio
- * - Saltar → sign-in
- * - Último slide → sign-in
+ * Slides de bienvenida — aparecen solo la primera vez.
+ * 4 pantallas deslizables con gradiente y contenido promocional.
  */
 
 import React, { useRef, useState, useCallback, useEffect } from 'react'
@@ -16,7 +12,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  Image,
+  StatusBar,
 } from 'react-native'
 import { router } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -28,14 +24,14 @@ import Animated, {
 } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '@constants/colors'
-import { Button } from '@components/ui/Button'
 
 const { width, height } = Dimensions.get('window')
-const ONBOARDING_KEY = '@mailyt_onboarding_done'
+export const ONBOARDING_KEY = '@mailyt_onboarding_done'
 
 interface Slide {
   id:       string
   emoji:    string
+  tag:      string
   title:    string
   subtitle: string
   gradient: [string, string]
@@ -45,23 +41,34 @@ const SLIDES: Slide[] = [
   {
     id:       '1',
     emoji:    '❤️',
-    title:    'Tu salud, siempre contigo',
-    subtitle: 'Registra signos vitales, medicamentos y citas médicas desde un solo lugar.',
-    gradient: [Colors.brand.warm, Colors.brand.hot],
+    tag:      'La salud familiar',
+    title:    'a un toque de ti',
+    subtitle: 'Registra signos vitales, medicamentos y resultados de laboratorio desde un solo lugar. Tu historial siempre disponible.',
+    gradient: ['#FF6B8A', '#C44569'],
   },
   {
     id:       '2',
-    emoji:    '👨‍⚕️',
-    title:    'Conectado con tu médico',
-    subtitle: 'Agenda consultas y recibe seguimiento personalizado de tu doctor o especialista.',
-    gradient: [Colors.brand.cool, Colors.brand.primary],
+    emoji:    '🩺',
+    tag:      'Cuidado y seguimiento',
+    title:    'personalizado',
+    subtitle: 'Recibe recordatorios de tus medicamentos, monitorea tus signos y lleva un control completo de tu salud día a día.',
+    gradient: [Colors.brand.primary, '#0A7A6B'],
   },
   {
     id:       '3',
     emoji:    '👨‍👩‍👧',
-    title:    'Cuida a quienes amas',
-    subtitle: 'Comparte el acceso con familia de confianza para un cuidado integral y coordinado.',
-    gradient: [Colors.brand.primary, Colors.brand.nature],
+    tag:      'Conectado con',
+    title:    'toda tu familia',
+    subtitle: 'Comparte el acceso con familiares de confianza para un cuidado integral y coordinado. Cuida a quienes amas.',
+    gradient: ['#6C63FF', '#3B37B0'],
+  },
+  {
+    id:       '4',
+    emoji:    '🤖',
+    tag:      'Asistente de salud',
+    title:    'con IA a tu lado',
+    subtitle: 'Consulta a nuestro asistente inteligente sobre tus datos de salud, obtén recomendaciones y alertas en tiempo real.',
+    gradient: ['#F8A600', '#E06B00'],
   },
 ]
 
@@ -73,11 +80,11 @@ function AnimatedDot({ index, currentIndex }: { index: number; currentIndex: num
   }, [currentIndex, index])
 
   const dotStyle = useAnimatedStyle(() => ({
-    width: 8 + progress.value * 16,
+    width: 8 + progress.value * 20,
     backgroundColor: interpolateColor(
       progress.value,
       [0, 1],
-      [Colors.light.border, Colors.brand.primary],
+      ['rgba(255,255,255,0.35)', '#FFFFFF'],
     ),
   }))
 
@@ -111,10 +118,12 @@ export default function OnboardingScreen() {
   )
 
   const isLast = currentIndex === SLIDES.length - 1
+  const slide  = SLIDES[currentIndex]
 
   return (
     <View style={styles.container}>
-      {/* Slides */}
+      <StatusBar barStyle="light-content" />
+
       <FlatList
         ref={listRef}
         data={SLIDES}
@@ -128,18 +137,28 @@ export default function OnboardingScreen() {
           <LinearGradient
             colors={item.gradient}
             style={styles.slide}
-            start={{ x: 0.2, y: 0 }}
-            end={{ x: 0.8, y: 1 }}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.emoji}>{item.emoji}</Text>
-            <Text style={styles.slideTitle}>{item.title}</Text>
-            <Text style={styles.slideSubtitle}>{item.subtitle}</Text>
+            <View style={styles.slideInner}>
+              <Text style={styles.emoji}>{item.emoji}</Text>
+              <View style={styles.textBlock}>
+                <Text style={styles.tag}>{item.tag}</Text>
+                <Text style={styles.title}>{item.title}</Text>
+                <Text style={styles.subtitle}>{item.subtitle}</Text>
+              </View>
+            </View>
           </LinearGradient>
         )}
       />
 
-      {/* Footer */}
-      <View style={styles.footer}>
+      {/* Footer pegado al fondo con gradiente del slide actual */}
+      <LinearGradient
+        colors={slide.gradient}
+        style={styles.footer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      >
         {/* Dots */}
         <View style={styles.dots}>
           {SLIDES.map((_, i) => (
@@ -147,61 +166,79 @@ export default function OnboardingScreen() {
           ))}
         </View>
 
-        {/* Botones */}
-        <View style={styles.buttons}>
-          <Button
-            label={isLast ? 'Comenzar' : 'Siguiente'}
-            onPress={goToNext}
-            fullWidth
-            size="lg"
-          />
+        {/* Botón principal */}
+        <TouchableOpacity
+          style={styles.mainBtn}
+          onPress={goToNext}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.mainBtnText}>
+            {isLast ? 'Comenzar ahora →' : 'Siguiente →'}
+          </Text>
+        </TouchableOpacity>
 
-          {!isLast && (
-            <TouchableOpacity onPress={finish} style={styles.skipBtn}>
-              <Text style={styles.skipText}>Saltar</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+        {/* Saltar */}
+        {!isLast && (
+          <TouchableOpacity onPress={finish} style={styles.skipBtn} activeOpacity={0.7}>
+            <Text style={styles.skipText}>Saltar introducción</Text>
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: Colors.dark.bg,
+    flex:            1,
+    backgroundColor: '#1A1A2E',
   },
   slide: {
     width,
-    height:         height * 0.72,
-    alignItems:     'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-    gap:            20,
+    height: height * 0.7,
+  },
+  slideInner: {
+    flex:              1,
+    alignItems:        'center',
+    justifyContent:    'center',
+    paddingHorizontal: 36,
+    gap:               28,
   },
   emoji: {
-    fontSize: 72,
+    fontSize: 80,
   },
-  slideTitle: {
-    fontSize:   28,
+  textBlock: {
+    alignItems: 'center',
+    gap:        10,
+  },
+  tag: {
+    fontSize:      13,
+    fontWeight:    '600',
+    color:         'rgba(255,255,255,0.7)',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  title: {
+    fontSize:   32,
     fontWeight: '800',
     color:      '#FFFFFF',
     textAlign:  'center',
-    lineHeight: 36,
+    lineHeight: 40,
   },
-  slideSubtitle: {
-    fontSize:  16,
-    color:     'rgba(255,255,255,0.85)',
+  subtitle: {
+    fontSize:  15,
+    color:     'rgba(255,255,255,0.82)',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 23,
+    marginTop:  4,
   },
   footer: {
     flex:              1,
-    backgroundColor:   Colors.dark.bg,
     paddingHorizontal: 28,
-    paddingTop:        28,
-    gap:               24,
+    paddingTop:        24,
+    paddingBottom:     40,
+    gap:               20,
+    alignItems:        'center',
   },
   dots: {
     flexDirection:  'row',
@@ -212,16 +249,27 @@ const styles = StyleSheet.create({
     height:       8,
     borderRadius: 4,
   },
-  buttons: {
-    gap: 12,
+  mainBtn: {
+    width:           '100%',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth:     1.5,
+    borderColor:     'rgba(255,255,255,0.5)',
+    borderRadius:    16,
+    paddingVertical: 18,
+    alignItems:      'center',
+  },
+  mainBtnText: {
+    fontSize:   17,
+    fontWeight: '700',
+    color:      '#FFFFFF',
+    letterSpacing: 0.3,
   },
   skipBtn: {
-    alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   skipText: {
     fontSize:  14,
-    color:     Colors.dark.textSecondary,
+    color:     'rgba(255,255,255,0.6)',
     fontWeight: '500',
   },
 })

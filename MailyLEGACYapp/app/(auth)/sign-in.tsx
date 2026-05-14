@@ -15,9 +15,10 @@ import {
   StyleSheet,
   Dimensions,
   Platform,
+  Alert,
 } from 'react-native'
 import { router } from 'expo-router'
-import { useOAuth } from '@clerk/clerk-expo'
+import { useOAuth, useAuth } from '@clerk/clerk-expo'
 import * as WebBrowser from 'expo-web-browser'
 import * as Linking from 'expo-linking'
 
@@ -31,21 +32,46 @@ const { width } = Dimensions.get('window')
 export default function SignInScreen() {
   const { startOAuthFlow: googleFlow } = useOAuth({ strategy: 'oauth_google' })
   const { startOAuthFlow: appleFlow  } = useOAuth({ strategy: 'oauth_apple'  })
-  const [loading, setLoading] = useState<'google' | 'apple' | null>(null)
+  const { isSignedIn }                 = useAuth()
+  const [loading, setLoading]          = useState<'google' | 'apple' | null>(null)
 
   const handleOAuth = async (provider: 'google' | 'apple') => {
     const flow = provider === 'google' ? googleFlow : appleFlow
     setLoading(provider)
     try {
-      // redirectUrl es necesario en Expo Go (scheme exp://) y en builds de producción
       const redirectUrl = Linking.createURL('/')
-      const { createdSessionId, setActive } = await flow({ redirectUrl })
-      if (createdSessionId) {
-        await setActive!({ session: createdSessionId })
-        router.replace('/')
+      const result = await flow({ redirectUrl })
+
+      const { createdSessionId, setActive } = result
+
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId })
       }
-    } catch {
-      // Usuario canceló o error de red — sin acción
+
+      // Navegar siempre: si no hay createdSessionId, Clerk ya tenía sesión activa.
+      // El splash (app/index.tsx) evalúa el estado real y redirige al destino correcto.
+      router.replace('/')
+    } catch (err: unknown) {
+      const msg = (err instanceof Error) ? err.message : String(err)
+
+      // Clerk lanza este error si ya hay sesión activa → ir directo al home
+      if (msg.includes('already signed in') || msg.includes('You\'re already signed in')) {
+        router.replace('/')
+        return
+      }
+
+      // Loguear errores inesperados
+      console.error('[OAuth] Error en flujo OAuth:', err)
+
+      // Mostrar error solo si no fue cancelación del usuario
+      const isCancelled = msg.includes('cancel') || msg.includes('dismiss') || msg === ''
+      if (!isCancelled) {
+        Alert.alert(
+          'Error al iniciar sesión',
+          `No se pudo completar el inicio de sesión.\n\n${msg}`,
+          [{ text: 'Entendido' }],
+        )
+      }
     } finally {
       setLoading(null)
     }
@@ -79,7 +105,6 @@ export default function SignInScreen() {
             disabled={loading !== null}
           >
             <View style={styles.oauthIcon}>
-              {/* G de Google en colores */}
               <Text style={styles.googleG}>G</Text>
             </View>
             <Text style={styles.oauthLabel}>
@@ -198,7 +223,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color:      Colors.light.textPrimary,
     textAlign:  'center',
-    marginRight: 32, // compensa el ícono para centrar visualmente
+    marginRight: 32,
   },
   oauthLabelApple: {
     color: '#FFFFFF',
