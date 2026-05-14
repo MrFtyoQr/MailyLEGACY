@@ -23,13 +23,17 @@ function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets()
 
+  // Filtrar solo los tabs visibles antes de renderizar
+  const visibleRoutes = state.routes.filter(
+    (route: any) => descriptors[route.key]?.options?.href !== null
+  )
+
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      {state.routes.map((route: any, index: number) => {
+      {visibleRoutes.map((route: any) => {
         const { options } = descriptors[route.key]
-        if (options.href === null) return null
+        const focused = state.routes[state.index]?.key === route.key
 
-        const focused = state.index === index
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
           if (!focused && !event.defaultPrevented) {
@@ -98,6 +102,8 @@ export default function PatientLayout() {
 const styles = StyleSheet.create({
   bar: {
     flexDirection:     'row',
+    justifyContent:    'space-evenly',
+    alignItems:        'center',
     backgroundColor:   TAB_BG,
     paddingTop:        10,
     borderTopWidth:    1,
