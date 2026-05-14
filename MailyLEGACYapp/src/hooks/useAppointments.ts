@@ -17,7 +17,7 @@ export function useAppointments() {
   return useQuery<Appointment[]>({
     queryKey: ['appointments'],
     staleTime: 2 * 60 * 1000,
-    queryFn:  () => get<Appointment[]>(EP.appointments),
+    queryFn:  () => get<{ results: Appointment[] }>(EP.appointments).then(r => r.results ?? []),
   })
 }
 
@@ -34,7 +34,7 @@ export function useDoctorAppointments() {
   return useQuery<Appointment[]>({
     queryKey: ['appointments', 'doctor'],
     staleTime: 2 * 60 * 1000,
-    queryFn:  () => get<Appointment[]>(EP.appointmentsDoctor),
+    queryFn:  () => get<{ results: Appointment[] }>(EP.appointmentsDoctor).then(r => r.results ?? []),
   })
 }
 

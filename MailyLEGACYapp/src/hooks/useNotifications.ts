@@ -17,7 +17,7 @@ export function useNotifications() {
   return useQuery<Notification[]>({
     queryKey: ['notifications'],
     staleTime: 60 * 1000,
-    queryFn:  () => get<Notification[]>(EP.notifications),
+    queryFn:  () => get<{ results: Notification[] }>(EP.notifications).then(r => r.results ?? []),
   })
 }
 

@@ -17,7 +17,7 @@ export function usePatients() {
   return useQuery<Patient[]>({
     queryKey: ['patients'],
     staleTime: 5 * 60 * 1000,
-    queryFn:  () => get<Patient[]>(EP.doctorPatients),
+    queryFn:  () => get<{ results: Patient[] }>(EP.doctorPatients).then(r => r.results ?? []),
   })
 }
 

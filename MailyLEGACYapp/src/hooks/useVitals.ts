@@ -26,7 +26,7 @@ export function useVitals() {
   return useQuery<VitalEntry[]>({
     queryKey: ['vitals'],
     staleTime: 2 * 60 * 1000,
-    queryFn:  () => get<VitalEntry[]>(EP.vitals),
+    queryFn:  () => get<{ results: VitalEntry[] }>(EP.vitals).then(r => r.results ?? []),
   })
 }
 

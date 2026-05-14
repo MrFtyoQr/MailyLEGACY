@@ -26,7 +26,7 @@ export function useMedications() {
   return useQuery<Medication[]>({
     queryKey: ['medications'],
     staleTime: 5 * 60 * 1000,
-    queryFn:  () => get<Medication[]>(EP.medications),
+    queryFn:  () => get<{ results: Medication[] }>(EP.medications).then(r => r.results ?? []),
   })
 }
 
@@ -34,7 +34,7 @@ export function useMedicationsToday() {
   return useQuery<MedHistoryEntry[]>({
     queryKey: ['medications', 'today'],
     staleTime: 60 * 1000,  // 1 min — se actualiza frecuente
-    queryFn:  () => get<MedHistoryEntry[]>(EP.medicationToday),
+    queryFn:  () => get<{ results: MedHistoryEntry[] }>(EP.medicationToday).then(r => r.results ?? []),
   })
 }
 
