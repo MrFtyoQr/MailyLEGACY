@@ -17,7 +17,8 @@ const BIDI_OVERRIDE   = /[‪-‮⁦-⁩]/g
  * Sanitiza un string de input:
  * - Elimina control chars, zero-width y bidi overrides
  * - Trunca al máximo permitido
- * - Trim de espacios extremos
+ * NOTA: NO hace trim() aquí — los espacios son válidos mientras el usuario escribe.
+ *       Aplica trim() solo al construir el payload antes de enviarlo al API.
  */
 export function sanitizeInput(value: string, maxLength = 500): string {
   if (typeof value !== 'string') return ''
@@ -26,7 +27,6 @@ export function sanitizeInput(value: string, maxLength = 500): string {
     .replace(ZERO_WIDTH, '')
     .replace(BIDI_OVERRIDE, '')
     .slice(0, maxLength)
-    .trim()
 }
 
 /**

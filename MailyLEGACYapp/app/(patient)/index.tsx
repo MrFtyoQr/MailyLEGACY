@@ -22,8 +22,9 @@ import { Avatar }        from '@components/ui/Avatar'
 import { Colors }        from '@constants/colors'
 import { get }           from '@lib/api/client'
 import { EP }            from '@lib/api/endpoints'
-import { useAuthStore }  from '@store/auth.store'
-import { useWsStore }    from '@store/ws.store'
+import { useAuthStore }   from '@store/auth.store'
+import { useWsStore }     from '@store/ws.store'
+import { useVitalsLatest, VITAL_META } from '@hooks/useVitals'
 
 const { width } = Dimensions.get('window')
 
@@ -92,8 +93,9 @@ export default function PatientHome() {
   const todayTip    = useMemo(() => HEALTH_TIPS[new Date().getDate() % HEALTH_TIPS.length], [])
   const todayStretch = useMemo(() => STRETCHES[new Date().getDate() % STRETCHES.length], [])
 
+  const { data: vitalsLatest } = useVitalsLatest()
+
   const meds     = dashboard?.medications_today
-  const vitals   = dashboard?.vitals_summary
   const nextAppt = dashboard?.next_appointment
   const streakDays = dashboard?.streak_days ?? 0
   const adherence  = dashboard?.adherence_pct ?? null
@@ -190,20 +192,23 @@ export default function PatientHome() {
         {/* ── Vitales recientes ── */}
         <SectionHeader
           title="Últimos vitales"
-          onAction={() => router.push('/(patient)/vitals/index')}
+          onAction={() => router.push('/(patient)/vitals')}
           actionLabel="Ver más"
         />
         {isLoading ? (
           <Skeleton height={96} borderRadius={16} style={styles.mx} />
-        ) : vitals && Object.values(vitals).some((v) => v != null) ? (
+        ) : vitalsLatest && vitalsLatest.length > 0 ? (
           <Card style={styles.vitalsCard}>
             <View style={styles.vitalsRow}>
-              {vitals.heart_rate    != null && <VitalChip icon="❤️" value={`${vitals.heart_rate}`}    unit="lpm"   />}
-              {vitals.glucose_mgdl  != null && <VitalChip icon="🩸" value={`${vitals.glucose_mgdl}`}  unit="mg/dL" />}
-              {vitals.systolic_bp   != null && vitals.diastolic_bp != null && (
-                <VitalChip icon="💉" value={`${vitals.systolic_bp}/${vitals.diastolic_bp}`} unit="mmHg" />
-              )}
-              {vitals.weight_kg     != null && <VitalChip icon="⚖️" value={`${vitals.weight_kg}`}     unit="kg"    />}
+              {vitalsLatest.slice(0, 4).map(v => {
+                const meta = VITAL_META[v.vital_type]
+                const display = v.vital_type === 'BLOOD_PRESSURE' && v.secondary_value != null
+                  ? `${v.value}/${v.secondary_value}`
+                  : `${v.value}`
+                return (
+                  <VitalChip key={v.vital_type} icon={meta?.icon ?? '📊'} value={display} unit={v.unit} label={meta?.label ?? v.vital_type} />
+                )
+              })}
             </View>
             <TouchableOpacity
               style={styles.addVitalBtn}
@@ -331,12 +336,13 @@ const sc = StyleSheet.create({
   sub:   { fontSize: 10, color: Colors.light.textMuted },
 })
 
-function VitalChip({ icon, value, unit }: { icon: string; value: string; unit: string }) {
+function VitalChip({ icon, value, unit, label }: { icon: string; value: string; unit: string; label?: string }) {
   return (
     <View style={vc.chip}>
       <Text style={vc.icon}>{icon}</Text>
       <Text style={vc.value}>{value}</Text>
       <Text style={vc.unit}>{unit}</Text>
+      {label && <Text style={vc.label} numberOfLines={1}>{label}</Text>}
     </View>
   )
 }
@@ -346,6 +352,7 @@ const vc = StyleSheet.create({
   icon:  { fontSize: 20 },
   value: { fontSize: 16, fontWeight: '700', color: Colors.light.textPrimary },
   unit:  { fontSize: 10, color: Colors.light.textMuted },
+  label: { fontSize: 9, color: Colors.light.textMuted, textAlign: 'center' },
 })
 
 function EmptyCard({
