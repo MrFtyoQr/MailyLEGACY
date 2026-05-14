@@ -1,112 +1,115 @@
 /**
  * (patient)/vitals/add.tsx
- * Formulario para registrar nuevos signos vitales.
+ * Registra signos vitales — todos los 14 tipos, registro parcial.
+ * Cada signo ingresado genera un POST separado con { vital_type, value, recorded_at }.
  */
 
 import React, { useState } from 'react'
 import {
-  ScrollView,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
+  ScrollView, View, Text, TextInput, TouchableOpacity,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native'
 import { router } from 'expo-router'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
-import { FormField } from '@components/forms/FormField'
-import { Button } from '@components/ui/Button'
 import { Colors } from '@constants/colors'
-import { useAddVital } from '@hooks/useVitals'
+import {
+  useAddVitals,
+  VITAL_META,
+  VITAL_TYPES_ORDERED,
+  type VitalType,
+  type AddVitalPayload,
+} from '@hooks/useVitals'
 
-interface FormValues {
-  glucose_mgdl:  string
-  heart_rate:    string
-  systolic_bp:   string
-  diastolic_bp:  string
-  weight_kg:     string
-  notes:         string
-}
-
-const EMPTY: FormValues = {
-  glucose_mgdl: '',
-  heart_rate:   '',
-  systolic_bp:  '',
-  diastolic_bp: '',
-  weight_kg:    '',
-  notes:        '',
-}
-
-// Rangos de validación clínicamente razonables
-const RANGES = {
-  glucose_mgdl: { min: 40,  max: 600,  label: 'Glucosa' },
-  heart_rate:   { min: 30,  max: 250,  label: 'Frecuencia cardíaca' },
-  systolic_bp:  { min: 60,  max: 300,  label: 'Presión sistólica' },
-  diastolic_bp: { min: 30,  max: 200,  label: 'Presión diastólica' },
-  weight_kg:    { min: 1,   max: 500,  label: 'Peso' },
-}
-
-type NumericField = keyof typeof RANGES
+type FormState = Partial<Record<VitalType, string>>
+type SecondaryState = Partial<Record<VitalType, string>>
 
 export default function AddVitalScreen() {
-  const [form, setForm]     = useState<FormValues>(EMPTY)
-  const [errors, setErrors] = useState<Partial<FormValues>>({})
-  const addVital = useAddVital()
+  const [values,    setValues]    = useState<FormState>({})
+  const [secondary, setSecondary] = useState<SecondaryState>({})
+  const [notes,     setNotes]     = useState('')
+  const addVitals = useAddVitals()
 
-  const set = (field: keyof FormValues) => (value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }))
-    setErrors((prev) => ({ ...prev, [field]: undefined }))
-  }
+  const setValue = (type: VitalType, val: string) =>
+    setValues(p => ({ ...p, [type]: val }))
+  const setSecVal = (type: VitalType, val: string) =>
+    setSecondary(p => ({ ...p, [type]: val }))
 
-  function validate(): boolean {
-    const newErrors: Partial<FormValues> = {}
-    let atLeastOne = false
+  function buildPayloads(): AddVitalPayload[] | null {
+    const now = new Date().toISOString()
+    const payloads: AddVitalPayload[] = []
+    const errors: string[] = []
 
-    for (const [key, range] of Object.entries(RANGES) as [NumericField, typeof RANGES[NumericField]][]) {
-      const raw = form[key].trim()
+    for (const type of VITAL_TYPES_ORDERED) {
+      const raw = values[type]?.trim()
       if (!raw) continue
 
-      atLeastOne = true
-      const num = parseFloat(raw)
+      const meta = VITAL_META[type]
+      const val  = parseFloat(raw)
 
-      if (isNaN(num)) {
-        newErrors[key] = 'Ingresa un número válido'
-      } else if (num < range.min || num > range.max) {
-        newErrors[key] = `${range.label}: rango válido ${range.min}–${range.max}`
+      if (isNaN(val)) { errors.push(`${meta.label}: valor inválido`); continue }
+      if (val < meta.min || val > meta.max) {
+        errors.push(`${meta.label}: debe estar entre ${meta.min} y ${meta.max} ${meta.unit}`)
+        continue
       }
+
+      const payload: AddVitalPayload = {
+        vital_type:  type,
+        value:       val,
+        recorded_at: now,
+        source:      'MANUAL',
+      }
+
+      if (meta.secondary) {
+        const rawSec = secondary[type]?.trim()
+        if (!rawSec) { errors.push(`${meta.label}: también ingresa la diastólica`); continue }
+        const secVal = parseFloat(rawSec)
+        if (isNaN(secVal) || secVal < meta.secondary.min || secVal > meta.secondary.max) {
+          errors.push(`Diastólica: debe estar entre ${meta.secondary.min} y ${meta.secondary.max}`)
+          continue
+        }
+        payload.secondary_value = secVal
+      }
+
+      if (notes.trim()) payload.notes = notes.trim()
+      payloads.push(payload)
     }
 
-    if (!atLeastOne) {
-      Alert.alert('Campo requerido', 'Completa al menos un signo vital antes de guardar.')
-      return false
+    if (errors.length > 0) {
+      Alert.alert('Valores fuera de rango', errors.join('\n'))
+      return null
     }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    if (payloads.length === 0) {
+      Alert.alert('Sin datos', 'Ingresa al menos un signo vital antes de guardar.')
+      return null
+    }
+    return payloads
   }
 
   async function handleSubmit() {
-    if (!validate()) return
-
-    const payload: Record<string, number | string | null> = {}
-    const numericFields: NumericField[] = ['glucose_mgdl', 'heart_rate', 'systolic_bp', 'diastolic_bp', 'weight_kg']
-    for (const field of numericFields) {
-      const raw = form[field].trim()
-      payload[field] = raw ? parseFloat(raw) : null
-    }
-    if (form.notes.trim()) payload.notes = form.notes.trim()
+    const payloads = buildPayloads()
+    if (!payloads) return
 
     try {
-      await addVital.mutateAsync(payload as Parameters<typeof addVital.mutateAsync>[0])
-      Alert.alert('¡Guardado!', 'Signos vitales registrados correctamente.', [
-        { text: 'OK', onPress: () => router.back() },
-      ])
+      const { ok, failed } = await addVitals.mutateAsync(payloads)
+      if (failed === 0) {
+        Alert.alert(
+          '¡Guardado!',
+          `${ok} signo${ok > 1 ? 's' : ''} vital${ok > 1 ? 'es' : ''} registrado${ok > 1 ? 's' : ''}.`,
+          [{ text: 'OK', onPress: () => router.back() }],
+        )
+      } else {
+        Alert.alert(
+          'Guardado parcial',
+          `${ok} registrado${ok > 1 ? 's' : ''}, ${failed} con error. Intenta de nuevo.`,
+          [{ text: 'OK', onPress: () => router.back() }],
+        )
+      }
     } catch {
-      Alert.alert('Error', 'No se pudo guardar. Verifica tu conexión e intenta de nuevo.')
+      Alert.alert('Error', 'No se pudieron guardar los signos vitales.')
     }
   }
+
+  const filledCount = VITAL_TYPES_ORDERED.filter(t => values[t]?.trim()).length
 
   return (
     <ScreenWrapper edges={['top', 'left', 'right']}>
@@ -114,12 +117,15 @@ export default function AddVitalScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
             <Text style={styles.back}>‹ Volver</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Registrar Vitales</Text>
-          <View style={{ width: 64 }} />
+          <View style={styles.countBadge}>
+            <Text style={styles.countText}>{filledCount}</Text>
+          </View>
         </View>
 
         <ScrollView
@@ -128,80 +134,84 @@ export default function AddVitalScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.hint}>
-            Completa al menos un campo. Los rangos se validarán automáticamente.
+            Ingresa solo los signos que mediste. Los demás mantienen su último valor registrado.
           </Text>
 
-          <FormField
-            label="Glucosa"
-            hint="mg/dL · Rango: 40–600"
-            error={errors.glucose_mgdl}
-            value={form.glucose_mgdl}
-            onChangeText={set('glucose_mgdl')}
-            keyboardType="decimal-pad"
-            placeholder="Ej. 95"
-          />
+          {VITAL_TYPES_ORDERED.map(type => {
+            const meta    = VITAL_META[type]
+            const val     = values[type] ?? ''
+            const secVal  = secondary[type] ?? ''
+            const filled  = val.trim().length > 0
 
-          <FormField
-            label="Frecuencia cardíaca"
-            hint="lpm · Rango: 30–250"
-            error={errors.heart_rate}
-            value={form.heart_rate}
-            onChangeText={set('heart_rate')}
-            keyboardType="number-pad"
-            placeholder="Ej. 72"
-          />
+            return (
+              <View key={type} style={[styles.vitalCard, filled && styles.vitalCardFilled]}>
+                <View style={styles.vitalHeader}>
+                  <Text style={styles.vitalIcon}>{meta.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.vitalLabel}>{meta.label}</Text>
+                    <Text style={styles.vitalHint}>
+                      {meta.unit} · Normal: {meta.normal.min}–{meta.normal.max}
+                    </Text>
+                  </View>
+                  {filled && <Text style={styles.filledCheck}>✓</Text>}
+                </View>
 
-          <View style={styles.row}>
-            <View style={styles.halfField}>
-              <FormField
-                label="Presión sistólica"
-                hint="mmHg"
-                error={errors.systolic_bp}
-                value={form.systolic_bp}
-                onChangeText={set('systolic_bp')}
-                keyboardType="number-pad"
-                placeholder="Ej. 120"
-              />
-            </View>
-            <View style={styles.halfField}>
-              <FormField
-                label="Presión diastólica"
-                hint="mmHg"
-                error={errors.diastolic_bp}
-                value={form.diastolic_bp}
-                onChangeText={set('diastolic_bp')}
-                keyboardType="number-pad"
-                placeholder="Ej. 80"
-              />
-            </View>
+                <TextInput
+                  style={[styles.input, filled && styles.inputFilled]}
+                  value={val}
+                  onChangeText={v => setValue(type, v)}
+                  keyboardType="decimal-pad"
+                  placeholder={`Rango: ${meta.min}–${meta.max}`}
+                  placeholderTextColor={Colors.light.textMuted}
+                  returnKeyType="next"
+                />
+
+                {/* Campo secundario solo para presión arterial */}
+                {meta.secondary && (
+                  <TextInput
+                    style={[styles.input, styles.inputSecondary,
+                            secondary[type]?.trim() && styles.inputFilled]}
+                    value={secVal}
+                    onChangeText={v => setSecVal(type, v)}
+                    keyboardType="decimal-pad"
+                    placeholder={`${meta.secondary.label} (${meta.secondary.min}–${meta.secondary.max})`}
+                    placeholderTextColor={Colors.light.textMuted}
+                    returnKeyType="next"
+                  />
+                )}
+              </View>
+            )
+          })}
+
+          {/* Notas globales */}
+          <View style={styles.notesCard}>
+            <Text style={styles.vitalLabel}>Notas (opcional)</Text>
+            <TextInput
+              style={[styles.input, styles.notesInput]}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Observaciones, contexto, síntomas…"
+              placeholderTextColor={Colors.light.textMuted}
+              multiline
+              maxLength={300}
+            />
           </View>
 
-          <FormField
-            label="Peso"
-            hint="kg · Rango: 1–500"
-            error={errors.weight_kg}
-            value={form.weight_kg}
-            onChangeText={set('weight_kg')}
-            keyboardType="decimal-pad"
-            placeholder="Ej. 70.5"
-          />
-
-          <FormField
-            label="Notas (opcional)"
-            value={form.notes}
-            onChangeText={set('notes')}
-            multiline
-            numberOfLines={3}
-            placeholder="Observaciones adicionales..."
-            style={{ minHeight: 80, textAlignVertical: 'top' }}
-          />
-
-          <Button
-            label={addVital.isPending ? 'Guardando…' : 'Guardar signos vitales'}
+          {/* Botón guardar */}
+          <TouchableOpacity
+            style={[styles.saveBtn, (addVitals.isPending || filledCount === 0) && styles.saveBtnDisabled]}
             onPress={handleSubmit}
-            disabled={addVital.isPending}
-            style={{ marginTop: 8 }}
-          />
+            activeOpacity={0.85}
+            disabled={addVitals.isPending || filledCount === 0}
+          >
+            {addVitals.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveBtnText}>
+                Guardar {filledCount > 0 ? `${filledCount} signo${filledCount > 1 ? 's' : ''}` : 'signos vitales'}
+              </Text>
+            )}
+          </TouchableOpacity>
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -212,39 +222,72 @@ export default function AddVitalScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'space-between',
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
     paddingVertical: 12,
+    paddingHorizontal: 4,
   },
   back: {
-    fontSize:  17,
-    color:     Colors.brand.primary,
-    fontWeight: '600',
-    minWidth:  64,
+    fontSize: 17, color: Colors.brand.primary, fontWeight: '600', minWidth: 64,
   },
   title: {
-    fontSize:   18,
-    fontWeight: '700',
-    color:      Colors.light.textPrimary,
+    fontSize: 17, fontWeight: '700', color: Colors.light.textPrimary,
   },
-  content: {
-    gap: 16,
-    paddingBottom: 24,
+  countBadge: {
+    minWidth: 28, height: 28, borderRadius: 14,
+    backgroundColor: Colors.brand.primary,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 6,
   },
+  countText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+
+  content: { gap: 10, paddingBottom: 24, paddingHorizontal: 2 },
   hint: {
-    fontSize:   13,
-    color:      Colors.light.textSecondary,
-    lineHeight: 18,
-    backgroundColor: Colors.light.surface,
-    padding:         12,
-    borderRadius:    10,
+    fontSize: 13, color: Colors.light.textSecondary, lineHeight: 18,
+    backgroundColor: Colors.light.surface, padding: 12, borderRadius: 10,
   },
-  row: {
-    flexDirection: 'row',
-    gap:           12,
+
+  vitalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.light.border,
   },
-  halfField: {
-    flex: 1,
+  vitalCardFilled: {
+    borderColor: Colors.brand.primary + '60',
+    backgroundColor: Colors.brand.primary + '05',
   },
+  vitalHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  vitalIcon:   { fontSize: 22 },
+  vitalLabel:  { fontSize: 14, fontWeight: '600', color: Colors.light.textPrimary },
+  vitalHint:   { fontSize: 11, color: Colors.light.textMuted, marginTop: 1 },
+  filledCheck: { fontSize: 16, color: Colors.brand.primary, fontWeight: '700' },
+
+  input: {
+    borderWidth: 1, borderColor: Colors.light.border,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: 15, color: Colors.light.textPrimary,
+    backgroundColor: Colors.light.bg,
+  },
+  inputFilled: {
+    borderColor: Colors.brand.primary,
+    backgroundColor: '#fff',
+  },
+  inputSecondary: { marginTop: 2 },
+
+  notesCard: {
+    backgroundColor: '#fff', borderRadius: 14, padding: 14,
+    gap: 8, borderWidth: 1.5, borderColor: Colors.light.border,
+  },
+  notesInput: { minHeight: 72, textAlignVertical: 'top' },
+
+  saveBtn: {
+    backgroundColor: Colors.brand.primary, borderRadius: 16,
+    paddingVertical: 16, alignItems: 'center', marginTop: 4,
+  },
+  saveBtnDisabled: { opacity: 0.5 },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 })

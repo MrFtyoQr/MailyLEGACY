@@ -91,7 +91,7 @@ class LabResultListCreateView(generics.ListCreateAPIView):
 class LabResultDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsPatient]
     serializer_class = LabResultWriteSerializer
-    http_method_names = ['patch', 'delete']
+    http_method_names = ['get', 'patch', 'delete']
 
     def get_queryset(self):
         return LabResult.objects.filter(patient=self.request.user.patient_profile)
