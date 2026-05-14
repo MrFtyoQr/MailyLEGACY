@@ -29,13 +29,18 @@ export function extractErrorMessage(data: unknown): string {
     const d = data as Record<string, unknown>
     if (typeof d.detail === 'string') return d.detail
     if (typeof d.error === 'string') return d.error
+    if (typeof d.message === 'string') return d.message
+    // DRF non_field_errors
+    if (Array.isArray(d.non_field_errors) && typeof d.non_field_errors[0] === 'string') {
+      return d.non_field_errors[0]
+    }
     // DRF field errors: { field: ['msg'] }
     const firstField = Object.values(d)[0]
     if (Array.isArray(firstField) && typeof firstField[0] === 'string') {
       return firstField[0]
     }
   }
-  return 'Error desconocido. Intenta de nuevo.'
+  return ''
 }
 
 /** Mensajes en español para códigos HTTP comunes */

@@ -7,12 +7,13 @@
 
 export const EP = {
   // ── Auth ─────────────────────────────────────────────────────────────────
-  authMe:                '/api/v1/auth/me/',
+  authMe:                '/auth/me/',
+  authInit:              '/auth/init/',  // crea usuario en Django si webhook falló
   me:                    '/auth/me/',
   myRole:                '/auth/me/role/',
   /** Factory para crear perfil por rol: 'patient' | 'doctor' | 'specialist' */
   profileCreate: (role: 'patient' | 'doctor' | 'specialist') =>
-    `/api/v1/auth/profiles/${role}/`,
+    `/auth/profiles/${role}/`,
   profilePatient:        '/auth/profiles/patient/',
   profilePatientPhoto:   '/auth/profiles/patient/photo/',
   profileDoctor:         '/auth/profiles/doctor/',
@@ -24,18 +25,23 @@ export const EP = {
 
   // ── Vitales ───────────────────────────────────────────────────────────────
   vitals:                '/vitals/',
+  vitalsDetail: (id: string) => `/vitals/${id}/`,
   vitalsLatest:          '/vitals/latest/',
   vitalsSummary:         '/vitals/summary/',
   vitalsGoals:           '/vitals/goals/',
   vitalsPatient: (id: string) => `/vitals/patient/${id}/`,
+  vitalsPatientLatest: (id: string) => `/vitals/patient/${id}/latest/`,
 
   // ── Medicamentos ──────────────────────────────────────────────────────────
   medications:           '/medications/',
+  medicationDetail: (id: string) => `/medications/${id}/`,
+  medicationSchedules: (id: string) => `/medications/${id}/schedules/`,
   medicationHistory:     '/medications/history/',
   medicationToday:       '/medications/history/today/',
   medicationTake: (id: string) => `/medications/history/${id}/take/`,
   medicationSkip: (id: string) => `/medications/history/${id}/skip/`,
   medicationPostpone: (id: string) => `/medications/history/${id}/postpone/`,
+  medicationsPatient: (id: string) => `/medications/patient/${id}/`,
 
   // ── Citas ─────────────────────────────────────────────────────────────────
   appointments:          '/appointments/',
@@ -97,6 +103,17 @@ export const EP = {
   analyticsDashboard:    '/analytics/dashboard/',
   analyticsAdherence:    '/analytics/adherence/',
 
+  // ── Especialistas & Referidos ─────────────────────────────────────────────
+  specialistsList:       '/specialists/',
+  specialistDetail: (id: string) => `/specialists/${id}/`,
+  referrals:             '/specialists/referrals/',
+  referralsIncoming:     '/specialists/referrals/incoming/',
+  referralDetail: (id: string) => `/specialists/referrals/${id}/`,
+  referralStatus: (id: string) => `/specialists/referrals/${id}/status/`,
+
   // ── Health check ─────────────────────────────────────────────────────────
   health:                '/health/',
+
+  // ── Solicitud de contacto (médicos / especialistas) ───────────────────────
+  contactRequest:        '/auth/contact-request/',
 } as const

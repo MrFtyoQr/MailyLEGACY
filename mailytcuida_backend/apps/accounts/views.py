@@ -3,6 +3,7 @@ import boto3
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,6 +16,7 @@ from .serializers import (
     SpecialistProfileSerializer, PartnerProfileSerializer,
     DoctorPatientSerializer, UserAdminSerializer, PhotoUploadSerializer,
 )
+from .middleware.clerk_auth import _verify_clerk_token
 
 
 # ── Auth me ───────────────────────────────────────────────────────────────────
@@ -26,6 +28,96 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+    def retrieve(self, request, *args, **kwargs):
+        """Devuelve { user, profile, is_complete } para el frontend."""
+        user = self.get_object()
+
+        profile_data = None
+        is_complete   = False
+
+        if user.role == User.Role.PATIENT:
+            try:
+                p = user.patient_profile
+                profile_data = PatientProfileSerializer(p).data
+                is_complete  = bool(p.first_name and p.last_name)
+            except PatientProfile.DoesNotExist:
+                pass
+        elif user.role == User.Role.DOCTOR:
+            try:
+                p = user.doctor_profile
+                profile_data = DoctorProfileSerializer(p).data
+                is_complete  = bool(p.first_name and p.last_name and p.license_number)
+            except DoctorProfile.DoesNotExist:
+                pass
+        elif user.role == User.Role.SPECIALIST:
+            try:
+                p = user.specialist_profile
+                profile_data = SpecialistProfileSerializer(p).data
+                is_complete  = bool(p.first_name and p.last_name)
+            except SpecialistProfile.DoesNotExist:
+                pass
+
+        return Response({
+            'user': {
+                'id':         str(user.id),
+                'clerk_id':   user.clerk_id,
+                'email':      user.email,
+                'role':       user.role,
+                'is_active':  user.is_active,
+                'created_at': user.created_at.isoformat(),
+            },
+            'profile':     profile_data,
+            'is_complete': is_complete,
+        })
+
+
+# ── Auth init (fallback si el webhook no creó al usuario) ────────────────────
+
+class AuthInitView(APIView):
+    """
+    POST /api/v1/auth/init/
+    Registra al usuario en Django si todavía no existe (fallback ante webhook fallido).
+    Verifica el JWT de Clerk directamente; no requiere que el usuario exista en BD.
+    """
+    authentication_classes = []
+    permission_classes      = [permissions.AllowAny]
+
+    def post(self, request):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return Response({'error': 'Token requerido'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        token = auth_header.split(' ', 1)[1]
+        try:
+            payload = _verify_clerk_token(token)
+        except AuthenticationFailed as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        clerk_id = payload.get('sub')
+        if not clerk_id:
+            return Response({'error': 'Token inválido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = request.data.get('email') or f'{clerk_id}@pending.mailyt'
+
+        user, created = User.objects.get_or_create(
+            clerk_id=clerk_id,
+            defaults={'email': email, 'role': User.Role.PATIENT},
+        )
+
+        # Actualizar email si teníamos placeholder
+        if not created and user.email.endswith('@pending.mailyt') and request.data.get('email'):
+            user.email = request.data['email']
+            user.save(update_fields=['email', 'updated_at'])
+
+        # Crear perfil de paciente si no existe
+        if user.role == User.Role.PATIENT:
+            PatientProfile.objects.get_or_create(
+                user=user,
+                defaults={'first_name': '', 'last_name': ''},
+            )
+
+        return Response({'status': 'ok', 'created': created})
 
 
 class RoleView(APIView):

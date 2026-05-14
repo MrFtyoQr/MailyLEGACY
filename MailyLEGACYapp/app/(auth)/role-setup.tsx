@@ -2,11 +2,11 @@
  * role-setup.tsx
  * --------------
  * Pantalla para completar el perfil tras el primer login.
- * 1. Selección de rol con cards animadas (spring al tap)
- * 2. Formulario mínimo según rol
- * 3. POST /api/v1/auth/profiles/{role}/ para crear el perfil
  *
- * Roles disponibles: PATIENT, DOCTOR, SPECIALIST
+ * FLUJOS:
+ *   PATIENT    → formulario de perfil (nombre + fecha nacimiento) → POST /auth/profiles/patient/
+ *   DOCTOR     → redirige a /(auth)/contact-request (solicitud al equipo)
+ *   SPECIALIST → redirige a /(auth)/contact-request (solicitud al equipo)
  */
 
 import React, { useState } from 'react'
@@ -17,29 +17,28 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Platform,
+  Modal,
 } from 'react-native'
 import { router } from 'expo-router'
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated'
 
-import { ScreenWrapper } from '@components/layout/ScreenWrapper'
-import { FormField }     from '@components/forms/FormField'
-import { ProtectedForm } from '@components/forms/ProtectedForm'
-import { Button }        from '@components/ui/Button'
-import { useFormGuard }  from '@hooks/useFormGuard'
+import { ScreenWrapper }   from '@components/layout/ScreenWrapper'
+import { FormField }       from '@components/forms/FormField'
+import { ProtectedForm }   from '@components/forms/ProtectedForm'
+import { Button }          from '@components/ui/Button'
+import { useFormGuard }    from '@hooks/useFormGuard'
 import { createRateLimiter } from '@lib/security/rateLimiter'
-import { post }        from '@lib/api/client'
-import { EP }           from '@lib/api/endpoints'
+import { patch }           from '@lib/api/client'
+import { EP }              from '@lib/api/endpoints'
 import {
   patientProfileSchema,
-  doctorProfileSchema,
-  specialistProfileSchema,
   type PatientProfileForm,
-  type DoctorProfileForm,
-  type SpecialistProfileForm,
 } from '@schemas/auth.schema'
 import { Colors } from '@constants/colors'
 
@@ -49,11 +48,11 @@ const setupLimiter = createRateLimiter({ maxAttempts: 5, windowMs: 60_000 })
 type RoleId = 'PATIENT' | 'DOCTOR' | 'SPECIALIST'
 
 interface RoleCard {
-  id:      RoleId
-  emoji:   string
-  label:   string
-  desc:    string
-  color:   string
+  id:    RoleId
+  emoji: string
+  label: string
+  desc:  string
+  color: string
 }
 
 const ROLES: RoleCard[] = [
@@ -80,19 +79,18 @@ const ROLES: RoleCard[] = [
   },
 ]
 
+// ── Role card con animación spring ──────────────────────────────────────────
 function RoleCardItem({
   card,
   selected,
   onSelect,
 }: {
-  card: RoleCard
+  card:     RoleCard
   selected: boolean
   onSelect: () => void
 }) {
-  const scale = useSharedValue(1)
-  const aStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }))
+  const scale  = useSharedValue(1)
+  const aStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
 
   return (
     <Animated.View style={aStyle}>
@@ -121,18 +119,171 @@ function RoleCardItem({
             <Text style={styles.checkText}>✓</Text>
           </View>
         )}
+        {(card.id === 'DOCTOR' || card.id === 'SPECIALIST') && (
+          <View style={styles.requestBadge}>
+            <Text style={styles.requestBadgeText}>Solicitud</Text>
+          </View>
+        )}
       </TouchableOpacity>
     </Animated.View>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Campos comunes
-// ---------------------------------------------------------------------------
+// ── Date Picker inline ───────────────────────────────────────────────────────
+function BirthDatePicker({
+  value,
+  onChange,
+  error,
+}: {
+  value:    Date | null
+  onChange: (date: Date) => void
+  error?:   string
+}) {
+  const [show, setShow] = useState(false)
+  const maxDate = new Date()
+  maxDate.setFullYear(maxDate.getFullYear() - 1)   // al menos 1 año de edad
 
+  const displayStr = value
+    ? value.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
+    : 'Seleccionar fecha'
+
+  function handleChange(_event: DateTimePickerEvent, selected?: Date) {
+    if (Platform.OS === 'android') setShow(false)
+    if (selected) onChange(selected)
+  }
+
+  return (
+    <View style={dp.wrapper}>
+      <View style={dp.labelRow}>
+        <Text style={dp.label}>Fecha de nacimiento</Text>
+        <Text style={dp.required}> *</Text>
+      </View>
+
+      <TouchableOpacity
+        style={[dp.field, error ? dp.fieldError : null]}
+        onPress={() => setShow(true)}
+        activeOpacity={0.7}
+      >
+        <Text style={[dp.fieldText, !value && dp.placeholder]}>
+          {displayStr}
+        </Text>
+        <Text style={dp.calIcon}>📅</Text>
+      </TouchableOpacity>
+
+      {error ? (
+        <Text style={dp.errorText}>{error}</Text>
+      ) : (
+        <Text style={dp.hint}>Toca para abrir el selector de fecha</Text>
+      )}
+
+      {/* Android: diálogo nativo directo */}
+      {Platform.OS === 'android' && show && (
+        <DateTimePicker
+          value={value ?? new Date(2000, 0, 1)}
+          mode="date"
+          display="default"
+          maximumDate={maxDate}
+          onChange={handleChange}
+          locale="es-MX"
+        />
+      )}
+
+      {/* iOS: modal con spinner (rueda de scroll) */}
+      {Platform.OS === 'ios' && (
+        <Modal
+          visible={show}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShow(false)}
+        >
+          <View style={dp.modalOverlay}>
+            <View style={dp.modalSheet}>
+              <View style={dp.modalHeader}>
+                <TouchableOpacity onPress={() => setShow(false)} activeOpacity={0.7}>
+                  <Text style={dp.modalCancel}>Cancelar</Text>
+                </TouchableOpacity>
+                <Text style={dp.modalTitle}>Fecha de nacimiento</Text>
+                <TouchableOpacity onPress={() => setShow(false)} activeOpacity={0.7}>
+                  <Text style={dp.modalDone}>Listo</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={dp.pickerWrap}>
+                <DateTimePicker
+                  value={value ?? new Date(2000, 0, 1)}
+                  mode="date"
+                  display="spinner"
+                  maximumDate={maxDate}
+                  onChange={handleChange}
+                  locale="es-MX"
+                  style={dp.picker}
+                  textColor="#000000"
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </View>
+  )
+}
+
+const dp = StyleSheet.create({
+  wrapper:   { marginBottom: 4 },
+  labelRow:  { flexDirection: 'row', marginBottom: 6 },
+  label:     { fontSize: 14, fontWeight: '500', color: Colors.light.textPrimary },
+  required:  { color: Colors.semantic.error, fontWeight: '600' },
+  field: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    backgroundColor:   Colors.light.surface,
+    borderWidth:       1.5,
+    borderColor:       Colors.light.border,
+    borderRadius:      12,
+    paddingHorizontal: 14,
+    paddingVertical:   14,
+  },
+  fieldError: {
+    borderColor: Colors.semantic.error,
+  },
+  fieldText:   { fontSize: 15, color: Colors.light.textPrimary, flex: 1 },
+  placeholder: { color: Colors.light.textMuted },
+  calIcon:     { fontSize: 18 },
+  hint:        { marginTop: 4, fontSize: 12, color: Colors.light.textSecondary },
+  errorText:   { marginTop: 4, fontSize: 12, color: Colors.semantic.error },
+
+  // Modal iOS
+  modalOverlay: {
+    flex:            1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent:  'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: Colors.light.bg,
+    borderTopLeftRadius:  20,
+    borderTopRightRadius: 20,
+    paddingBottom:        Platform.OS === 'ios' ? 34 : 16,
+  },
+  modalHeader: {
+    flexDirection:     'row',
+    justifyContent:    'space-between',
+    alignItems:        'center',
+    paddingHorizontal: 20,
+    paddingVertical:   14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  modalTitle:  { fontSize: 16, fontWeight: '600', color: Colors.light.textPrimary },
+  modalCancel: { fontSize: 15, color: Colors.light.textSecondary },
+  modalDone:   { fontSize: 15, fontWeight: '700', color: Colors.brand.primary },
+  pickerWrap:  { backgroundColor: '#FFFFFF', borderRadius: 8, overflow: 'hidden' },
+  picker:      { height: 216 },
+})
+
+// ── Campos comunes (nombre/apellido) ─────────────────────────────────────────
 function BaseFields({
   firstName, setFirstName,
-  lastName, setLastName,
+  lastName,  setLastName,
   errors,
   clearErrors,
 }: {
@@ -163,96 +314,51 @@ function BaseFields({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Pantalla principal
-// ---------------------------------------------------------------------------
-
+// ── Pantalla principal ────────────────────────────────────────────────────────
 export default function RoleSetupScreen() {
   const [selectedRole, setSelectedRole] = useState<RoleId | null>(null)
-  const [step, setStep] = useState<'role' | 'profile'>('role')
+  const [step,         setStep]         = useState<'role' | 'profile'>('role')
 
-  // Campos
-  const [firstName,     setFirstName]     = useState('')
-  const [lastName,      setLastName]      = useState('')
-  const [birthDate,     setBirthDate]     = useState('')
-  const [licenseNumber, setLicenseNumber] = useState('')
-  const [specialty,     setSpecialty]     = useState('')
-  const [specialtyType, setSpecialtyType] = useState('')
+  // Campos del paciente
+  const [firstName, setFirstName] = useState('')
+  const [lastName,  setLastName]  = useState('')
+  const [birthDate, setBirthDate] = useState<Date | null>(null)
 
-  // Patient
-  const { submit: submitPatient, isSubmitting: subPatient, formError: errPatient,
-          fieldErrors: fePatient, clearErrors: clearPatient } =
+  const { submit: submitPatient, isSubmitting, formError, fieldErrors, clearErrors } =
     useFormGuard<PatientProfileForm, PatientProfileForm>({
       schema:      patientProfileSchema,
       rateLimiter: setupLimiter,
       onSubmit: async (data) => {
-        await post(EP.profileCreate('patient'), {
+        await patch(EP.profilePatient, {
           first_name: data.firstName,
           last_name:  data.lastName,
-          birth_date: data.birthDate,
+          birth_date: data.birthDate,   // YYYY-MM-DD string
         })
         router.replace('/(patient)')
       },
     })
 
-  // Doctor
-  const { submit: submitDoctor, isSubmitting: subDoctor, formError: errDoctor,
-          fieldErrors: feDoctor, clearErrors: clearDoctor } =
-    useFormGuard<DoctorProfileForm, DoctorProfileForm>({
-      schema:      doctorProfileSchema,
-      rateLimiter: setupLimiter,
-      onSubmit: async (data) => {
-        await post(EP.profileCreate('doctor'), {
-          first_name:     data.firstName,
-          last_name:      data.lastName,
-          license_number: data.licenseNumber,
-          specialty:      data.specialty,
-        })
-        router.replace('/(doctor)')
-      },
-    })
-
-  // Specialist
-  const { submit: submitSpecialist, isSubmitting: subSpecialist, formError: errSpecialist,
-          fieldErrors: feSpecialist, clearErrors: clearSpecialist } =
-    useFormGuard<SpecialistProfileForm, SpecialistProfileForm>({
-      schema:      specialistProfileSchema,
-      rateLimiter: setupLimiter,
-      onSubmit: async (data) => {
-        await post(EP.profileCreate('specialist'), {
-          first_name:     data.firstName,
-          last_name:      data.lastName,
-          specialty_type: data.specialtyType,
-          license_number: data.licenseNumber,
-        })
-        router.replace('/(specialist)')
-      },
-    })
-
-  const isSubmitting = subPatient || subDoctor || subSpecialist
-
-  const handleSubmit = () => {
+  function handleContinue() {
+    if (!selectedRole) return
     if (selectedRole === 'PATIENT') {
-      submitPatient({ role: 'PATIENT', firstName, lastName, birthDate } as never)
-    } else if (selectedRole === 'DOCTOR') {
-      submitDoctor({ role: 'DOCTOR', firstName, lastName, licenseNumber, specialty } as never)
-    } else if (selectedRole === 'SPECIALIST') {
-      submitSpecialist({ role: 'SPECIALIST', firstName, lastName, specialtyType, licenseNumber } as never)
+      setStep('profile')
+    } else {
+      // DOCTOR / SPECIALIST → flujo de solicitud de contacto
+      router.push({
+        pathname: '/(auth)/contact-request',
+        params:   { role: selectedRole },
+      })
     }
   }
 
-  const currentFormError =
-    selectedRole === 'PATIENT' ? errPatient :
-    selectedRole === 'DOCTOR'  ? errDoctor  :
-    errSpecialist
-
-  const currentFieldErrors: Record<string, string | undefined> =
-    selectedRole === 'PATIENT' ? fePatient as never :
-    selectedRole === 'DOCTOR'  ? feDoctor  as never :
-    feSpecialist as never
-
-  const clearCurrent = () => {
-    clearPatient(); clearDoctor(); clearSpecialist()
+  function handleSubmitPatient() {
+    if (!birthDate) return
+    // Convertir Date → "YYYY-MM-DD"
+    const y   = birthDate.getFullYear()
+    const m   = String(birthDate.getMonth() + 1).padStart(2, '0')
+    const d   = String(birthDate.getDate()).padStart(2, '0')
+    const str = `${y}-${m}-${d}`
+    submitPatient({ role: 'PATIENT', firstName, lastName, birthDate: str } as never)
   }
 
   // ---- Paso 1: Selección de rol ----
@@ -276,9 +382,22 @@ export default function RoleSetupScreen() {
             ))}
           </View>
 
+          {/* Nota para médicos/especialistas */}
+          {(selectedRole === 'DOCTOR' || selectedRole === 'SPECIALIST') && (
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>
+                💡 Los médicos y especialistas pasan por un proceso de verificación antes de unirse al equipo. Te contactaremos en breve.
+              </Text>
+            </View>
+          )}
+
           <Button
-            label="Continuar"
-            onPress={() => { if (selectedRole) setStep('profile') }}
+            label={
+              selectedRole === 'DOCTOR' || selectedRole === 'SPECIALIST'
+                ? 'Enviar solicitud →'
+                : 'Continuar'
+            }
+            onPress={handleContinue}
             disabled={!selectedRole}
             fullWidth
             size="lg"
@@ -289,7 +408,7 @@ export default function RoleSetupScreen() {
     )
   }
 
-  // ---- Paso 2: Formulario según rol ----
+  // ---- Paso 2: Formulario de paciente ----
   return (
     <ScreenWrapper>
       <ScrollView
@@ -302,77 +421,27 @@ export default function RoleSetupScreen() {
         </TouchableOpacity>
 
         <Text style={styles.title}>Completa tu perfil</Text>
-        <Text style={styles.subtitle}>
-          Solo unos datos más para empezar
-        </Text>
+        <Text style={styles.subtitle}>Solo unos datos más para empezar</Text>
 
-        <ProtectedForm error={currentFormError} isSubmitting={isSubmitting} scrollable>
+        <ProtectedForm error={formError} isSubmitting={isSubmitting} scrollable>
           <BaseFields
             firstName={firstName} setFirstName={setFirstName}
             lastName={lastName}   setLastName={setLastName}
-            errors={currentFieldErrors}
-            clearErrors={clearCurrent}
+            errors={fieldErrors as Record<string, string | undefined>}
+            clearErrors={clearErrors}
           />
 
-          {selectedRole === 'PATIENT' && (
-            <FormField
-              label="Fecha de nacimiento"
-              placeholder="YYYY-MM-DD"
-              value={birthDate}
-              onChangeText={(t) => { clearCurrent(); setBirthDate(t) }}
-              error={currentFieldErrors.birthDate}
-              keyboardType="numeric"
-              required
-              hint="Formato: AAAA-MM-DD"
-            />
-          )}
-
-          {selectedRole === 'DOCTOR' && (
-            <>
-              <FormField
-                label="Cédula profesional"
-                placeholder="Ej: 12345678"
-                value={licenseNumber}
-                onChangeText={(t) => { clearCurrent(); setLicenseNumber(t) }}
-                error={currentFieldErrors.licenseNumber}
-                required
-              />
-              <FormField
-                label="Especialidad"
-                placeholder="Ej: Medicina General"
-                value={specialty}
-                onChangeText={(t) => { clearCurrent(); setSpecialty(t) }}
-                error={currentFieldErrors.specialty}
-                required
-              />
-            </>
-          )}
-
-          {selectedRole === 'SPECIALIST' && (
-            <>
-              <FormField
-                label="Tipo de especialidad"
-                placeholder="Ej: Laboratorista, Terapeuta..."
-                value={specialtyType}
-                onChangeText={(t) => { clearCurrent(); setSpecialtyType(t) }}
-                error={currentFieldErrors.specialtyType}
-                required
-              />
-              <FormField
-                label="Cédula profesional"
-                placeholder="Ej: 12345678"
-                value={licenseNumber}
-                onChangeText={(t) => { clearCurrent(); setLicenseNumber(t) }}
-                error={currentFieldErrors.licenseNumber}
-                required
-              />
-            </>
-          )}
+          <BirthDatePicker
+            value={birthDate}
+            onChange={(d) => { clearErrors(); setBirthDate(d) }}
+            error={(fieldErrors as Record<string, string | undefined>).birthDate}
+          />
 
           <Button
             label="Guardar y continuar"
-            onPress={handleSubmit}
+            onPress={handleSubmitPatient}
             loading={isSubmitting}
+            disabled={!birthDate}
             fullWidth
             size="lg"
             style={styles.btn}
@@ -396,13 +465,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    fontSize:      15,
-    color:         Colors.light.textSecondary,
-    marginBottom:  28,
+    fontSize:     15,
+    color:        Colors.light.textSecondary,
+    marginBottom: 28,
   },
   roleList: {
     gap:          12,
-    marginBottom: 28,
+    marginBottom: 16,
   },
   roleCard: {
     flexDirection:   'row',
@@ -414,13 +483,8 @@ const styles = StyleSheet.create({
     borderColor:     Colors.light.border,
     gap:             12,
   },
-  roleEmoji: {
-    fontSize: 32,
-  },
-  roleText: {
-    flex: 1,
-    gap:  2,
-  },
+  roleEmoji: { fontSize: 32 },
+  roleText:  { flex: 1, gap: 2 },
   roleLabel: {
     fontSize:   16,
     fontWeight: '600',
@@ -442,12 +506,36 @@ const styles = StyleSheet.create({
     fontSize:   13,
     fontWeight: '700',
   },
+  requestBadge: {
+    backgroundColor:   Colors.light.border,
+    paddingHorizontal: 8,
+    paddingVertical:   3,
+    borderRadius:      8,
+  },
+  requestBadgeText: {
+    fontSize:   11,
+    color:      Colors.light.textMuted,
+    fontWeight: '500',
+  },
+  infoBox: {
+    backgroundColor: Colors.light.surface,
+    borderRadius:    12,
+    padding:         14,
+    marginBottom:    16,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.brand.primary,
+  },
+  infoText: {
+    fontSize:   13,
+    color:      Colors.light.textSecondary,
+    lineHeight: 18,
+  },
   back: {
     marginBottom: 16,
   },
   backText: {
-    fontSize: 14,
-    color:    Colors.brand.primary,
+    fontSize:   14,
+    color:      Colors.brand.primary,
     fontWeight: '500',
   },
   btn: {

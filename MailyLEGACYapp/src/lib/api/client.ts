@@ -57,7 +57,10 @@ apiClient.interceptors.response.use(
     }
 
     const { status, data } = error.response
-    const message = extractErrorMessage(data) || httpErrorMessage(status)
+    const message =
+      extractErrorMessage(data) ||
+      httpErrorMessage(status) ||
+      'Error desconocido. Intenta de nuevo.'
     throw new ApiError(status, message, data)
   },
 )

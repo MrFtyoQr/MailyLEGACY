@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    MeView, RoleView,
+    MeView, RoleView, AuthInitView,
     PatientProfileView, PatientPhotoView,
     DoctorProfileView, DoctorPhotoView,
     SpecialistProfileView, PartnerProfileView,
@@ -12,6 +12,9 @@ from .webhooks.clerk_webhooks import ClerkWebhookView
 urlpatterns = [
     # Clerk webhook
     path('webhook/clerk/', ClerkWebhookView.as_view(), name='clerk-webhook'),
+
+    # Registro inicial (fallback si webhook no llegó)
+    path('init/', AuthInitView.as_view(), name='auth-init'),
 
     # Usuario autenticado
     path('me/', MeView.as_view(), name='auth-me'),

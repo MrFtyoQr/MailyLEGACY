@@ -1,17 +1,51 @@
-import { Stack } from 'expo-router'
+/**
+ * (specialist)/_layout.tsx
+ * Tab navigator del rol SPECIALIST.
+ * 4 tabs: Inicio · Referidos · Agenda · Perfil
+ */
+
+import React from 'react'
+import { Text } from 'react-native'
+import { Tabs } from 'expo-router'
+import { TabBar } from '@components/layout/TabBar'
 import { Colors } from '@constants/colors'
+
+function Icon({ emoji, focused }: { emoji: string; focused: boolean }) {
+  return (
+    <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>
+  )
+}
 
 export default function SpecialistLayout() {
   return (
-    <Stack
+    <Tabs
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
-        headerStyle:     { backgroundColor: Colors.light.bg },
-        headerTintColor: Colors.light.textPrimary,
-        headerTitleStyle: { fontWeight: '600', fontSize: 17 },
-        headerShadowVisible: false,
+        headerShown:           false,
+        tabBarActiveTintColor: Colors.role.specialist,
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'Mi Panel' }} />
-    </Stack>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Inicio',
+          tabBarIcon: ({ focused }) => <Icon emoji="🔬" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="referrals/index"
+        options={{
+          title: 'Referidos',
+          tabBarIcon: ({ focused }) => <Icon emoji="📋" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Perfil',
+          tabBarIcon: ({ focused }) => <Icon emoji="👤" focused={focused} />,
+        }}
+      />
+    </Tabs>
   )
 }

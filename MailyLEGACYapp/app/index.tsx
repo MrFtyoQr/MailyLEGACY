@@ -14,7 +14,7 @@ import React, { useEffect, useCallback } from 'react'
 import { View, Image, Text, StyleSheet, Dimensions } from 'react-native'
 import { router } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useAuth } from '@clerk/clerk-expo'
+import { useAuth, useUser } from '@clerk/clerk-expo'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -26,7 +26,7 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { useAuthStore }  from '@store/auth.store'
-import { get }          from '@lib/api/client'
+import { get, post }    from '@lib/api/client'
 import { EP }           from '@lib/api/endpoints'
 import { Colors }       from '@constants/colors'
 import type { MeResponse } from '@/types/api.types'
@@ -35,6 +35,7 @@ const { width } = Dimensions.get('window')
 
 export default function SplashAnimatedScreen() {
   const { isLoaded, isSignedIn } = useAuth()
+  const { user: clerkUser }      = useUser()
   const setLoaded   = useAuthStore((s) => s.setLoaded)
   const setSignedIn = useAuthStore((s) => s.setSignedIn)
   const setUser     = useAuthStore((s) => s.setUser)
@@ -70,9 +71,7 @@ export default function SplashAnimatedScreen() {
     setLoaded(true)
     setSignedIn(!!isSignedIn)
 
-    // Animación de salida
     containerScale.value = withTiming(0.95, { duration: 200 })
-
     await new Promise((r) => setTimeout(r, 200))
     await SplashScreen.hideAsync()
 
@@ -81,9 +80,7 @@ export default function SplashAnimatedScreen() {
       return
     }
 
-    // Verificar si el perfil está completo
-    try {
-      const me = await get<MeResponse>(EP.authMe)
+    const handleMe = async (me: MeResponse) => {
       setUser({
         id:        me.user.id,
         clerkId:   me.user.clerk_id,
@@ -93,31 +90,43 @@ export default function SplashAnimatedScreen() {
         lastName:  me.profile?.last_name  ?? null,
         photoUrl:  me.profile?.photo_url  ?? null,
       })
-
       if (!me.is_complete || !me.user.role) {
         router.replace('/(auth)/role-setup')
         return
       }
-
       const roleMap: Record<string, string> = {
         PATIENT:    '/(patient)',
         DOCTOR:     '/(doctor)',
         SPECIALIST: '/(specialist)',
       }
       router.replace((roleMap[me.user.role] ?? '/(auth)/role-setup') as never)
+    }
+
+    try {
+      const me = await get<MeResponse>(EP.authMe)
+      await handleMe(me)
     } catch (err: unknown) {
-      // Si el backend falla pero Clerk tiene sesión activa,
-      // mandamos a role-setup (mejor UX que volver a sign-in en bucle).
-      // Solo volvemos a sign-in si el error es 401 (token inválido).
-      const status = (err as { response?: { status?: number } })?.response?.status
-      if (status === 401) {
-        router.replace('/(auth)/sign-in')
+      // ApiError tiene .status directamente (no .response.status)
+      const httpStatus = (err as { status?: number }).status
+
+      if (httpStatus === 401) {
+        // El usuario existe en Clerk pero no en Django (webhook no llegó).
+        // Llamamos a /auth/init/ para crearlo, luego reintentamos.
+        try {
+          const email = clerkUser?.primaryEmailAddress?.emailAddress ?? ''
+          await post(EP.authInit, { email })
+          const me = await get<MeResponse>(EP.authMe)
+          await handleMe(me)
+        } catch {
+          // Si sigue fallando después del init, volver a login
+          router.replace('/(auth)/sign-in')
+        }
       } else {
-        // Backend no disponible, red caída, etc. → intentar continuar
+        // Backend no disponible, red caída, etc. → role-setup
         router.replace('/(auth)/role-setup')
       }
     }
-  }, [isLoaded, isSignedIn])
+  }, [isLoaded, isSignedIn, clerkUser])
 
   useEffect(() => {
     // Secuencia de entrada del logo
