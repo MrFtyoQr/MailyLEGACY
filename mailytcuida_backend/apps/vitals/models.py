@@ -60,6 +60,8 @@ class VitalSign(models.Model):
         max_length=15, choices=VitalSource.choices, default=VitalSource.MANUAL
     )
     notes           = models.TextField(blank=True)
+    # Optional photo evidence (URL in R2 after client-side presigned upload)
+    photo_url       = models.URLField(max_length=512, blank=True)
     recorded_at     = models.DateTimeField(db_index=True)
     created_at      = models.DateTimeField(auto_now_add=True)
 

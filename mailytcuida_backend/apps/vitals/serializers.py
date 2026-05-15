@@ -7,7 +7,7 @@ class VitalSignSerializer(serializers.ModelSerializer):
         model = VitalSign
         fields = [
             'id', 'vital_type', 'value', 'secondary_value',
-            'unit', 'source', 'notes', 'recorded_at', 'created_at',
+            'unit', 'source', 'notes', 'photo_url', 'recorded_at', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
 
