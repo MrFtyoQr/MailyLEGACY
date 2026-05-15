@@ -102,10 +102,10 @@ export default function PatientLayout() {
 const styles = StyleSheet.create({
   bar: {
     flexDirection:     'row',
-    justifyContent:    'space-evenly',
     alignItems:        'center',
     backgroundColor:   TAB_BG,
     paddingTop:        10,
+    paddingHorizontal: 12,
     borderTopWidth:    1,
     borderTopColor:    '#EDF2F7',
     shadowColor:       '#000',
