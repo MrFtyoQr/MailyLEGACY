@@ -105,10 +105,11 @@ export const VITAL_META: Record<VitalType, {
     normal: { min: 7, max: 9 } },
 }
 
+/** Tipos enviados al backend. BMI se calcula en la app, no se registra. */
 export const VITAL_TYPES_ORDERED: VitalType[] = [
   'BLOOD_PRESSURE', 'HEART_RATE', 'OXYGEN_SAT', 'RESPIRATORY',
   'GLUCOSE', 'GLUCOSE_FAST', 'TEMPERATURE',
-  'WEIGHT', 'HEIGHT', 'BMI', 'WAIST', 'HIP',
+  'WEIGHT', 'HEIGHT', 'WAIST', 'HIP',
   'STEPS', 'SLEEP_HOURS',
 ]
 

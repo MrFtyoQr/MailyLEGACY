@@ -37,6 +37,37 @@ function statusColor(type: VitalType, value: number): string {
   return Colors.semantic.success
 }
 
+// ── Tarjeta de IMC calculado ──────────────────────────────────────────────────
+function BmiCard({ weight, height }: { weight?: number; height?: number }) {
+  const hasBoth = weight != null && height != null && height > 0
+  const bmi     = hasBoth ? weight! / Math.pow(height! / 100, 2) : null
+  const bmiStr  = bmi != null ? bmi.toFixed(1) : '—'
+
+  let color  = Colors.light.textMuted
+  let label  = 'Sin datos'
+  if (bmi != null) {
+    if      (bmi < 18.5) { color = Colors.semantic.warning; label = 'Bajo peso' }
+    else if (bmi < 25)   { color = Colors.semantic.success; label = 'Normal' }
+    else if (bmi < 30)   { color = Colors.semantic.warning; label = 'Sobrepeso' }
+    else                 { color = Colors.semantic.error;   label = 'Obesidad' }
+  }
+
+  return (
+    <View style={[styles.vitalCard, bmi != null && { borderLeftColor: color, borderLeftWidth: 3 }]}>
+      <Text style={styles.vitalIcon}>📊</Text>
+      <Text style={[styles.vitalValue, { color: bmi != null ? color : Colors.light.textMuted }]}>
+        {bmiStr}
+      </Text>
+      <Text style={styles.vitalUnit}>kg/m²</Text>
+      <Text style={styles.vitalName} numberOfLines={2}>IMC (calculado)</Text>
+      {bmi != null && <Text style={styles.vitalTime}>{label}</Text>}
+      {!hasBoth && (
+        <Text style={[styles.vitalTime, { fontSize: 9 }]}>Registra peso y talla</Text>
+      )}
+    </View>
+  )
+}
+
 // ── Componente tarjeta de un signo ────────────────────────────────────────────
 function VitalSignCard({ type, latest }: { type: VitalType; latest?: VitalLatest }) {
   const meta      = VITAL_META[type]
@@ -188,6 +219,11 @@ export default function VitalsScreen() {
                 latest={latestMap[type]}
               />
             ))}
+            {/* IMC calculado a partir de peso + talla */}
+            <BmiCard
+              weight={latestMap['WEIGHT']?.value}
+              height={latestMap['HEIGHT']?.value}
+            />
           </View>
         )}
 

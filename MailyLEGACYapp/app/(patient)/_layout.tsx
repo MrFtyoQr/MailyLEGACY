@@ -115,12 +115,11 @@ const styles = StyleSheet.create({
     elevation:         12,
   },
   tabItem: {
+    flex:            1,
     alignItems:      'center',
     justifyContent:  'center',
     paddingVertical: 4,
-    paddingHorizontal: 14,
     gap:             4,
-    minWidth:        44,
   },
   tabEmoji: {
     fontSize: 26,
