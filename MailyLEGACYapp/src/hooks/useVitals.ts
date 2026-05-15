@@ -54,13 +54,14 @@ export interface VitalSummaryEntry {
 }
 
 export interface AddVitalPayload {
-  vital_type:      VitalType
-  value:           number
+  vital_type:       VitalType
+  value:            number
   secondary_value?: number
-  recorded_at:     string
-  unit?:           string
-  source?:         'MANUAL' | 'DEVICE' | 'INTEGRATION'
-  notes?:          string
+  recorded_at:      string
+  unit?:            string
+  source?:          'MANUAL' | 'DEVICE' | 'INTEGRATION'
+  notes?:           string
+  photo_url?:       string
 }
 
 // ── Metadatos locales para UI ─────────────────────────────────────────────────
