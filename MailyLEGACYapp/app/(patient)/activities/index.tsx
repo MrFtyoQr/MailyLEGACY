@@ -63,6 +63,11 @@ const MOOD_COLOR = (score: number) => {
 
 const SLEEP_EMOJIS = ['😴', '💤', '🌙', '⭐', '🌟']
 
+/** Django devuelve microsegundos en el ISO string — iOS no los parsea. */
+function safeDate(iso: string): Date {
+  return new Date(iso.replace(/\.\d{1,6}(?=[+-Z]|$)/, ''))
+}
+
 export default function ActivitiesScreen() {
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing]   = useState(false)
@@ -91,16 +96,52 @@ export default function ActivitiesScreen() {
     queryFn:   () => get<{ results: MoodEntry[] }>(EP.wellnessMood),
   })
 
+  // DailyCheckin es solo lectura — el backend lo genera automáticamente
+  // cuando se guardan MoodEntry + SleepEntry.
   const checkinMutation = useMutation({
-    mutationFn: () => post(EP.wellnessCheckins, {
-      mood_score:  moodScore,
-      sleep_hours: sleepHours,
-      notes:       notes.trim() || null,
-    }),
+    mutationFn: async () => {
+      const now   = new Date()
+      const today = now.toISOString().split('T')[0]
+
+      // Derivar label de ánimo a partir del score
+      const moodLabel =
+        moodScore >= 9 ? 'EXCELLENT' :
+        moodScore >= 7 ? 'GOOD'      :
+        moodScore >= 5 ? 'NEUTRAL'   :
+        moodScore >= 3 ? 'LOW'       : 'SAD'
+
+      // Derivar calidad de sueño a partir de horas
+      const sleepQuality =
+        sleepHours >= 8 ? 'GREAT' :
+        sleepHours >= 7 ? 'GOOD'  :
+        sleepHours >= 5 ? 'FAIR'  :
+        sleepHours >= 3 ? 'POOR'  : 'INSOMNIA'
+
+      // Mood: puede haber múltiples por día — si falla, propagamos el error
+      await post(EP.wellnessMood, {
+        logged_at: now.toISOString(),
+        score:     moodScore,
+        label:     moodLabel,
+        note:      notes.trim() || '',
+      })
+
+      // Sleep: unique_together (patient, sleep_date) — si ya existe hoy, ignoramos el error
+      try {
+        await post(EP.wellnessSleep, {
+          sleep_date:     today,
+          duration_hours: sleepHours,
+          quality:        sleepQuality,
+          note:           notes.trim() || '',
+        })
+      } catch {
+        // Ya registrado hoy — DailyCheckin se actualiza igual desde el mood entry
+      }
+    },
     onSuccess: () => {
       setSubmitted(true)
       queryClient.invalidateQueries({ queryKey: ['wellness-checkins'] })
       queryClient.invalidateQueries({ queryKey: ['wellness-mood'] })
+      queryClient.invalidateQueries({ queryKey: ['wellness-sleep'] })
     },
   })
 
@@ -116,8 +157,9 @@ export default function ActivitiesScreen() {
 
   // Verificar si ya hizo check-in hoy
   const today = new Date().toISOString().split('T')[0]
-  const todayCheckin = checkinsQ.data?.results?.find((c) => c.date === today)
-  const alreadyDone  = !!todayCheckin || submitted
+  const todayCheckin  = checkinsQ.data?.results?.find((c) => c.date === today)
+  const sleepDoneToday = !!todayCheckin?.sleep_hours
+  const alreadyDone   = !!todayCheckin || submitted
 
   // Promedio de ánimo de la semana
   const moodEntries  = moodQ.data?.results?.slice(0, 7) ?? []
@@ -155,14 +197,19 @@ export default function ActivitiesScreen() {
         {alreadyDone ? (
           <Card style={styles.doneCard}>
             <Text style={styles.doneEmoji}>✅</Text>
-            <View>
-              <Text style={styles.doneTitle}>¡Check-in completado!</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.doneTitle}>¡Check-in de ánimo completado!</Text>
               <Text style={styles.doneSub}>
                 Ánimo: {MOOD_EMOJIS[todayCheckin?.mood_score ?? moodScore]}{' '}
                 {todayCheckin?.mood_score ?? moodScore}/10
                 {'  ·  '}
                 Sueño: {todayCheckin?.sleep_hours ?? sleepHours}h
               </Text>
+              {sleepDoneToday && (
+                <Text style={styles.sleepNote}>
+                  💤 Sueño de hoy registrado — próxima anotación: mañana a partir de las 00:00
+                </Text>
+              )}
             </View>
           </Card>
         ) : (
@@ -256,7 +303,7 @@ export default function ActivitiesScreen() {
                       {entry.score}
                     </Text>
                     <Text style={styles.moodDayDate}>
-                      {new Date(entry.recorded_at).toLocaleDateString('es-MX', { weekday: 'short' })}
+                      {safeDate(entry.recorded_at).toLocaleDateString('es-MX', { weekday: 'short' })}
                     </Text>
                   </View>
                 ))}
@@ -281,7 +328,7 @@ export default function ActivitiesScreen() {
               </View>
               <Text style={styles.progressLabel}>{e.progress_pct}% completado</Text>
               <Text style={styles.programDate}>
-                Inicio: {new Date(e.started_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+                Inicio: {safeDate(e.started_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
               </Text>
             </Card>
           ))
@@ -330,10 +377,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
-  doneCard: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  doneCard:  { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   doneEmoji: { fontSize: 32 },
   doneTitle: { fontSize: 16, fontWeight: '700', color: Colors.light.textPrimary },
   doneSub:   { fontSize: 13, color: Colors.light.textSecondary, marginTop: 2 },
+  sleepNote: { fontSize: 12, color: Colors.light.textMuted, marginTop: 6, lineHeight: 17 },
 
   checkinCard: { gap: 14 },
   fieldLabel:  { fontSize: 14, fontWeight: '600', color: Colors.light.textPrimary },

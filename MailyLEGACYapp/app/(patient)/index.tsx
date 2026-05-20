@@ -53,6 +53,21 @@ interface DashboardData {
   adherence_pct?: number
 }
 
+interface HealthInsight {
+  id:            string
+  insight_type:  'MEDICATION_ADHERENCE' | 'VITAL_TREND' | 'LAB_ANALYSIS' | 'GENERAL_HEALTH'
+  title:         string
+  content:       string
+  generated_at:  string
+}
+
+const INSIGHT_TYPE_ICON: Record<string, string> = {
+  MEDICATION_ADHERENCE: '💊',
+  VITAL_TREND:          '📈',
+  LAB_ANALYSIS:         '🔬',
+  GENERAL_HEALTH:       '🧠',
+}
+
 // ── Tips rotativos ────────────────────────────────────────────────────────────
 const HEALTH_TIPS = [
   { emoji: '💧', title: 'Hidratación', text: 'Bebe al menos 8 vasos de agua al día. La hidratación mejora la concentración y el estado de ánimo.' },
@@ -94,6 +109,14 @@ export default function PatientHome() {
   const todayStretch = useMemo(() => STRETCHES[new Date().getDate() % STRETCHES.length], [])
 
   const { data: vitalsLatest } = useVitalsLatest()
+
+  const { data: insightsData } = useQuery<{ results: HealthInsight[] }>({
+    queryKey:  ['analytics-insights'],
+    staleTime: 10 * 60 * 1000,
+    queryFn:   () => get<{ results: HealthInsight[] }>(EP.analyticsInsights),
+    retry:     false,
+  })
+  const latestInsight = insightsData?.results?.[0] ?? null
 
   const meds     = dashboard?.medications_today
   const nextAppt = dashboard?.next_appointment
@@ -225,6 +248,28 @@ export default function PatientHome() {
             action="Registrar primero"
             onAction={() => router.push('/(patient)/vitals/add')}
           />
+        )}
+
+        {/* ── Insight IA ── */}
+        {latestInsight && (
+          <>
+            <SectionHeader title="Análisis IA de salud" />
+            <Card style={styles.insightCard}>
+              <View style={styles.insightHeader}>
+                <Text style={styles.insightIcon}>
+                  {INSIGHT_TYPE_ICON[latestInsight.insight_type] ?? '🧠'}
+                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.insightTitle} numberOfLines={2}>{latestInsight.title}</Text>
+                  <Text style={styles.insightDate}>
+                    {new Date(latestInsight.generated_at.replace(/\.\d{1,6}(?=[+-Z]|$)/, ''))
+                      .toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.insightBody} numberOfLines={4}>{latestInsight.content}</Text>
+            </Card>
+          </>
         )}
 
         {/* ── Próxima cita ── */}
@@ -438,4 +483,17 @@ const styles = StyleSheet.create({
   tipText:  { flex: 1, gap: 4 },
   tipTitle: { fontSize: 14, fontWeight: '700', color: Colors.light.textPrimary },
   tipBody:  { fontSize: 13, color: Colors.light.textSecondary, lineHeight: 19 },
+
+  // AI insight
+  insightCard: {
+    marginHorizontal: 20,
+    gap: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.brand.primary,
+  },
+  insightHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  insightIcon:   { fontSize: 26 },
+  insightTitle:  { fontSize: 14, fontWeight: '700', color: Colors.light.textPrimary, lineHeight: 20 },
+  insightDate:   { fontSize: 11, color: Colors.light.textMuted, marginTop: 2 },
+  insightBody:   { fontSize: 13, color: Colors.light.textSecondary, lineHeight: 19 },
 })

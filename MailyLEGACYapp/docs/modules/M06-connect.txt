@@ -1,0 +1,44 @@
+================================================================================
+MÓDULO: M06 — Appointments  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-15
+MÓDULO BACKEND REF: docs/modules/M06.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/appointments/index.tsx  → lista de citas con filtros por estado
+app/(patient)/appointments/[id].tsx   → detalle de una cita
+app/(patient)/index.tsx               → sección "Próximas citas" (hasta 2)
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.appointments        = GET  /api/v1/appointments/         → lista paginada (useAppointments)
+EP.appointmentDetail   = GET  /api/v1/appointments/<id>/    → detalle (useAppointmentDetail)
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+src/hooks/useAppointments.ts
+  useAppointments()           → lista de citas ordenadas por fecha
+  useAppointmentDetail(id)    → detalle de una cita específica
+  useUpcomingAppointments()   → filtra status=SCHEDULED próximas 7 días
+
+--------------------------------------------------------------------------------
+GAMIFICACIÓN
+--------------------------------------------------------------------------------
+Cuando el médico marca una cita como COMPLETED, el backend dispara
+signals.py → award_points(APPOINTMENT_KEPT, 20 pts base).
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- Appointment.status: SCHEDULED | COMPLETED | CANCELLED | NO_SHOW
+- Las citas se crean desde el lado del médico o la plataforma de telemedicina.
+- El paciente no puede crear ni cancelar citas directamente en M06
+  (cancelación via soporte o médico).
+================================================================================

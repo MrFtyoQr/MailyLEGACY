@@ -1,0 +1,120 @@
+================================================================================
+MÓDULO: M21 — Wellness  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-15
+MÓDULO BACKEND REF: docs/modules/M21.txt
+ESTADO:  PARCIALMENTE CONECTADO ⚠ (check-in corregido; programas solo lectura)
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/activities/index.tsx  → check-in diario (ánimo + sueño) + programas
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.wellnessMood        = GET  /api/v1/wellness/mood/        → historial de ánimo
+EP.wellnessMood        = POST /api/v1/wellness/mood/        → registrar entrada de ánimo
+EP.wellnessSleep       = POST /api/v1/wellness/sleep/       → registrar entrada de sueño
+EP.wellnessCheckins    = GET  /api/v1/wellness/checkins/    → check-ins diarios (solo lectura)
+EP.wellnessEnrollments = GET  /api/v1/wellness/enrollments/ → programas inscritos del paciente
+
+IMPORTANTE — DailyCheckin es READ-ONLY en el backend:
+  El modelo DailyCheckin se genera AUTOMÁTICAMENTE cuando se guarda un
+  MoodEntry o SleepEntry (via upsert_daily_checkin en services.py).
+  NO existe POST /wellness/checkins/ — intentarlo devuelve 405 o 400.
+
+--------------------------------------------------------------------------------
+PAYLOAD MOOD (POST /api/v1/wellness/mood/)
+--------------------------------------------------------------------------------
+Campo     | Tipo     | Req | Notas
+----------|----------|-----|----------------------------------------------
+logged_at | ISO8601  |  ✓  | DateTime del registro (now en el cliente)
+score     | int      |  ✓  | 1–10 (validado en backend)
+label     | string   |     | EXCELLENT|GOOD|NEUTRAL|LOW|ANXIOUS|STRESSED|SAD|ANGRY
+note      | string   |     | Texto libre
+
+Derivación automática de label en frontend (activities/index.tsx):
+  score >= 9 → EXCELLENT
+  score >= 7 → GOOD
+  score >= 5 → NEUTRAL
+  score >= 3 → LOW
+  score < 3  → SAD
+
+--------------------------------------------------------------------------------
+PAYLOAD SLEEP (POST /api/v1/wellness/sleep/)
+--------------------------------------------------------------------------------
+Campo          | Tipo   | Req | Notas
+---------------|--------|-----|----------------------------------------------
+sleep_date     | date   |  ✓  | "YYYY-MM-DD" (hoy)
+duration_hours | number |  ✓  | Decimal, > 0 y <= 24 (validado en backend)
+quality        | string |  ✓  | GREAT|GOOD|FAIR|POOR|INSOMNIA
+note           | string |     | Texto libre
+
+Derivación automática de quality en frontend:
+  hours >= 8 → GREAT
+  hours >= 7 → GOOD
+  hours >= 5 → FAIR
+  hours >= 3 → POOR
+  hours < 3  → INSOMNIA
+
+Restricción backend: unique_together = ('patient', 'sleep_date')
+  → Si el paciente ya registró sueño hoy, el segundo POST devuelve 400.
+  TODO: detectar este caso y mostrar mensaje amigable.
+
+--------------------------------------------------------------------------------
+FLUJO DE CHECK-IN DIARIO
+--------------------------------------------------------------------------------
+1. Pantalla carga → GET /wellness/checkins/ para verificar si ya hay check-in hoy
+2. Si todayCheckin existe → muestra resumen "Ya registraste hoy"
+3. Si no → muestra formulario: slider ánimo (1-10) + selector horas (4h-10h) + nota
+4. Al tocar "Registrar check-in":
+   a. POST /wellness/mood/ con { logged_at, score, label, note }
+   b. POST /wellness/sleep/ con { sleep_date, duration_hours, quality, note }
+   (ambos en Promise.all — paralelo)
+5. onSuccess → invalidate queries wellness-checkins + wellness-mood + wellness-sleep
+
+--------------------------------------------------------------------------------
+VALIDACIONES EN FRONTEND
+--------------------------------------------------------------------------------
+[x] moodScore limitado al rango 1-10 (UI de selector de números)
+[x] sleepHours limitado al rango 4-10 (selector de chips)
+[x] notes.trim() antes de enviar
+[x] Botón deshabilitado mientras mutación está pendiente (isPending)
+[x] Verificación de check-in duplicado (todayCheckin guard)
+
+--------------------------------------------------------------------------------
+ESTADO DE CONEXIÓN POR SECCIÓN
+--------------------------------------------------------------------------------
+activities/index.tsx
+  [x] GET wellness/checkins  → detecta check-in de hoy
+  [x] POST wellness/mood     → registra ánimo (score, label, note)
+  [x] POST wellness/sleep    → registra sueño (date, hours, quality)
+  [x] GET wellness/enrollments → lista programas inscritos
+  [ ] GET wellness/programs  → catálogo de programas disponibles (no conectado aún)
+  [ ] POST wellness/enrollments/<id>/complete-activity/ → marcar actividad completa
+
+--------------------------------------------------------------------------------
+BUG CORREGIDO (2026-05-15)
+--------------------------------------------------------------------------------
+ANTES: checkinMutation posteaba a EP.wellnessCheckins con { mood_score, sleep_hours, notes }
+  → DailyCheckin NO tiene POST; serializer tiene read_only_fields = all
+  → Error: "No se pudo guardar. Intenta de nuevo."
+
+DESPUÉS: checkinMutation postea en paralelo a:
+  → EP.wellnessMood  con payload correcto (logged_at, score, label, note)
+  → EP.wellnessSleep con payload correcto (sleep_date, duration_hours, quality, note)
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Detectar unique_together de SleepEntry (mostrar "Ya registraste sueño hoy" en vez de error)
+[ ] Conectar catálogo de programas (GET /wellness/programs/)
+[ ] Marcar actividades completas dentro de un programa
+[ ] Historial de mood entries (gráfica de ánimo últimos 7 días)
+[ ] Historial de sleep entries (gráfica de sueño últimos 7 días)
+[ ] Filtros de fecha en mood y sleep endpoints
+
+================================================================================

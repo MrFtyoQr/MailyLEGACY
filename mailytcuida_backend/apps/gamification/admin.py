@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Badge, PlayerProfile, PointTransaction, PlayerBadge
+from .models import Badge, PlayerProfile, PointTransaction, PlayerBadge, RewardProduct
 
 
 @admin.register(Badge)
@@ -41,3 +41,22 @@ class PointTransactionAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(RewardProduct)
+class RewardProductAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'points_cost', 'stock', 'is_active', 'created_at')
+    list_filter   = ('is_active',)
+    search_fields = ('name', 'description')
+    readonly_fields = ('id', 'created_at', 'updated_at')
+    fieldsets = (
+        (None, {
+            'fields': ('id', 'name', 'description', 'image_url'),
+        }),
+        ('Canje', {
+            'fields': ('points_cost', 'stock', 'is_active'),
+        }),
+        ('Fechas', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )

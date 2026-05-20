@@ -1,0 +1,74 @@
+================================================================================
+MÓDULO: M15 — Gamification  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-15
+MÓDULO BACKEND REF: docs/modules/M15.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/gamification.tsx         → pantalla principal: puntos, racha, badges, historial, rewards
+app/(patient)/vitals/index.tsx         → chip "⭐ N pts · Nv.X" tappable → navega a gamification
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.gamification             = GET  /api/v1/gamification/me/                 → PlayerProfile
+EP.gamificationTransactions = GET  /api/v1/gamification/me/transactions/    → historial paginado
+EP.badges                   = GET  /api/v1/gamification/badges/             → catálogo de badges
+EP.gamificationRewards      = GET  /api/v1/gamification/rewards/            → productos canjeables
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+src/hooks/useGamification.ts
+  usePlayerProfile()    → { total_points, level, current_streak, longest_streak, multiplier, badges }
+  useTransactions()     → { results: PointTransaction[], count }
+  useAvailableBadges()  → Badge[]  (todos los badges del catálogo)
+  useRewardProducts()   → RewardProduct[]  (productos activos del admin)
+
+--------------------------------------------------------------------------------
+PUNTOS POR ACCIÓN (BASE × MULTIPLICADOR DE PLAN)
+--------------------------------------------------------------------------------
+Fuente               | Base pts | Multiplicador
+---------------------|----------|---------------------------
+MEDICATION_TAKEN     |   10     | FREE×1 / SILVER×2 / GOLD×3 / PLATINUM×5
+VITAL_LOGGED (texto) |    5     | ídem
+VITAL_LOGGED (foto)  |   10     | ídem  ← foto detectada via photo_url
+LAB_UPLOADED         |   15     | ídem
+APPOINTMENT_KEPT     |   20     | ídem
+STREAK_BONUS         |   25     | ídem
+REFERRAL_COMPLETED   |   50     | ídem
+PROFILE_COMPLETED    |   30     | ídem
+
+--------------------------------------------------------------------------------
+FLUJO DE PUNTOS FOTO
+--------------------------------------------------------------------------------
+vitals/add.tsx → pick imagen → presigned R2 URL → PUT a R2 → save con photo_url
+Backend: VitalSign.photo_url presente → signal award_points(base_pts=10)
+Hook useAddVitals.onSuccess → invalidateQueries(['player-profile']) → chip actualizado
+
+--------------------------------------------------------------------------------
+PRODUCTOS CANJEABLES (ADMIN)
+--------------------------------------------------------------------------------
+- El admin sube la imagen a R2 desde el panel Django (RewardProduct.image_url)
+- Si no hay productos activos, la app muestra placeholder "Próximamente…"
+- El canje real se implementará en M17 (Coupons)
+
+--------------------------------------------------------------------------------
+NIVELES
+--------------------------------------------------------------------------------
+Nivel 1: 0 pts   | Nivel 2: 200   | Nivel 3: 500    | Nivel 4: 1.000
+Nivel 5: 2.000   | Nivel 6: 4.000 | Nivel 7: 8.000  | Nivel 8: 15.000
+Nivel 9: 30.000  | Nivel 10: max
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- PlayerProfile se crea lazily en el primer award_points (get_or_create).
+- PointTransaction es inmutable — el save() lanza ValueError si se intenta editar.
+- El leaderboard (EP.leaderboard) está disponible pero no se usa en la pantalla actual.
+================================================================================

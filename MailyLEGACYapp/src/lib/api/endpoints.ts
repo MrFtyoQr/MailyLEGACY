@@ -85,9 +85,11 @@ export const EP = {
   documentExport:        '/documents/export/',
 
   // ── Gamificación ─────────────────────────────────────────────────────────
-  gamification:          '/gamification/me/',
-  badges:                '/gamification/badges/',
-  leaderboard:           '/gamification/leaderboard/',
+  gamification:             '/gamification/me/',
+  gamificationTransactions: '/gamification/me/transactions/',
+  badges:                   '/gamification/badges/',
+  gamificationRewards:      '/gamification/rewards/',
+  leaderboard:              '/gamification/leaderboard/',
 
   // ── Family Care ───────────────────────────────────────────────────────────
   familyCareLinks:       '/family-care/links/',

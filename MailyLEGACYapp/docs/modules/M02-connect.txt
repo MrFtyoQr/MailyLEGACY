@@ -1,0 +1,59 @@
+================================================================================
+MÓDULO: M02 — Accounts & Profiles  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M02.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/profile.tsx          → ver y editar perfil del paciente + foto
+app/(doctor)/profile.tsx           → ver y editar perfil del doctor + foto
+app/(specialist)/profile.tsx       → ver perfil del especialista
+app/(auth)/role-setup.tsx          → crea perfil inicial al elegir rol (M01 + M02)
+app/(doctor)/patients/index.tsx    → listado de pacientes asignados al doctor
+app/(doctor)/patients/[id].tsx     → ficha de un paciente (solo doctor)
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.profilePatient       = GET/PATCH /api/v1/auth/profiles/patient/
+EP.profilePatientPhoto  = POST      /api/v1/auth/profiles/patient/photo/
+EP.profileDoctor        = GET/PATCH /api/v1/auth/profiles/doctor/
+EP.profileDoctorPhoto   = POST      /api/v1/auth/profiles/doctor/photo/
+EP.profileSpecialist    = GET/PATCH /api/v1/auth/profiles/specialist/
+EP.doctorPatients       = GET       /api/v1/auth/doctor/patients/
+EP.doctorPatient(id)    = GET       /api/v1/auth/doctor/patients/<id>/
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+src/hooks/useProfile.ts
+  usePatientProfile()    → perfil del paciente autenticado
+  useDoctorProfile()     → perfil del doctor autenticado
+  useUpdateProfile()     → mutación PATCH → invalida ['profile']
+  useUploadPhoto()       → POST foto → URL en R2 guardada en DB
+  useDoctorPatients()    → lista de pacientes del doctor (usePatients.ts)
+
+--------------------------------------------------------------------------------
+FLUJO DE FOTO DE PERFIL
+--------------------------------------------------------------------------------
+1. Usuario selecciona imagen (expo-image-picker)
+2. POST /auth/profiles/patient/photo/ con FormData (multipart)
+3. Backend sube a R2, devuelve { photo_url }
+4. El store actualiza user.photoUrl via updateUser()
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- El perfil del paciente incluye: fecha de nacimiento, tipo de sangre, alergias,
+  condiciones crónicas, contacto de emergencia.
+- Estos campos son sensibles: no se loguean en Sentry (sanitizados en before_send).
+- El doctor asigna pacientes por email desde el panel; el frontend (doctor) solo
+  los lista y consulta, no los asigna.
+- SpecialistProfile y PartnerProfile no tienen pantalla de edición completa en el
+  móvil en esta versión — se gestionan desde el admin de Django.
+================================================================================

@@ -1,0 +1,43 @@
+================================================================================
+MÓDULO: M07 — Notifications  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-15
+MÓDULO BACKEND REF: docs/modules/M07.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/notifications.tsx   → lista de notificaciones + marcar leídas
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.notifications     = GET  /api/v1/notifications/         → lista paginada (useNotifications)
+EP.notificationRead  = POST /api/v1/notifications/<id>/read/  → marcar como leída
+EP.notificationsReadAll = POST /api/v1/notifications/read-all/ → marcar todas leídas
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+src/hooks/useNotifications.ts
+  useNotifications()    → lista de notificaciones (is_read: bool, title, body, type)
+  useMarkRead()         → mutación POST read/<id>/
+  useMarkAllRead()      → mutación POST read-all/
+
+--------------------------------------------------------------------------------
+PUSH / WEBSOCKET
+--------------------------------------------------------------------------------
+El proyecto usa Django Channels + Redis para WebSocket (sin Firebase).
+Las notificaciones push en tiempo real llegan por WS al canal del usuario.
+El hook useNotifications refresca al reconectar (onFocus invalidateQueries).
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- Notification.type: MEDICATION_REMINDER | LAB_RESULT | APPOINTMENT | SYSTEM | CHAT
+- El conteo de no leídas se muestra en el header del Home como badge rojo.
+- El acceso a esta pantalla es desde el ícono de campana en el header.
+================================================================================

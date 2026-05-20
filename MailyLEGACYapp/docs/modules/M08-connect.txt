@@ -1,0 +1,38 @@
+================================================================================
+MÓDULO: M08 — Chat (Mensajería Médico-Paciente)  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M08.txt
+ESTADO:  PENDIENTE — sin pantalla implementada
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Mensajería en tiempo real entre médico y paciente vía Django Channels (WebSocket)
+con Redis. Soporte para texto, imágenes y archivos. REST como fallback.
+
+--------------------------------------------------------------------------------
+ENDPOINTS DISPONIBLES (sin conectar)
+--------------------------------------------------------------------------------
+EP.conversations        = GET  /api/v1/chat/
+EP.conversationUnread   = GET  /api/v1/chat/unread-count/
+EP.conversationRead(id) = POST /api/v1/chat/<id>/read/
+EP.messages(id)         = GET  /api/v1/chat/<id>/messages/
+
+WebSocket: ws://<host>/ws/chat/<conversation_id>/
+
+--------------------------------------------------------------------------------
+PANTALLAS PENDIENTES
+--------------------------------------------------------------------------------
+[ ] app/(patient)/chat/index.tsx    → lista de conversaciones
+[ ] app/(patient)/chat/[id].tsx     → conversación individual
+
+--------------------------------------------------------------------------------
+NOTAS
+--------------------------------------------------------------------------------
+- El backend implementa WebSocket via Django Channels + Redis.
+- La integración frontend requiere expo-modules compatible con WebSocket nativo.
+- Unread count podría mostrarse en el tab bar como badge (M07 Notifications).
+================================================================================

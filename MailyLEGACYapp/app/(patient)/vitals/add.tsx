@@ -1,18 +1,18 @@
 /**
  * (patient)/vitals/add.tsx
  * Registra signos vitales — 13 tipos (BMI se calcula, no se sube).
- * Cada signo rellenado genera un POST con { vital_type, value, recorded_at }.
- * Foto de evidencia opcional por signo: flujo presigned-upload → R2 → photo_url.
+ * Flujo: formulario → revisión → confirmar → POST.
+ * Foto de evidencia opcional por signo: presigned-upload → R2 → photo_url.
  */
 
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   ScrollView, View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, KeyboardAvoidingView, Platform,
   ActivityIndicator, Image,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Colors } from '@constants/colors'
 import { post } from '@lib/api/client'
@@ -28,7 +28,7 @@ import {
 type FormState      = Partial<Record<VitalType, string>>
 type SecondaryState = Partial<Record<VitalType, string>>
 type PhotoState     = Partial<Record<VitalType, string>>   // uri local
-type PhotoUrlState  = Partial<Record<VitalType, string>>   // URL R2 ya subida
+type PhotoUrlState  = Partial<Record<VitalType, string>>   // URL R2 subida
 
 // ── Subida de foto a R2 via presigned URL ─────────────────────────────────────
 async function uploadPhotoToR2(localUri: string): Promise<string> {
@@ -36,12 +36,10 @@ async function uploadPhotoToR2(localUri: string): Promise<string> {
   const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg'
   const fileName = `vital_${Date.now()}.${ext}`
 
-  // 1. Pedir URL presignada al backend
   const { upload_url, file_url } = await post<{ upload_url: string; file_url: string }>(
     EP.documentUploadUrl, { file_name: fileName, mime_type: mimeType },
   )
 
-  // 2. Subir directamente a R2
   const blob = await fetch(localUri).then(r => r.blob())
   const res  = await fetch(upload_url, {
     method:  'PUT',
@@ -54,14 +52,27 @@ async function uploadPhotoToR2(localUri: string): Promise<string> {
 
 // ── Pantalla ──────────────────────────────────────────────────────────────────
 export default function AddVitalScreen() {
+  const [step,      setStep]      = useState<'form' | 'review'>('form')
   const [values,    setValues]    = useState<FormState>({})
   const [secondary, setSecondary] = useState<SecondaryState>({})
   const [notes,     setNotes]     = useState('')
   const [photos,    setPhotos]    = useState<PhotoState>({})
   const [photoUrls, setPhotoUrls] = useState<PhotoUrlState>({})
   const [uploading, setUploading] = useState<Partial<Record<VitalType, boolean>>>({})
+  const [pendingPayloads, setPendingPayloads] = useState<AddVitalPayload[]>([])
 
   const addVitals = useAddVitals()
+
+  useFocusEffect(useCallback(() => {
+    setStep('form')
+    setValues({})
+    setSecondary({})
+    setNotes('')
+    setPhotos({})
+    setPhotoUrls({})
+    setUploading({})
+    setPendingPayloads([])
+  }, []))
 
   const setValue  = (type: VitalType, val: string) =>
     setValues(p => ({ ...p, [type]: val }))
@@ -89,7 +100,7 @@ export default function AddVitalScreen() {
     try {
       const url = await uploadPhotoToR2(uri)
       setPhotoUrls(p => ({ ...p, [type]: url }))
-    } catch (e) {
+    } catch {
       Alert.alert('Error de subida', 'No se pudo subir la foto. Puedes intentarlo de nuevo.')
       setPhotos(p => { const n = { ...p }; delete n[type]; return n })
     } finally {
@@ -102,7 +113,7 @@ export default function AddVitalScreen() {
     setPhotoUrls(p => { const n = { ...p }; delete n[type]; return n })
   }
 
-  // ── Construir payloads ─────────────────────────────────────────────────────
+  // ── Validar y construir payloads ──────────────────────────────────────────
   function buildPayloads(): AddVitalPayload[] | null {
     const now = new Date().toISOString()
     const payloads: AddVitalPayload[] = []
@@ -139,8 +150,8 @@ export default function AddVitalScreen() {
         payload.secondary_value = secVal
       }
 
-      if (notes.trim())     payload.notes     = notes.trim()
-      if (photoUrls[type])  payload.photo_url = photoUrls[type]
+      if (notes.trim())    payload.notes     = notes.trim()
+      if (photoUrls[type]) payload.photo_url = photoUrls[type]
 
       payloads.push(payload)
     }
@@ -156,19 +167,22 @@ export default function AddVitalScreen() {
     return payloads
   }
 
-  async function handleSubmit() {
-    // Verificar que no haya fotos pendientes de subir
-    const stillUploading = VITAL_TYPES_ORDERED.some(t => uploading[t])
-    if (stillUploading) {
+  // ── Ir a pantalla de revisión ─────────────────────────────────────────────
+  function handleGoToReview() {
+    if (VITAL_TYPES_ORDERED.some(t => uploading[t])) {
       Alert.alert('Espera', 'Todavía se están subiendo fotos. Espera un momento.')
       return
     }
-
     const payloads = buildPayloads()
     if (!payloads) return
+    setPendingPayloads(payloads)
+    setStep('review')
+  }
 
+  // ── Confirmar y enviar ────────────────────────────────────────────────────
+  async function handleConfirmSubmit() {
     try {
-      const { ok, failed } = await addVitals.mutateAsync(payloads)
+      const { ok, failed } = await addVitals.mutateAsync(pendingPayloads)
       if (failed === 0) {
         Alert.alert(
           '¡Guardado!',
@@ -178,7 +192,7 @@ export default function AddVitalScreen() {
       } else {
         Alert.alert(
           'Guardado parcial',
-          `${ok} registrado${ok > 1 ? 's' : ''}, ${failed} con error. Intenta de nuevo.`,
+          `${ok} registrado${ok > 1 ? 's' : ''}, ${failed} con error.`,
           [{ text: 'OK', onPress: () => router.back() }],
         )
       }
@@ -189,6 +203,81 @@ export default function AddVitalScreen() {
 
   const filledCount = VITAL_TYPES_ORDERED.filter(t => values[t]?.trim()).length
 
+  // ── PANTALLA DE REVISIÓN ──────────────────────────────────────────────────
+  if (step === 'review') {
+    return (
+      <ScreenWrapper edges={['top', 'left', 'right']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setStep('form')} activeOpacity={0.7}>
+            <Text style={styles.back}>‹ Editar</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Confirmar registro</Text>
+          <View style={{ width: 64 }} />
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+        >
+          <Text style={[styles.hint, { backgroundColor: Colors.semantic.successBg }]}>
+            Revisa los valores antes de guardar. Toca "Editar" para hacer cambios.
+          </Text>
+
+          {pendingPayloads.map((p) => {
+            const meta = VITAL_META[p.vital_type]
+            const isInNormal = p.value >= meta.normal.min && p.value <= meta.normal.max
+            return (
+              <View key={p.vital_type} style={styles.reviewCard}>
+                <View style={styles.reviewLeft}>
+                  <Text style={styles.vitalIcon}>{meta.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.vitalLabel}>{meta.label}</Text>
+                    <Text style={[styles.reviewValue, { color: isInNormal ? Colors.semantic.success : Colors.semantic.warning }]}>
+                      {p.value}{p.secondary_value != null ? `/${p.secondary_value}` : ''} {meta.unit}
+                    </Text>
+                    {p.notes ? <Text style={styles.reviewNote} numberOfLines={1}>📝 {p.notes}</Text> : null}
+                  </View>
+                </View>
+                {p.photo_url ? (
+                  <Image
+                    source={{ uri: p.photo_url }}
+                    style={styles.reviewThumb}
+                  />
+                ) : null}
+              </View>
+            )
+          })}
+
+          <TouchableOpacity
+            style={[styles.saveBtn, addVitals.isPending && styles.saveBtnDisabled]}
+            onPress={handleConfirmSubmit}
+            activeOpacity={0.85}
+            disabled={addVitals.isPending}
+          >
+            {addVitals.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveBtnText}>
+                Confirmar y guardar {pendingPayloads.length} signo{pendingPayloads.length > 1 ? 's' : ''}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => setStep('form')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.editBtnText}>← Editar valores</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </ScreenWrapper>
+    )
+  }
+
+  // ── PANTALLA DE FORMULARIO ────────────────────────────────────────────────
   return (
     <ScreenWrapper edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
@@ -212,16 +301,17 @@ export default function AddVitalScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.hint}>
-            Ingresa solo los signos que mediste. Puedes adjuntar una foto de evidencia por cada uno.
+            Ingresa solo los signos que mediste. Puedes adjuntar una foto de evidencia (+5 pts extra).
           </Text>
 
           {VITAL_TYPES_ORDERED.map(type => {
-            const meta    = VITAL_META[type]
-            const val     = values[type] ?? ''
-            const secVal  = secondary[type] ?? ''
-            const filled  = val.trim().length > 0
-            const photo   = photos[type]
-            const isUp    = !!uploading[type]
+            const meta   = VITAL_META[type]
+            const val    = values[type] ?? ''
+            const secVal = secondary[type] ?? ''
+            const filled = val.trim().length > 0
+            const photo  = photos[type]
+            const isUp   = !!uploading[type]
+            const hasUrl = !!photoUrls[type]
 
             return (
               <View key={type} style={[styles.vitalCard, filled && styles.vitalCardFilled]}>
@@ -273,8 +363,11 @@ export default function AddVitalScreen() {
                           <Text style={styles.photoUploadingText}>Subiendo…</Text>
                         </View>
                       ) : (
-                        <View style={styles.photoReadyBadge}>
-                          <Text style={styles.photoReadyText}>✓ Listo</Text>
+                        <View style={[styles.photoReadyBadge,
+                          { backgroundColor: hasUrl ? Colors.semantic.success : Colors.semantic.error }]}>
+                          <Text style={styles.photoReadyText}>
+                            {hasUrl ? '✓ Subida — +5 pts extra' : '⚠ Error al subir'}
+                          </Text>
                         </View>
                       )}
                       <TouchableOpacity
@@ -313,25 +406,20 @@ export default function AddVitalScreen() {
             />
           </View>
 
-          {/* Botón guardar */}
+          {/* Botón → revisión */}
           <TouchableOpacity
             style={[styles.saveBtn,
-              (addVitals.isPending || filledCount === 0 ||
-               VITAL_TYPES_ORDERED.some(t => uploading[t])) && styles.saveBtnDisabled]}
-            onPress={handleSubmit}
+              (filledCount === 0 || VITAL_TYPES_ORDERED.some(t => uploading[t])) &&
+              styles.saveBtnDisabled]}
+            onPress={handleGoToReview}
             activeOpacity={0.85}
-            disabled={addVitals.isPending || filledCount === 0 ||
-                      VITAL_TYPES_ORDERED.some(t => uploading[t])}
+            disabled={filledCount === 0 || VITAL_TYPES_ORDERED.some(t => uploading[t])}
           >
-            {addVitals.isPending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.saveBtnText}>
-                Guardar {filledCount > 0
-                  ? `${filledCount} signo${filledCount > 1 ? 's' : ''}`
-                  : 'signos vitales'}
-              </Text>
-            )}
+            <Text style={styles.saveBtnText}>
+              Revisar {filledCount > 0
+                ? `${filledCount} signo${filledCount > 1 ? 's' : ''}`
+                : 'signos vitales'} →
+            </Text>
           </TouchableOpacity>
 
           <View style={{ height: 40 }} />
@@ -405,8 +493,10 @@ const styles = StyleSheet.create({
   },
   photoUploadingBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   photoUploadingText:  { color: '#fff', fontSize: 12, fontWeight: '600' },
-  photoReadyBadge:     {},
-  photoReadyText:      { color: '#fff', fontSize: 13, fontWeight: '700' },
+  photoReadyBadge: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+  },
+  photoReadyText:  { color: '#fff', fontSize: 12, fontWeight: '700' },
   photoRemoveBtn: {
     width: 26, height: 26, borderRadius: 13,
     backgroundColor: 'rgba(255,255,255,0.25)',
@@ -426,4 +516,47 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText:     { fontSize: 16, fontWeight: '700', color: '#fff' },
+
+  // Review
+  reviewCard: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    backgroundColor: '#fff',
+    borderRadius:    14,
+    padding:         14,
+    borderWidth:     1.5,
+    borderColor:     Colors.light.border,
+    gap:             12,
+  },
+  reviewLeft: {
+    flex:          1,
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           10,
+  },
+  reviewValue: {
+    fontSize:   18,
+    fontWeight: '700',
+    marginTop:  2,
+  },
+  reviewNote: {
+    fontSize: 12,
+    color:    Colors.light.textSecondary,
+    marginTop: 2,
+  },
+  reviewThumb: {
+    width:        64,
+    height:       64,
+    borderRadius: 10,
+    resizeMode:   'cover',
+  },
+  editBtn: {
+    alignItems:    'center',
+    paddingVertical: 14,
+  },
+  editBtnText: {
+    fontSize:   15,
+    color:      Colors.light.textSecondary,
+    fontWeight: '500',
+  },
 })

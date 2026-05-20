@@ -1,0 +1,60 @@
+================================================================================
+MÓDULO: M10 — Analytics & Dashboard  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M10.txt
+ESTADO:  PARCIALMENTE CONECTADO ⚠
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/index.tsx     → dashboard principal del paciente
+app/(doctor)/index.tsx      → resumen de pacientes (doctor dashboard)
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS (activos)
+--------------------------------------------------------------------------------
+EP.analyticsDashboard = GET /api/v1/analytics/dashboard/
+  → resumen ejecutivo: vitales recientes, adherencia del día, próxima cita,
+    insights disponibles. Consumido en patient/index.tsx via useQuery.
+
+--------------------------------------------------------------------------------
+ENDPOINTS PENDIENTES (declarados en EP, aún sin pantalla)
+--------------------------------------------------------------------------------
+EP.analyticsAdherence         = GET /api/v1/analytics/adherence/?days=7|30|90
+EP.analyticsInsights          = GET /api/v1/analytics/insights/
+EP.analyticsInsightsGenerate  = POST /api/v1/analytics/insights/generate/
+
+--------------------------------------------------------------------------------
+ESTRUCTURA DE RESPUESTA DEL DASHBOARD
+--------------------------------------------------------------------------------
+{
+  vitals_summary:    VitalSummaryEntry[]   ← últimas lecturas por tipo
+  adherence_today:   number (0–100)        ← % medicamentos tomados hoy
+  next_appointment:  AppointmentBasic | null
+  active_insights:   HealthInsight[]       ← generados por IA (Celery)
+  points_today:      number                ← puntos de gamificación del día
+}
+
+--------------------------------------------------------------------------------
+IA POR PLAN DE SUSCRIPCIÓN
+--------------------------------------------------------------------------------
+FREE      → no recibe insights activos (sin llamada externa)
+SILVER    → OpenAI gpt-4o (insights estándar)
+GOLD      → OpenAI gpt-4o (insights detallados)
+PLATINUM  → Claude claude-sonnet-4-6 (análisis clínico avanzado)
+
+El frontend muestra el insight si existe — no distingue qué modelo lo generó.
+El chip de plan visible en el perfil determina qué ve el usuario.
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- El dashboard es síncrono (agrega en memoria en el backend, sin modelo extra).
+- AdherenceReport y HealthInsight se generan semanalmente via Celery; el GET
+  devuelve el último snapshot disponible, no calcula en tiempo real.
+- Pendiente: pantalla de adherencia histórica (gráfica de 7/30/90 días).
+- Pendiente: pantalla de insights con botón "Generar nuevo análisis".
+================================================================================

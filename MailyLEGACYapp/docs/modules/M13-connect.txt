@@ -1,0 +1,42 @@
+================================================================================
+MÓDULO: M13 — Prescriptions  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-15
+MÓDULO BACKEND REF: docs/modules/M13.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/prescriptions/index.tsx  → lista de recetas filtrada por estado
+
+--------------------------------------------------------------------------------
+FILTROS DISPONIBLES
+--------------------------------------------------------------------------------
+Tab "Activas"    → status=ACTIVE
+Tab "Vencidas"   → status=EXPIRED
+Tab "Todas"      → sin filtro
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.prescriptions       = GET  /api/v1/prescriptions/         → lista paginada (usePrescriptions)
+EP.prescriptionDetail  = GET  /api/v1/prescriptions/<id>/    → detalle
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+src/hooks/usePrescriptions.ts  (integrado en la pantalla directamente)
+  usePrescriptions(status?)    → lista filtrada por status opcional
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- Prescription.status: ACTIVE | EXPIRED | CANCELLED
+- Las recetas son creadas por el médico desde su panel.
+- El paciente solo puede consultar sus recetas (sin crear/modificar).
+- Cada receta tiene: doctor_name, issue_date, expiry_date, items (medicamentos).
+- Las recetas próximas a vencer (< 7 días) se resaltan con color de advertencia.
+================================================================================

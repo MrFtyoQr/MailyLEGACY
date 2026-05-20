@@ -8,8 +8,12 @@ Covered:
   Appointment status → COMPLETED    → APPOINTMENT_KEPT points
   ReferralRequest status → COMPLETED → REFERRAL_COMPLETED points
 """
+import logging
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+
+logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender='medications.MedicationHistory')
@@ -29,10 +33,17 @@ def _on_vital_logged(sender, instance, created, **kwargs):
     if not created:
         return
     from .engine import award_points, PointSource
+    base_pts = 10 if instance.photo_url else 5
+    logger.info(
+        'VitalSign %s created | type=%s | photo_url=%r | base_pts=%d',
+        instance.id, instance.vital_type, instance.photo_url, base_pts,
+    )
     award_points(
-        patient = instance.patient,
-        source  = PointSource.VITAL_LOGGED,
-        ref_id  = str(instance.id),
+        patient     = instance.patient,
+        source      = PointSource.VITAL_LOGGED,
+        ref_id      = str(instance.id),
+        base_points = base_pts,
+        note        = 'con foto de evidencia' if instance.photo_url else '',
     )
 
 

@@ -19,11 +19,12 @@ export interface AuthUser {
 }
 
 interface AuthState {
-  user:     AuthUser | null
-  isLoaded: boolean   // Clerk terminó de cargar
+  user:       AuthUser | null
+  isLoaded:   boolean   // Clerk terminó de cargar
   isSignedIn: boolean
 
   setUser:     (user: AuthUser | null) => void
+  updateUser:  (partial: Partial<AuthUser>) => void
   setLoaded:   (v: boolean) => void
   setSignedIn: (v: boolean) => void
   clear:       () => void
@@ -34,8 +35,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoaded:   false,
   isSignedIn: false,
 
-  setUser:     (user)  => set({ user }),
-  setLoaded:   (v)     => set({ isLoaded: v }),
-  setSignedIn: (v)     => set({ isSignedIn: v }),
-  clear:       ()      => set({ user: null, isSignedIn: false }),
+  setUser:     (user)    => set({ user }),
+  updateUser:  (partial) => set((s) => ({ user: s.user ? { ...s.user, ...partial } : null })),
+  setLoaded:   (v)       => set({ isLoaded: v }),
+  setSignedIn: (v)       => set({ isSignedIn: v }),
+  clear:       ()        => set({ user: null, isSignedIn: false }),
 }))

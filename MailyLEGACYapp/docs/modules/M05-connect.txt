@@ -1,0 +1,51 @@
+================================================================================
+MÓDULO: M05 — Labs  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-15
+MÓDULO BACKEND REF: docs/modules/M05.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/labs/index.tsx    → 3 pestañas: Todos | Anormales | Por subir
+app/(patient)/index.tsx         → sección "Últimos resultados" (resumen)
+
+--------------------------------------------------------------------------------
+TABS DE LA PANTALLA PRINCIPAL
+--------------------------------------------------------------------------------
+Tab "Todos"      → lista completa de LabResult paginada
+Tab "Anormales"  → filtro status=ABNORMAL
+Tab "Por subir"  → resultados sin archivo PDF adjunto (file_url vacío)
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.labs           = GET  /api/v1/lab-results/              → lista paginada (useLabs)
+EP.labSummary     = GET  /api/v1/lab-results/summary/      → stats abnormal/pending (useLabSummary)
+EP.labAbnormal    = GET  /api/v1/lab-results/?status=ABNORMAL → resultados anormales
+EP.documentUploadUrl = POST /api/v1/documents/upload-url/  → presigned R2 URL para subir PDF
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+src/hooks/useLabs.ts  (pendiente de implementar hook dedicado)
+  useLabs()           → lista completa
+  useLabSummary()     → { total, abnormal_count, pending_upload }
+  useAbnormalLabs()   → filtrado por status=ABNORMAL
+
+--------------------------------------------------------------------------------
+GAMIFICACIÓN
+--------------------------------------------------------------------------------
+Al crear un LabResult, el backend dispara signals.py → award_points(LAB_UPLOADED, 15 pts base).
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- LabResult.file_url → URL en Cloudflare R2; el frontend usa documentUploadUrl para obtener
+  la URL prefirmada y luego hace PUT directo a R2.
+- Los resultados de CAMSA (analizador externo) llegan vía webhook y crean LabResult automáticamente.
+- El campo `status`: NORMAL | ABNORMAL | BORDERLINE | PENDING.
+================================================================================

@@ -1,0 +1,33 @@
+================================================================================
+MÓDULO: M12 — Audit Log  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M12.txt
+ESTADO:  SIN PANTALLA — backend-only
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Bitácora HIPAA inmutable de 17 tipos de acción sobre 15 tipos de recurso.
+El AuditMiddleware registra automáticamente cada request autenticado.
+Retención: 730 días (2 años).
+
+--------------------------------------------------------------------------------
+INTEGRACIÓN FRONTEND
+--------------------------------------------------------------------------------
+El frontend NO interactúa con el audit log directamente. Todo registro es
+automático vía middleware y signals del backend.
+
+No hay endpoints expuestos al móvil — solo el admin de Django puede consultarlo.
+
+--------------------------------------------------------------------------------
+RELEVANCIA PARA EL FRONTEND
+--------------------------------------------------------------------------------
+- Cada acción del usuario (registrar vital, tomar medicamento, subir foto)
+  genera una entrada de auditoría automáticamente en el backend.
+- En caso de soporte o disputa médica, el admin puede reconstruir el historial
+  completo de acciones del paciente desde el panel Django.
+- El frontend no necesita hacer nada explícito para activarlo.
+================================================================================

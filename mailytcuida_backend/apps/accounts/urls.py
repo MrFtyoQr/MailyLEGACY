@@ -7,6 +7,7 @@ from .views import (
     DoctorPatientListCreateView, DoctorPatientDetailView,
     AdminUserListView, AdminUserDetailView,
 )
+from .admin_views import AdminDashboardView
 from .webhooks.clerk_webhooks import ClerkWebhookView
 
 urlpatterns = [
@@ -35,4 +36,5 @@ urlpatterns = [
     # Admin
     path('admin/users/', AdminUserListView.as_view(), name='admin-users'),
     path('admin/users/<uuid:pk>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
+    path('admin/dashboard/', AdminDashboardView.as_view(), name='admin-dashboard'),
 ]

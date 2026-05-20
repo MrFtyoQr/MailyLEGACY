@@ -20,6 +20,7 @@ DEBUG = env.bool('DEBUG', default=False)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 
 DJANGO_APPS = [
+    'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -64,6 +65,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'core.middleware.csp.ContentSecurityPolicyMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -247,3 +249,38 @@ CELERY_TASK_SERIALIZER   = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE          = TIME_ZONE
 CELERY_BEAT_SCHEDULER    = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# ── Django Unfold Admin theme ─────────────────────────────────────────────────
+UNFOLD = {
+    'SITE_TITLE':  'MailyT-Cuida',
+    'SITE_HEADER': 'MailyT-Cuida Admin',
+    'SITE_SUBHEADER': 'Panel de administración',
+    'SITE_ICON': {
+        'light': None,
+        'dark':  None,
+    },
+    'COLORS': {
+        'primary': {
+            '50':  '236 253 255',
+            '100': '207 250 254',
+            '200': '165 243 252',
+            '300': '103 232 249',
+            '400': '34 211 238',
+            '500': '0 197 227',   # #00C5E3 — brand primary
+            '600': '0 168 193',
+            '700': '0 131 153',
+            '800': '0 104 121',
+            '900': '0 83 97',
+            '950': '0 52 61',
+        },
+    },
+    'EXTENSIONS': {
+        'modeltranslation': {
+            'flags': {},
+        },
+    },
+    'SIDEBAR': {
+        'show_search': True,
+        'show_all_applications': True,
+    },
+}

@@ -1,0 +1,48 @@
+================================================================================
+MÓDULO: M03 — Medications  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-15
+MÓDULO BACKEND REF: docs/modules/M03.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/medications/index.tsx  → lista de medicamentos activos + dosis de hoy
+app/(patient)/medications/[id].tsx   → detalle + historial de tomas de un medicamento
+app/(patient)/index.tsx              → sección "Medicamentos de hoy" (próximas dosis)
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.medications        = GET  /api/v1/medications/         → lista paginada (useMedications)
+EP.medicationDetail   = GET  /api/v1/medications/<id>/    → detalle (useMedicationDetail)
+EP.medicationHistory  = GET  /api/v1/medications/history/ → historial de tomas (useHistory)
+EP.medicationTake     = POST /api/v1/medications/<id>/take/  → registrar dosis tomada
+EP.medicationSkip     = POST /api/v1/medications/<id>/skip/  → registrar dosis omitida
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+src/hooks/useMedications.ts
+  useMedications()         → lista de medicamentos activos
+  useMedicationDetail(id)  → detalle de un medicamento
+  useMedicationHistory()   → historial de tomas
+  useTakeMedication()      → mutación take  → invalida ['medications', 'player-profile']
+  useSkipMedication()      → mutación skip  → invalida ['medications']
+
+--------------------------------------------------------------------------------
+GAMIFICACIÓN
+--------------------------------------------------------------------------------
+Al registrar una toma (take) el backend dispara signals.py → award_points(MEDICATION_TAKEN, 10 pts base).
+El hook invalida 'player-profile' para refrescar el chip de puntos en vitals/index.
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- El backend filtra automáticamente los medicamentos activos del paciente autenticado.
+- El campo `status` en MedicationHistory: TAKEN | SKIPPED | MISSED.
+- Dosis "de hoy" se calcula en el frontend comparando scheduled_time con la fecha actual.
+================================================================================

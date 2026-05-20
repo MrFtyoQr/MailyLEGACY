@@ -1,0 +1,75 @@
+================================================================================
+MÓDULO: M14 — Specialists Marketplace  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M14.txt
+ESTADO:  PARCIALMENTE CONECTADO ⚠
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(specialist)/index.tsx          → dashboard del especialista (referidos recibidos)
+app/(specialist)/profile.tsx        → perfil del especialista
+app/(specialist)/referrals/index.tsx → lista de referidos recibidos + cambiar estado
+app/(patient)/prescriptions/index.tsx → referidos del paciente (mis derivaciones)
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS (activos)
+--------------------------------------------------------------------------------
+Especialista (rol SPECIALIST):
+  EP.referralsIncoming  = GET   /api/v1/specialists/referrals/incoming/
+    → referidos recibidos por el especialista autenticado
+
+  EP.referralStatus(id) = PATCH /api/v1/specialists/referrals/<id>/status/
+    → accept | complete | reject el referido
+
+  EP.specialistDetail(id) = GET /api/v1/specialists/<id>/
+    → detalle del propio perfil
+
+Paciente (rol PATIENT):
+  EP.referrals     = GET /api/v1/specialists/referrals/mine/
+    → mis derivaciones activas (referidos donde soy paciente)
+
+--------------------------------------------------------------------------------
+ENDPOINTS PENDIENTES (sin pantalla en el móvil)
+--------------------------------------------------------------------------------
+EP.specialistsList   = GET  /api/v1/specialists/          → búsqueda de especialistas
+EP.referralDetail    = GET  /api/v1/specialists/referrals/<id>/
+Doctor:
+  POST /api/v1/specialists/referrals/   → crear referido (pantalla doctor)
+  GET  /api/v1/specialists/team/        → mi equipo de especialistas
+  POST /api/v1/specialists/team/        → añadir al equipo
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+(sin hook dedicado aún — queries inline en las pantallas)
+Pendiente: src/hooks/useSpecialists.ts con:
+  useIncomingReferrals()   → para especialista
+  useMyReferrals()         → para paciente
+  useUpdateReferralStatus()→ mutación PATCH
+
+--------------------------------------------------------------------------------
+CICLO DE VIDA DEL REFERIDO
+--------------------------------------------------------------------------------
+PENDING → ACCEPTED → COMPLETED → (puede generar comisión — M09 futuro)
+         ↓
+       REJECTED / CANCELLED
+
+- Doctor crea el referido (pantalla doctor — pendiente en mobile)
+- Especialista acepta/completa/rechaza desde referrals/index.tsx
+- Paciente ve el estado en prescriptions/index.tsx
+- Al completarse, el backend dispara gamificación: award_points(REFERRAL_COMPLETED)
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- Solo aparecen especialistas VERIFIED en el browse público.
+- Nuevos especialistas inician como PENDING — admin los verifica en el panel.
+- Las notas clínicas del referido requieren patient_consent=true en el backend;
+  el frontend debe obtener la aceptación del paciente antes de incluirlas.
+- La pantalla del doctor para crear y gestionar su equipo de especialistas
+  está pendiente de implementación en mobile.
+================================================================================

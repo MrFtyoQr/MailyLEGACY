@@ -10,7 +10,7 @@ import {
   ScrollView, View, Text, TouchableOpacity,
   StyleSheet, RefreshControl, Dimensions,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { ScreenWrapper }    from '@components/layout/ScreenWrapper'
 import { Skeleton }         from '@components/ui/Skeleton'
@@ -80,7 +80,11 @@ function VitalSignCard({ type, latest }: { type: VitalType; latest?: VitalLatest
     : '—'
 
   return (
-    <View style={[styles.vitalCard, hasValue && { borderLeftColor: color, borderLeftWidth: 3 }]}>
+    <TouchableOpacity
+      style={[styles.vitalCard, hasValue && { borderLeftColor: color, borderLeftWidth: 3 }]}
+      onPress={() => router.push(`/(patient)/vitals/${type}` as any)}
+      activeOpacity={0.75}
+    >
       <Text style={styles.vitalIcon}>{meta.icon}</Text>
       <Text style={[styles.vitalValue, { color: hasValue ? color : Colors.light.textMuted }]}>
         {valueStr}
@@ -94,7 +98,8 @@ function VitalSignCard({ type, latest }: { type: VitalType; latest?: VitalLatest
           })}
         </Text>
       )}
-    </View>
+      <Text style={styles.vitalChevron}>›</Text>
+    </TouchableOpacity>
   )
 }
 
@@ -174,12 +179,16 @@ export default function VitalsScreen() {
             <Text style={styles.statLabel}>sin registrar</Text>
           </View>
           {playerProfile && (
-            <View style={[styles.statChip, styles.statChipPoints]}>
+            <TouchableOpacity
+              style={[styles.statChip, styles.statChipPoints]}
+              onPress={() => router.push('/(patient)/gamification' as any)}
+              activeOpacity={0.7}
+            >
               <Text style={[styles.statValue, { color: Colors.brand.primary }]}>
                 ⭐ {playerProfile.total_points}
               </Text>
               <Text style={styles.statLabel}>pts · Nv.{playerProfile.level}</Text>
-            </View>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -332,7 +341,8 @@ const styles = StyleSheet.create({
   vitalValue: { fontSize: 20, fontWeight: '800', marginTop: 2 },
   vitalUnit:  { fontSize: 10, color: Colors.light.textMuted },
   vitalName:  { fontSize: 11, fontWeight: '600', color: Colors.light.textSecondary, marginTop: 2 },
-  vitalTime:  { fontSize: 10, color: Colors.light.textMuted },
+  vitalTime:    { fontSize: 10, color: Colors.light.textMuted },
+  vitalChevron: { fontSize: 14, color: Colors.light.textMuted, alignSelf: 'flex-end', marginTop: 2 },
 
   historyToggle: {
     backgroundColor: Colors.light.surface, borderRadius: 12,

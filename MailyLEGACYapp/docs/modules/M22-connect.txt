@@ -1,0 +1,78 @@
+================================================================================
+MÓDULO: M22 — Family Care  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M22.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/family-care/index.tsx  → gestión de vínculos del paciente:
+  - Ver cuidadores vinculados (links ACTIVE y PENDING)
+  - Aceptar/revocar solicitudes pendientes
+  - Ver alertas recibidas de sus cuidadores
+  - Ver configuraciones de monitoreo activas
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.familyCareLinks          = GET  /api/v1/family-care/links/
+EP.familyCareLinkAccept(id) = POST /api/v1/family-care/links/<id>/accept/
+EP.familyCareLinkRevoke(id) = POST /api/v1/family-care/links/<id>/revoke/
+EP.familyCareAlerts(id)     = GET  /api/v1/family-care/links/<id>/alerts/
+EP.familyCareVitals(id)     = GET  /api/v1/family-care/links/<id>/vitals/
+
+--------------------------------------------------------------------------------
+HOOKS
+--------------------------------------------------------------------------------
+src/hooks/useFamilyCare.ts
+  useFamilyCareLinks()        → vínculos donde el usuario es paciente o cuidador
+  useAcceptFamilyLink(id)     → mutación accept → invalida ['family-care']
+  useRevokeFamilyLink(id)     → mutación revoke → invalida ['family-care']
+  useFamilyCareAlerts(linkId) → alertas del vínculo
+  useFamilyCareVitals(linkId) → vitales del paciente visibles al cuidador
+
+--------------------------------------------------------------------------------
+ROLES Y PERSPECTIVAS
+--------------------------------------------------------------------------------
+Paciente (pantalla actual):
+  - Ve solicitudes entrantes de cuidadores → puede aceptar o rechazar
+  - Ve vínculos ACTIVE: qué datos puede ver su cuidador
+  - Puede revocar cualquier vínculo activo en cualquier momento
+  - Ve las alertas que su cuidador ha generado (VITAL_ABNORMAL, VITAL_OVERDUE)
+
+Cuidador (pendiente pantalla dedicada):
+  - Solicita vínculo buscando al paciente por email
+  - Ve vitales, medicamentos y citas del paciente (solo si link ACTIVE)
+  - Puede despachar al médico del paciente: EP.familyCareAlertDispatch
+  - Configura monitoreo por tipo de vital (VitalMonitorConfig)
+
+--------------------------------------------------------------------------------
+MODELO DE CONSENTIMIENTO
+--------------------------------------------------------------------------------
+FamilyCareLink.status: PENDING_CONSENT → ACTIVE → REVOKED
+El consentimiento es explícito: el paciente acepta cada vínculo individualmente.
+Una vez revocado no puede reactivarse — hay que crear un nuevo vínculo.
+
+--------------------------------------------------------------------------------
+ALERTAS AUTOMÁTICAS (backend → frontend via notificaciones)
+--------------------------------------------------------------------------------
+VITAL_ABNORMAL  → Celery dispara cuando vital sale del rango del VitalGoal
+VITAL_OVERDUE   → Celery task periódica (cada hora) si el paciente no registró
+                  el vital configurado en VitalMonitorConfig
+Las alertas aparecen en la pantalla del cuidador y también en el Centro de
+Notificaciones del paciente (M07).
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- FamilyCareLink.patient es FK a User (no PatientProfile).
+  Las queries de vitales usan patient__user=link.patient en el backend.
+- El botón "Despachar médico" crea una Appointment urgente si el paciente tiene
+  un DoctorPatient activo; si no tiene médico asignado, devuelve 400.
+- La pantalla de cuidador (perspectiva del caregiver) no está implementada
+  en mobile aún — se gestiona vía notificaciones y el admin.
+================================================================================

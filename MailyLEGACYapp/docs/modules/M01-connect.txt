@@ -1,0 +1,70 @@
+================================================================================
+MÓDULO: M01 — Auth & Security  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M01.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/index.tsx                    → routing inicial: detecta sesión Clerk y redirige
+app/(auth)/sign-in.tsx           → login con Clerk (email + Google)
+app/(auth)/sign-up.tsx           → registro con Clerk
+app/(auth)/onboarding.tsx        → pantalla de bienvenida post-registro
+app/(auth)/role-setup.tsx        → primer uso: el usuario elige rol y crea su perfil
+app/_layout.tsx                  → ClerkProvider envuelve toda la app
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.authMe     = GET  /api/v1/auth/me/       → perfil + rol del usuario autenticado
+EP.authInit   = POST /api/v1/auth/init/     → crea usuario en Django si webhook falló
+EP.myRole     = GET  /api/v1/auth/me/role/  → rol actual (PATIENT | DOCTOR | SPECIALIST…)
+
+--------------------------------------------------------------------------------
+STORE / ESTADO GLOBAL
+--------------------------------------------------------------------------------
+src/store/auth.store.ts (Zustand)
+  user: AuthUser | null          → datos cacheados del /auth/me/
+  isLoading: bool
+  setUser(user)                  → hydra al cargar la app
+  updateUser(partial)            → actualización parcial (post role-setup)
+  clearUser()                    → logout
+
+AuthUser {
+  id, clerkId, email
+  firstName, lastName
+  role: 'PATIENT' | 'DOCTOR' | 'SPECIALIST' | 'PARTNER' | 'ADMIN'
+  hasProfile: bool
+}
+
+--------------------------------------------------------------------------------
+FLUJO DE AUTENTICACIÓN
+--------------------------------------------------------------------------------
+1. app/index.tsx monta → llama /auth/me/ con el JWT de Clerk
+2. Si 200 OK → { role, hasProfile } → redirige a /(patient) | /(doctor) | /(specialist)
+3. Si hasProfile=false → redirige a /(auth)/role-setup
+4. Si red fallida → 2 reintentos con 1.5 s de espera → pantalla "Sin conexión" con Reintentar
+5. role-setup PATCH → /auth/profiles/{role}/ → llama updateUser(partial) para actualizar Zustand sin reload
+
+--------------------------------------------------------------------------------
+AUTENTICACIÓN EN CADA REQUEST
+--------------------------------------------------------------------------------
+src/lib/api/client.ts
+  - Función get() / post() / del() inyectan el JWT de Clerk en header Authorization: Bearer <token>
+  - El token se obtiene via useAuth().getToken() del SDK @clerk/clerk-expo
+  - El backend (ClerkAuthMiddleware) verifica el JWT contra JWKS de Clerk
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- El webhook de Clerk (user.created) crea el User en Django automáticamente.
+  EP.authInit es el fallback para casos donde el webhook llega tarde.
+- El JWT dura 15 min; Clerk lo renueva automáticamente en el cliente.
+- No hay pantalla de recuperación de contraseña: Clerk la maneja in-app nativo.
+- Los roles se asignan en Django (no en Clerk publicMetadata) para evitar
+  inconsistencias entre sistemas.
+================================================================================

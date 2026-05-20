@@ -16,10 +16,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from apps.accounts.models import PatientProfile, DoctorPatient
-from .models import PlayerProfile, PointTransaction, Badge
+from .models import PlayerProfile, PointTransaction, Badge, RewardProduct
 from .serializers import (
     PlayerProfileSerializer, PointTransactionSerializer,
-    BadgeSerializer, LeaderboardEntrySerializer,
+    BadgeSerializer, LeaderboardEntrySerializer, RewardProductSerializer,
 )
 
 
@@ -71,6 +71,13 @@ class LeaderboardView(generics.ListAPIView):
         return PlayerProfile.objects.select_related(
             'patient'
         ).order_by('-total_points')[:50]
+
+
+class RewardProductListView(generics.ListAPIView):
+    """Active redeemable products — shown in the gamification screen."""
+    permission_classes = [IsAuthenticated]
+    serializer_class   = RewardProductSerializer
+    queryset           = RewardProduct.objects.filter(is_active=True)
 
 
 class DoctorPatientGameView(APIView):

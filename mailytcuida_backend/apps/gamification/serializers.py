@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import PlayerProfile, PointTransaction, Badge, PlayerBadge
+from .models import PlayerProfile, PointTransaction, Badge, PlayerBadge, RewardProduct
 
 
 class BadgeSerializer(serializers.ModelSerializer):
@@ -54,6 +54,15 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
         except Exception:
             tier = 'FREE'
         return PLAN_MULTIPLIERS.get(tier, 1)
+
+
+class RewardProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = RewardProduct
+        fields = [
+            'id', 'name', 'description', 'image_url',
+            'points_cost', 'stock', 'is_active',
+        ]
 
 
 class LeaderboardEntrySerializer(serializers.ModelSerializer):

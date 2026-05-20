@@ -1,0 +1,29 @@
+================================================================================
+MÓDULO: M20 — Nutrition  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M20.txt
+ESTADO:  PENDIENTE — sin pantalla
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Plan nutricional asignado por el médico/nutriólogo. Registro diario de alimentos
+por MealSlot (desayuno, comida, cena, snacks). DailyNutritionSummary calculado
+automáticamente por Celery con macros y calorías.
+
+--------------------------------------------------------------------------------
+INTEGRACIÓN PREVISTA
+--------------------------------------------------------------------------------
+- El plan lo asigna el médico; el paciente lo ve y registra sus comidas diarias.
+- El log diario podría integrarse en el check-in de actividades (M21 Wellness).
+- Los macros calculados pueden mostrarse en el dashboard (M10).
+
+--------------------------------------------------------------------------------
+PANTALLAS PENDIENTES
+--------------------------------------------------------------------------------
+[ ] app/(patient)/nutrition/index.tsx → plan activo + log del día
+[ ] app/(patient)/nutrition/log.tsx   → registrar comida en un slot
+================================================================================

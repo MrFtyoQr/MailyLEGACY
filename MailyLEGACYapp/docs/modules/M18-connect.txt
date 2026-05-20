@@ -1,0 +1,31 @@
+================================================================================
+MÓDULO: M18 — Telemedicine  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M18.txt
+ESTADO:  PENDIENTE — sin pantalla
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Videoconsultas (Fase 1: links externos a Zoom/Meet/Teams). VideoSession lifecycle:
+SCHEDULED → WAITING → IN_PROGRESS → COMPLETED. Captura de vitales al check-in
+y notas SOAP al completar.
+
+--------------------------------------------------------------------------------
+INTEGRACIÓN PREVISTA
+--------------------------------------------------------------------------------
+- Las videoconsultas se crearían desde la pantalla de citas (M06) como un tipo
+  especial de appointment con video_session asociado.
+- Al llegar la hora, el paciente ve un botón "Unirse a videollamada" que abre
+  el link externo (Linking.openURL).
+- El médico documenta la nota SOAP desde la app del doctor.
+
+--------------------------------------------------------------------------------
+PANTALLAS PENDIENTES
+--------------------------------------------------------------------------------
+[ ] Botón "Unirse" en app/(patient)/appointments/[id].tsx
+[ ] Vista de nota SOAP en app/(doctor)/appointments/[id].tsx
+================================================================================

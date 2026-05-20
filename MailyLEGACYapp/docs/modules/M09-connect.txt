@@ -1,0 +1,38 @@
+================================================================================
+MÓDULO: M09 — Payments / Subscriptions  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M09.txt
+ESTADO:  PENDIENTE — endpoints declarados, sin pantalla
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Suscripciones con Stripe: 4 tiers (FREE, SILVER, GOLD, PLATINUM). Checkout
+sessions, portal de cliente, webhooks y degradado automático por no-pago.
+
+--------------------------------------------------------------------------------
+ENDPOINTS DISPONIBLES (sin conectar en mobile)
+--------------------------------------------------------------------------------
+EP.plans            = GET  /api/v1/payments/plans/         → planes disponibles + precios
+EP.subscription     = GET  /api/v1/payments/subscription/  → suscripción activa del usuario
+EP.checkout         = POST /api/v1/payments/checkout/      → crear Stripe Checkout Session
+EP.portal           = POST /api/v1/payments/portal/        → Stripe Customer Portal URL
+EP.cancelSubscription = POST /api/v1/payments/cancel/
+
+--------------------------------------------------------------------------------
+IMPACTO EN LA APP (aunque no haya pantalla)
+--------------------------------------------------------------------------------
+- El tier del usuario afecta qué modelo de IA genera los insights en M10:
+  FREE → sin insights, SILVER/GOLD → OpenAI, PLATINUM → Claude
+- El profile.tsx podría mostrar el plan actual como chip informativo
+- Pendiente: pantalla de upgrade/suscripción
+
+--------------------------------------------------------------------------------
+PANTALLAS PENDIENTES
+--------------------------------------------------------------------------------
+[ ] app/(patient)/subscription/index.tsx → ver plan actual + upgrade
+[ ] app/(patient)/subscription/plans.tsx → comparativa de planes + checkout
+================================================================================

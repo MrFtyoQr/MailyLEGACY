@@ -1,0 +1,29 @@
+================================================================================
+MÓDULO: M19 — Surveys  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M19.txt
+ESTADO:  PENDIENTE — sin pantalla
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Cuestionarios de salud asignados por el médico al paciente. Soporte para
+múltiples tipos de pregunta, SurveyAssignment tracking, respuestas y
+cálculo de score.
+
+--------------------------------------------------------------------------------
+INTEGRACIÓN PREVISTA
+--------------------------------------------------------------------------------
+- El médico asigna encuestas desde su panel; el paciente recibe notificación (M07).
+- La pantalla del paciente lista encuestas pendientes y permite responderlas.
+- Los scores calculados pueden integrarse con el dashboard de analytics (M10).
+
+--------------------------------------------------------------------------------
+PANTALLAS PENDIENTES
+--------------------------------------------------------------------------------
+[ ] app/(patient)/surveys/index.tsx → encuestas asignadas pendientes
+[ ] app/(patient)/surveys/[id].tsx  → responder encuesta
+================================================================================

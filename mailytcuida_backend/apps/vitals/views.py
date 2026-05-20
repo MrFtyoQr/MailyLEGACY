@@ -1,3 +1,5 @@
+import logging
+
 from django.db.models import Min, Max, Avg, Count
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
@@ -11,6 +13,8 @@ from .serializers import (
     VitalSignSerializer, VitalGoalSerializer,
     VitalLatestSerializer, VitalSummarySerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class VitalPagination(PageNumberPagination):
@@ -40,6 +44,13 @@ class VitalSignListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
+        photo_url = serializer.validated_data.get('photo_url', '')
+        logger.info(
+            'VitalSign create: patient=%s type=%s photo_url=%r',
+            self.request.user.id,
+            serializer.validated_data.get('vital_type'),
+            photo_url,
+        )
         instance = serializer.save(patient=self.request.user.patient_profile)
         # async check for abnormal reading
         from .tasks import check_abnormal_vitals

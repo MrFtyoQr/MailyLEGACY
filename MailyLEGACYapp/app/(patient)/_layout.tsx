@@ -1,133 +1,104 @@
 /**
  * (patient)/_layout.tsx
- * Tab navigator del rol PATIENT — 6 tabs, solo iconos.
- * Home · Labs · Recetas · Medicamentos · Actividades · Enfermería
+ * Tab navigator — barra nativa de Expo Router/React Navigation.
+ * Sin componente custom: tabBarIcon + tabBarStyle, mismo patrón que Instagram.
  */
 
 import React from 'react'
-import { Text, View, StyleSheet } from 'react-native'
+import { View, Text } from 'react-native'
 import { Tabs } from 'expo-router'
-import { Colors } from '@constants/colors'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Colors } from '@constants/colors'
 
-const ACTIVE_COLOR   = Colors.brand.primary
-const INACTIVE_COLOR = '#A0AEC0'
-const TAB_BG         = '#FFFFFF'
+const ACTIVE = Colors.brand.primary
 
-function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
+// Icono con punto activo debajo — igual que Instagram
+function EmojiIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return (
-    <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>
-  )
-}
-
-function CustomTabBar({ state, descriptors, navigation }: any) {
-  const insets = useSafeAreaInsets()
-
-  // Filtrar solo los tabs visibles antes de renderizar
-  const visibleRoutes = state.routes.filter(
-    (route: any) => descriptors[route.key]?.options?.href !== null
-  )
-
-  return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      {visibleRoutes.map((route: any) => {
-        const { options } = descriptors[route.key]
-        const focused = state.routes[state.index]?.key === route.key
-
-        const onPress = () => {
-          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
-          if (!focused && !event.defaultPrevented) {
-            navigation.navigate(route.name)
-          }
-        }
-
-        return (
-          <View key={route.key} style={styles.tabItem}>
-            <Text
-              onPress={onPress}
-              style={[styles.tabEmoji, { opacity: focused ? 1 : 0.4 }]}
-            >
-              {options.tabBarLabel}
-            </Text>
-            {focused && <View style={styles.activeDot} />}
-          </View>
-        )
-      })}
+    <View style={{ alignItems: 'center', gap: 4 }}>
+      <Text style={{ fontSize: 26, opacity: focused ? 1 : 0.38 }}>{emoji}</Text>
+      {focused && (
+        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: ACTIVE }} />
+      )}
     </View>
   )
 }
 
 export default function PatientLayout() {
+  const insets = useSafeAreaInsets()
+
   return (
     <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown:      false,
+        tabBarShowLabel:  false,
+        tabBarStyle: {
+          backgroundColor:  '#FFFFFF',
+          borderTopWidth:   1,
+          borderTopColor:   '#EDF2F7',
+          height:           56 + insets.bottom,
+          paddingBottom:    insets.bottom,
+          paddingTop:       6,
+          elevation:        12,
+          shadowColor:      '#000',
+          shadowOffset:     { width: 0, height: -2 },
+          shadowOpacity:    0.06,
+          shadowRadius:     8,
+        },
+        tabBarItemStyle: {
+          flex:             1,
+          justifyContent:   'center',
+          alignItems:       'center',
+        },
+      }}
     >
       <Tabs.Screen
         name="index"
-        options={{ tabBarLabel: '🏠' }}
+        options={{
+          tabBarIcon: ({ focused }) => <EmojiIcon emoji="🏠" focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="labs/index"
-        options={{ tabBarLabel: '🔬' }}
+        options={{
+          tabBarIcon: ({ focused }) => <EmojiIcon emoji="🔬" focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="prescriptions/index"
-        options={{ tabBarLabel: '📋' }}
+        options={{
+          tabBarIcon: ({ focused }) => <EmojiIcon emoji="📋" focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="medications/index"
-        options={{ tabBarLabel: '💊' }}
+        options={{
+          tabBarIcon: ({ focused }) => <EmojiIcon emoji="💊" focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="activities/index"
-        options={{ tabBarLabel: '🏃' }}
+        options={{
+          tabBarIcon: ({ focused }) => <EmojiIcon emoji="🏃" focused={focused} />,
+        }}
       />
       <Tabs.Screen
         name="vitals/index"
-        options={{ tabBarLabel: '🩺' }}
+        options={{
+          tabBarIcon: ({ focused }) => <EmojiIcon emoji="🩺" focused={focused} />,
+        }}
       />
 
-      {/* Pantallas que no aparecen en el tab bar */}
-      <Tabs.Screen name="vitals/add"            options={{ href: null }} />
-      <Tabs.Screen name="medications/[id]"      options={{ href: null }} />
-      <Tabs.Screen name="appointments/index"    options={{ href: null }} />
-      <Tabs.Screen name="appointments/[id]"     options={{ href: null }} />
-      <Tabs.Screen name="notifications"         options={{ href: null }} />
-      <Tabs.Screen name="profile"               options={{ href: null }} />
+      {/* Pantallas sin tab */}
+      <Tabs.Screen name="vitals/add"           options={{ href: null }} />
+      <Tabs.Screen name="vitals/[type]"        options={{ href: null }} />
+      <Tabs.Screen name="medications/[id]"     options={{ href: null }} />
+      <Tabs.Screen name="appointments/index"   options={{ href: null }} />
+      <Tabs.Screen name="appointments/[id]"    options={{ href: null }} />
+      <Tabs.Screen name="notifications"        options={{ href: null }} />
+      <Tabs.Screen name="profile"              options={{ href: null }} />
+      <Tabs.Screen name="gamification"         options={{ href: null }} />
+      <Tabs.Screen name="family-care/index"    options={{ href: null }} />
     </Tabs>
   )
 }
-
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   TAB_BG,
-    paddingTop:        10,
-    paddingHorizontal: 12,
-    borderTopWidth:    1,
-    borderTopColor:    '#EDF2F7',
-    shadowColor:       '#000',
-    shadowOffset:      { width: 0, height: -2 },
-    shadowOpacity:     0.06,
-    shadowRadius:      8,
-    elevation:         12,
-  },
-  tabItem: {
-    flex:            1,
-    alignItems:      'center',
-    justifyContent:  'center',
-    paddingVertical: 4,
-    gap:             4,
-  },
-  tabEmoji: {
-    fontSize: 26,
-  },
-  activeDot: {
-    width:           4,
-    height:          4,
-    borderRadius:    2,
-    backgroundColor: ACTIVE_COLOR,
-  },
-})

@@ -30,11 +30,13 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # Sevalla pone el proxy delante — confiar en su header
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# ── Storage Cloudflare R2 ─────────────────────────────────────────────────────
+# ── Storage Cloudflare R2 (solo media — fotos, documentos) ───────────────────
 DEFAULT_FILE_STORAGE   = 'storages.backends.s3boto3.S3Boto3Storage'
-STATICFILES_STORAGE    = 'storages.backends.s3boto3.S3StaticStorage'
 AWS_DEFAULT_ACL        = 'public-read'
 AWS_QUERYSTRING_AUTH   = False
+
+# Archivos estáticos (CSS/JS admin) — whitenoise los sirve directamente del container
+STATICFILES_STORAGE    = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOGGING = {

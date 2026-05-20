@@ -40,7 +40,8 @@ import {
   patientProfileSchema,
   type PatientProfileForm,
 } from '@schemas/auth.schema'
-import { Colors } from '@constants/colors'
+import { Colors }          from '@constants/colors'
+import { useAuthStore }    from '@store/auth.store'
 
 const { width } = Dimensions.get('window')
 const setupLimiter = createRateLimiter({ maxAttempts: 5, windowMs: 60_000 })
@@ -324,6 +325,8 @@ export default function RoleSetupScreen() {
   const [lastName,  setLastName]  = useState('')
   const [birthDate, setBirthDate] = useState<Date | null>(null)
 
+  const updateUser = useAuthStore((s) => s.updateUser)
+
   const { submit: submitPatient, isSubmitting, formError, fieldErrors, clearErrors } =
     useFormGuard<PatientProfileForm, PatientProfileForm>({
       schema:      patientProfileSchema,
@@ -334,6 +337,8 @@ export default function RoleSetupScreen() {
           last_name:  data.lastName,
           birth_date: data.birthDate,   // YYYY-MM-DD string
         })
+        // Sincronizar Zustand para que el saludo muestre el nombre inmediatamente
+        updateUser({ role: 'PATIENT', firstName: data.firstName, lastName: data.lastName })
         router.replace('/(patient)')
       },
     })

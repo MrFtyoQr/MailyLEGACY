@@ -173,3 +173,30 @@ class PlayerBadge(models.Model):
 
     def __str__(self):
         return f'{self.player.patient} — {self.badge.name}'
+
+
+class RewardProduct(models.Model):
+    """
+    Productos/cupones canjeables por puntos.
+    El admin sube la imagen a R2 y guarda la URL aquí.
+    La app muestra el catálogo; el canje futuro se implementa en M17 (Coupons).
+    """
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name        = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    image_url   = models.URLField(max_length=512, blank=True,
+                                  help_text='URL en R2 — sube la imagen y pega aquí la URL pública.')
+    points_cost = models.PositiveIntegerField(help_text='Puntos necesarios para canjear.')
+    is_active   = models.BooleanField(default=True)
+    stock       = models.PositiveIntegerField(
+        default=0, help_text='Unidades disponibles. 0 = ilimitado.'
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['points_cost', 'name']
+
+    def __str__(self):
+        stock_str = '∞' if self.stock == 0 else str(self.stock)
+        return f'{self.name} — {self.points_cost} pts (stock: {stock_str})'

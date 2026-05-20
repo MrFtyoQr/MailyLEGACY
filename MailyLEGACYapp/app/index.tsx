@@ -10,8 +10,8 @@
  *      - Con sesión   → si perfil completo → /(rol)/ | si no → /(auth)/role-setup
  */
 
-import React, { useEffect, useCallback } from 'react'
-import { View, Image, Text, StyleSheet, Dimensions } from 'react-native'
+import React, { useEffect, useCallback, useState } from 'react'
+import { View, Image, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native'
 import { router } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useAuth } from '@clerk/clerk-expo'
@@ -40,6 +40,7 @@ export default function SplashAnimatedScreen() {
   const setLoaded   = useAuthStore((s) => s.setLoaded)
   const setSignedIn = useAuthStore((s) => s.setSignedIn)
   const setUser     = useAuthStore((s) => s.setUser)
+  const [networkError, setNetworkError] = useState(false)
 
   // Valores de animación
   const logoScale   = useSharedValue(0.3)
@@ -108,13 +109,23 @@ export default function SplashAnimatedScreen() {
       router.replace((roleMap[me.user.role] ?? '/(auth)/role-setup') as never)
     }
 
-    try {
-      const me = await get<MeResponse>(EP.authMe)
-      await handleMe(me)
-    } catch {
-      // Backend no disponible o error inesperado → role-setup para capturar datos
-      router.replace('/(auth)/role-setup')
+    // Reintentar una vez automáticamente antes de mostrar error
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const me = await get<MeResponse>(EP.authMe)
+        setNetworkError(false)
+        await handleMe(me)
+        return
+      } catch {
+        if (attempt === 0) {
+          // Esperar 1.5s y reintentar — el servidor puede estar arrancando
+          await new Promise((r) => setTimeout(r, 1500))
+        }
+      }
     }
+    // Solo llegar aquí si ambos intentos fallaron
+    setNetworkError(true)
+    await SplashScreen.hideAsync()
   }, [isLoaded, isSignedIn])
 
   useEffect(() => {
@@ -133,6 +144,26 @@ export default function SplashAnimatedScreen() {
       return () => clearTimeout(timer)
     }
   }, [isLoaded])
+
+  // Error de red — mostrar en lugar del splash animado
+  if (networkError) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ fontSize: 48, marginBottom: 16 }}>📡</Text>
+        <Text style={styles.appName}>Sin conexión</Text>
+        <Text style={[styles.tagLine, { fontSize: 14, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }]}>
+          No se pudo conectar al servidor.{'\n'}Verifica tu conexión e intenta de nuevo.
+        </Text>
+        <TouchableOpacity
+          onPress={() => { setNetworkError(false); navigate() }}
+          style={{ marginTop: 32, backgroundColor: Colors.brand.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 }}
+          activeOpacity={0.8}
+        >
+          <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 16 }}>Reintentar</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
 
   return (
     <View style={styles.container}>

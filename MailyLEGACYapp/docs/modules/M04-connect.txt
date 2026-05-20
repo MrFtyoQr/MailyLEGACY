@@ -1,0 +1,101 @@
+================================================================================
+MÓDULO: M04 — Vitals  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-15
+MÓDULO BACKEND REF: docs/modules/M04.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/vitals/index.tsx     → grid de 13 signos + IMC calculado + historial
+app/(patient)/vitals/add.tsx       → formulario de registro parcial (1–13 signos)
+app/(patient)/vitals/[type].tsx    → detalle + gráfica de barras por tipo de signo
+app/(patient)/index.tsx            → sección "Últimos vitales" (hasta 4 chips)
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.vitals          = GET  /api/v1/vitals/           → historial paginado (useVitals)
+EP.vitals          = POST /api/v1/vitals/           → registrar signo (useAddVitals)
+EP.vitalsLatest    = GET  /api/v1/vitals/latest/    → último valor por tipo (useVitalsLatest)
+EP.vitalsSummary   = GET  /api/v1/vitals/summary/   → stats min/max/avg (useVitalsSummary)
+EP.vitalsGoals     = GET  /api/v1/vitals/goals/     → metas por tipo (useVitalsGoals)
+EP.documentUploadUrl = POST /api/v1/documents/upload-url/ → presigned R2 URL para foto evidencia
+
+--------------------------------------------------------------------------------
+PAYLOAD DE REGISTRO (POST /api/v1/vitals/)
+--------------------------------------------------------------------------------
+Campo           | Tipo     | Req | Notas
+----------------|----------|-----|--------------------------------------------
+vital_type      | string   |  ✓  | Enum: BLOOD_PRESSURE|HEART_RATE|OXYGEN_SAT|
+                |          |     | RESPIRATORY|GLUCOSE|GLUCOSE_FAST|WEIGHT|
+                |          |     | HEIGHT|WAIST|HIP|TEMPERATURE|STEPS|SLEEP_HOURS
+value           | number   |  ✓  | Valor primario (sistólica si BLOOD_PRESSURE)
+secondary_value | number   |  *  | Solo BLOOD_PRESSURE → diastólica (requerido)
+recorded_at     | ISO8601  |  ✓  | Fecha/hora del registro
+source          | string   |     | MANUAL (default) | DEVICE | INTEGRATION
+notes           | string   |     | Texto libre (max 300 chars)
+photo_url       | string   |     | URL pública en R2 (flujo presigned upload)
+
+* secondary_value: requerido ÚNICAMENTE para BLOOD_PRESSURE.
+  Si se envía en otro tipo → 400 "secondary_value solo aplica para BLOOD_PRESSURE."
+
+--------------------------------------------------------------------------------
+VALIDACIONES EN FRONTEND (add.tsx)
+--------------------------------------------------------------------------------
+[x] Rango numérico por tipo (definido en VITAL_META.min / VITAL_META.max)
+[x] Diastólica requerida si tipo = BLOOD_PRESSURE
+[x] Parse decimal — rechazo de NaN
+[x] Botón Guardar deshabilitado hasta mínimo 1 signo llenado
+[x] Botón bloqueado mientras foto se está subiendo (uploading state)
+[x] sanitizeInput en notas (elimina control chars, zero-width, bidi override)
+[x] Trim solo al construir payload (no en onChange — permite espacios)
+
+--------------------------------------------------------------------------------
+FLUJO FOTO DE EVIDENCIA
+--------------------------------------------------------------------------------
+1. Usuario toca "📷 Adjuntar foto" en la tarjeta del signo
+2. expo-image-picker → galería (permiso media library requerido)
+3. POST /api/v1/documents/upload-url/ con { file_name, mime_type }
+   → responde { upload_url (presigned PUT), file_url (URL pública R2) }
+4. PUT directo a upload_url con el blob de la imagen
+5. file_url se guarda en photoUrls[type] (estado local)
+6. Al hacer POST /api/v1/vitals/ → photo_url: file_url incluido en payload
+
+--------------------------------------------------------------------------------
+ESTADO DE CONEXIÓN POR PANTALLA
+--------------------------------------------------------------------------------
+vitals/index.tsx
+  [x] useVitalsLatest()  → grid de 13 tarjetas con valor actual
+  [x] useVitals()        → historial colapsable (últimas 30 lecturas)
+  [x] EP.gamification    → chip de puntos y nivel (ver M15-connect.txt)
+  [x] IMC calculado localmente de weight + height (no se sube al backend)
+  [x] Tarjetas tappables → navegan a vitals/[type]
+
+vitals/add.tsx
+  [x] useAddVitals()     → batch POST (Promise.allSettled por cada signo)
+  [x] useFocusEffect     → limpia el formulario completo al enfocar la pantalla
+  [x] Foto presigned     → upload directo a R2 antes del POST del vital
+
+vitals/[type].tsx
+  [x] useVitals({ type }) → historial filtrado por tipo (últimas 50)
+  [x] useVitalsLatest()   → valor actual para la tarjeta header
+  [x] Gráfica de barras   → Views nativas (sin SVG), coloreada por estado
+
+app/(patient)/index.tsx
+  [x] useVitalsLatest()   → sección "Últimos vitales" (max 4 chips)
+  [x] router.push('/(patient)/vitals') → "Ver más"
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Filtros de fecha en historial de vitals/[type] (el backend lo soporta: ?from=&to=)
+[ ] Gráfica de línea en lugar de barras (requiere react-native-svg compatible)
+[ ] Compartir gráfica (screenshot) con el médico
+[ ] Metas personalizadas por tipo (VitalGoal — endpoint ya disponible)
+[ ] Exportar historial a PDF via /api/v1/documents/export/
+
+================================================================================

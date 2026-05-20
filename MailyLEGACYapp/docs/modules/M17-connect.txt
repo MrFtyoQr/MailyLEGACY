@@ -1,0 +1,27 @@
+================================================================================
+MÓDULO: M17 — Coupons  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M17.txt
+ESTADO:  PENDIENTE — sin pantalla
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Códigos de descuento (PERCENT / FIXED) aplicables al flujo de checkout de
+Stripe. Validación de ventana de vigencia, cap por usuario y restricción por plan.
+
+--------------------------------------------------------------------------------
+INTEGRACIÓN PREVISTA
+--------------------------------------------------------------------------------
+El campo de cupón se añadiría en la pantalla de checkout (M09) antes de
+llamar POST /payments/checkout/. El backend valida el código y aplica el
+descuento en Stripe antes de crear la Session.
+
+--------------------------------------------------------------------------------
+PANTALLAS PENDIENTES
+--------------------------------------------------------------------------------
+[ ] Input de cupón en app/(patient)/subscription/plans.tsx (pendiente M09)
+================================================================================

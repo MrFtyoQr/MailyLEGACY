@@ -1,0 +1,81 @@
+================================================================================
+MÓDULO: M11 — Documents & Medical Files  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-20
+MÓDULO BACKEND REF: docs/modules/M11.txt
+ESTADO:  CONECTADO ✓
+
+--------------------------------------------------------------------------------
+PANTALLAS QUE CONSUMEN ESTE MÓDULO
+--------------------------------------------------------------------------------
+app/(patient)/documents/index.tsx   → pantalla principal de documentos (NUEVA)
+app/(patient)/vitals/add.tsx        → usa upload-url para fotos de evidencia
+app/(patient)/labs/index.tsx        → usa upload-url para adjuntar PDF de labs
+
+--------------------------------------------------------------------------------
+ENDPOINTS CONECTADOS
+--------------------------------------------------------------------------------
+EP.documentUploadUrl = POST /api/v1/documents/upload-url/
+  Parámetros: { file_name, mime_type }
+  Devuelve:   { upload_url, file_url, key }
+  Uso: subir directamente a R2, luego pasar file_url al recurso
+
+EP.documents = GET /api/v1/documents/
+  Parámetros opcionales: ?category=LAB_RESULT|PRESCRIPTION|IMAGING|CLINICAL_NOTE|INSURANCE|OTHER
+  Devuelve lista de MedicalDocument del paciente autenticado
+  Usado en: documents/index.tsx (con filtro por categoría)
+
+EP.documents = POST /api/v1/documents/
+  Body: { title, category, file_url, file_name, file_size?, mime_type? }
+  Registra el documento médico (dispara OCR async)
+  Usado en: documents/index.tsx (confirmUpload)
+
+DELETE /api/v1/documents/<id>/
+  Soft delete (is_active = False)
+  Usado en: documents/index.tsx (confirmDelete → swipe or trash icon)
+
+--------------------------------------------------------------------------------
+FLUJO DE UPLOAD (presigned R2)
+--------------------------------------------------------------------------------
+1. Usuario elige archivo con expo-document-picker (PDF o imagen)
+2. Modal solicita título y categoría
+3. POST /documents/upload-url/ → { upload_url, file_url }
+4. PUT directo a R2 con blob del archivo (Content-Type correcto)
+5. POST /documents/ con { title, category, file_url, file_name, file_size, mime_type }
+6. Backend crea MedicalDocument + encola process_document_ocr()
+7. Lista se invalida con queryClient.invalidateQueries(['documents'])
+
+--------------------------------------------------------------------------------
+FEATURES DE LA PANTALLA
+--------------------------------------------------------------------------------
+- Filtros por categoría (chips horizontales): Todos / Laboratorio / Receta / Imagen /
+  Nota clínica / Seguro / Otro
+- Cards con color izquierdo según categoría, badge de estado (READY/PENDING/etc.)
+- Expandir card para ver texto OCR cuando está disponible (status = READY)
+- Subida: ActionSheet-less modal inferior con selección de título y categoría
+- Eliminación con Alert de confirmación (soft delete)
+
+--------------------------------------------------------------------------------
+ENDPOINTS PENDIENTES (fase 2)
+--------------------------------------------------------------------------------
+EP.documentExport = POST /api/v1/documents/export/
+  → exportar PDF de resumen de salud (vitales + medicamentos + labs + citas)
+  → Pantalla pendiente: documents/export.tsx
+
+GET /api/v1/documents/<id>/shares/     → gestión de compartir con médico
+POST /api/v1/documents/<id>/shares/    → compartir con médico asignado
+DELETE /api/v1/documents/<id>/shares/<share_id>/ → revocar acceso
+
+--------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+--------------------------------------------------------------------------------
+- expo-document-picker v14 (disponible en package.json) — type: ['application/pdf','image/*']
+- La respuesta de GET /documents/ puede ser array plano o paginada {results, count};
+  el frontend normaliza ambos formatos.
+- El OCR se dispara automáticamente; el frontend solo muestra el resultado cuando
+  status = 'READY' y ocr_text existe.
+- El campo document_date (fecha en el documento) no se expone aún en el formulario
+  de subida — pendiente para fase 2.
+================================================================================

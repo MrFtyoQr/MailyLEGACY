@@ -14,17 +14,48 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { useClerk } from '@clerk/clerk-expo'
+import { useQuery } from '@tanstack/react-query'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Avatar } from '@components/ui/Avatar'
 import { Card } from '@components/ui/Card'
 import { Badge } from '@components/ui/Badge'
 import { Colors } from '@constants/colors'
 import { useAuthStore } from '@store/auth.store'
+import { get } from '@lib/api/client'
+import { EP } from '@lib/api/endpoints'
+
+interface Subscription {
+  plan: { name: string; tier: 'FREE' | 'SILVER' | 'GOLD' | 'PLATINUM' } | null
+  status: 'ACTIVE' | 'CANCELLED' | 'PAST_DUE' | null
+}
+
+const PLAN_COLORS: Record<string, string> = {
+  FREE:     '#8E8E93',
+  SILVER:   '#5E9FE0',
+  GOLD:     '#F5A623',
+  PLATINUM: '#9B59B6',
+}
+
+const PLAN_ICONS: Record<string, string> = {
+  FREE: '🆓', SILVER: '🥈', GOLD: '🥇', PLATINUM: '💎',
+}
 
 export default function PatientProfileScreen() {
   const user      = useAuthStore((s) => s.user)
   const clearUser = useAuthStore((s) => s.clear)
   const { signOut } = useClerk()
+
+  const { data: subscription } = useQuery<Subscription>({
+    queryKey:  ['subscription'],
+    staleTime: 5 * 60_000,
+    queryFn:   () => get<Subscription>(EP.subscription),
+    retry:     false,
+  })
+
+  const tier      = subscription?.plan?.tier ?? 'FREE'
+  const planName  = subscription?.plan?.name ?? 'Plan Gratuito'
+  const planColor = PLAN_COLORS[tier] ?? PLAN_COLORS.FREE
+  const planIcon  = PLAN_ICONS[tier]  ?? '🆓'
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Mi Perfil'
 
@@ -72,12 +103,30 @@ export default function PatientProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
+        {/* Plan de suscripción */}
+        <View style={[styles.planCard, { borderLeftColor: planColor }]}>
+          <Text style={styles.planIcon}>{planIcon}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.planLabel}>Plan activo</Text>
+            <Text style={[styles.planName, { color: planColor }]}>{planName}</Text>
+          </View>
+          {tier === 'FREE' && (
+            <TouchableOpacity
+              style={[styles.upgradeBtn, { backgroundColor: PLAN_COLORS.GOLD }]}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.upgradeBtnText}>Mejorar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Info personal */}
         <Text style={styles.sectionTitle}>Información</Text>
         <Card>
           <InfoRow icon="👤" label="Nombre" value={fullName} />
           {user?.email && <InfoRow icon="✉️" label="Email" value={user.email} divider />}
           <InfoRow icon="🏷️" label="Rol" value="Paciente" divider />
+          <InfoRow icon={planIcon} label="Plan" value={planName} divider />
         </Card>
 
         {/* Opciones */}
@@ -87,6 +136,18 @@ export default function PatientProfileScreen() {
             icon="🔔"
             label="Notificaciones"
             onPress={() => router.push('/(patient)/notifications')}
+          />
+          <MenuRow
+            icon="⭐"
+            label="Mis puntos y logros"
+            onPress={() => router.push('/(patient)/gamification')}
+            divider
+          />
+          <MenuRow
+            icon="🗂️"
+            label="Mis documentos"
+            onPress={() => router.push('/(patient)/documents')}
+            divider
           />
         </Card>
 
@@ -131,14 +192,17 @@ const ir = StyleSheet.create({
 })
 
 function MenuRow({
-  icon, label, onPress,
-}: { icon: string; label: string; onPress: () => void }) {
+  icon, label, onPress, divider,
+}: { icon: string; label: string; onPress: () => void; divider?: boolean }) {
   return (
-    <TouchableOpacity style={mr.row} onPress={onPress} activeOpacity={0.7}>
-      <Text style={mr.icon}>{icon}</Text>
-      <Text style={mr.label}>{label}</Text>
-      <Text style={mr.chevron}>›</Text>
-    </TouchableOpacity>
+    <View>
+      {divider && <View style={{ height: 1, backgroundColor: Colors.light.border, marginLeft: 52 }} />}
+      <TouchableOpacity style={mr.row} onPress={onPress} activeOpacity={0.7}>
+        <Text style={mr.icon}>{icon}</Text>
+        <Text style={mr.label}>{label}</Text>
+        <Text style={mr.chevron}>›</Text>
+      </TouchableOpacity>
+    </View>
   )
 }
 
@@ -197,4 +261,26 @@ const styles = StyleSheet.create({
     color:     Colors.light.textMuted,
     textAlign: 'center',
   },
+
+  // Plan card
+  planCard: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    gap:            12,
+    backgroundColor: '#fff',
+    borderRadius:   14,
+    padding:        16,
+    borderWidth:    1,
+    borderColor:    Colors.light.border,
+    borderLeftWidth: 4,
+  },
+  planIcon:  { fontSize: 26 },
+  planLabel: { fontSize: 12, color: Colors.light.textMuted, marginBottom: 2 },
+  planName:  { fontSize: 16, fontWeight: '700' },
+  upgradeBtn: {
+    paddingHorizontal: 14,
+    paddingVertical:    8,
+    borderRadius:      10,
+  },
+  upgradeBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 })

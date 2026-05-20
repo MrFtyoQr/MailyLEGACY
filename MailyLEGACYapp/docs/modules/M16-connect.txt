@@ -1,0 +1,24 @@
+================================================================================
+MÓDULO: M16 — Partner Portal  |  CONEXIÓN FRONTEND
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+FECHA:   2026-05-16
+MÓDULO BACKEND REF: docs/modules/M16.txt
+ESTADO:  PENDIENTE — sin pantalla (B2B, portal web separado previsto)
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Portal B2B para empresas/aseguradoras. Gestión de MemberEnrollment (empleados
+inscritos), PartnerHealthSnapshot (métricas de salud anonimizadas) y
+reportes de adherencia grupal.
+
+--------------------------------------------------------------------------------
+NOTAS
+--------------------------------------------------------------------------------
+- Este módulo está diseñado principalmente para un portal web B2B (no mobile).
+- Los pacientes pueden ver si están inscritos por una empresa en su perfil,
+  pero no gestionan la inscripción ellos mismos.
+- Pendiente evaluar si aplica una pantalla mobile de "Mi beneficio corporativo".
+================================================================================
