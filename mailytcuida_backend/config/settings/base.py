@@ -140,7 +140,6 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']   # CSS / JS custom (incluyendo dark theme)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -274,13 +273,6 @@ CELERY_TIMEZONE          = TIME_ZONE
 CELERY_BEAT_SCHEDULER    = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # ── Django Unfold Admin theme ─────────────────────────────────────────────────
-def _admin_static(path):
-    """Helper usado en UNFOLD STYLES — carga static() perezosamente para evitar
-    que Django intente resolver URLs antes de que las apps estén cargadas."""
-    from django.templatetags.static import static
-    return static(path)
-
-
 UNFOLD = {
     'SITE_TITLE':     'MailyT-Cuida',
     'SITE_HEADER':    'MailyT-Cuida',
@@ -289,11 +281,6 @@ UNFOLD = {
         'light': None,
         'dark':  None,
     },
-
-    # ── Inyectar CSS oscuro personalizado ─────────────────────────────────────
-    'STYLES': [
-        lambda request: _admin_static('admin/css/mailytcuida_admin.css'),
-    ],
 
     # ── Paleta primaria (cyan #00C5E3) ────────────────────────────────────────
     'COLORS': {
