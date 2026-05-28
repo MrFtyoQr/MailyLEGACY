@@ -140,6 +140,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']   # CSS / JS custom (incluyendo dark theme)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -273,14 +274,28 @@ CELERY_TIMEZONE          = TIME_ZONE
 CELERY_BEAT_SCHEDULER    = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # ── Django Unfold Admin theme ─────────────────────────────────────────────────
+def _admin_static(path):
+    """Helper usado en UNFOLD STYLES — carga static() perezosamente para evitar
+    que Django intente resolver URLs antes de que las apps estén cargadas."""
+    from django.templatetags.static import static
+    return static(path)
+
+
 UNFOLD = {
-    'SITE_TITLE':  'MailyT-Cuida',
-    'SITE_HEADER': 'MailyT-Cuida Admin',
+    'SITE_TITLE':     'MailyT-Cuida',
+    'SITE_HEADER':    'MailyT-Cuida',
     'SITE_SUBHEADER': 'Panel de administración',
     'SITE_ICON': {
         'light': None,
         'dark':  None,
     },
+
+    # ── Inyectar CSS oscuro personalizado ─────────────────────────────────────
+    'STYLES': [
+        lambda request: _admin_static('admin/css/mailytcuida_admin.css'),
+    ],
+
+    # ── Paleta primaria (cyan #00C5E3) ────────────────────────────────────────
     'COLORS': {
         'primary': {
             '50':  '236 253 255',
@@ -288,7 +303,7 @@ UNFOLD = {
             '200': '165 243 252',
             '300': '103 232 249',
             '400': '34 211 238',
-            '500': '0 197 227',   # #00C5E3 — brand primary
+            '500': '0 197 227',   # #00C5E3
             '600': '0 168 193',
             '700': '0 131 153',
             '800': '0 104 121',
@@ -296,13 +311,107 @@ UNFOLD = {
             '950': '0 52 61',
         },
     },
+
     'EXTENSIONS': {
         'modeltranslation': {
             'flags': {},
         },
     },
+
+    # ── Sidebar ───────────────────────────────────────────────────────────────
     'SIDEBAR': {
-        'show_search': True,
-        'show_all_applications': True,
+        'show_search':            True,
+        'show_all_applications':  False,   # solo apps registradas explícitamente
+        'navigation': [
+            {
+                'title': 'Plataforma',
+                'collapsible': False,
+                'items': [
+                    {
+                        'title': 'Dashboard',
+                        'icon':  'dashboard',
+                        'link':  '/admin/',
+                    },
+                ],
+            },
+            {
+                'title': 'Usuarios',
+                'collapsible': True,
+                'items': [
+                    {
+                        'title': 'Usuarios',
+                        'icon':  'person',
+                        'link':  '/admin/accounts/user/',
+                    },
+                    {
+                        'title': 'Perfiles Paciente',
+                        'icon':  'patient_list',
+                        'link':  '/admin/accounts/patientprofile/',
+                    },
+                    {
+                        'title': 'Perfiles Médico',
+                        'icon':  'stethoscope',
+                        'link':  '/admin/accounts/doctorprofile/',
+                    },
+                    {
+                        'title': 'Especialistas',
+                        'icon':  'science',
+                        'link':  '/admin/specialists/specialistprofile/',
+                    },
+                ],
+            },
+            {
+                'title': 'Salud',
+                'collapsible': True,
+                'items': [
+                    {
+                        'title': 'Signos Vitales',
+                        'icon':  'monitor_heart',
+                        'link':  '/admin/vitals/vitalsign/',
+                    },
+                    {
+                        'title': 'Medicamentos',
+                        'icon':  'medication',
+                        'link':  '/admin/medications/medication/',
+                    },
+                    {
+                        'title': 'Lab Results',
+                        'icon':  'science',
+                        'link':  '/admin/lab_results/labresult/',
+                    },
+                    {
+                        'title': 'Citas',
+                        'icon':  'calendar_month',
+                        'link':  '/admin/appointments/appointment/',
+                    },
+                ],
+            },
+            {
+                'title': 'Plataforma',
+                'collapsible': True,
+                'items': [
+                    {
+                        'title': 'Audit Log',
+                        'icon':  'history',
+                        'link':  '/admin/audit/auditlog/',
+                    },
+                    {
+                        'title': 'Notificaciones',
+                        'icon':  'notifications',
+                        'link':  '/admin/notifications/notification/',
+                    },
+                    {
+                        'title': 'Suscripciones',
+                        'icon':  'credit_card',
+                        'link':  '/admin/payments/subscription/',
+                    },
+                    {
+                        'title': 'Token Blacklist',
+                        'icon':  'block',
+                        'link':  '/admin/token_blacklist/blacklistedtoken/',
+                    },
+                ],
+            },
+        ],
     },
 }
