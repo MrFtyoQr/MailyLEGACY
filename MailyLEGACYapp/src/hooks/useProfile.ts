@@ -26,12 +26,11 @@ export function useProfile() {
       // Sync con Zustand
       setUser({
         id:        data.user.id,
-        clerkId:   data.user.clerk_id,
         email:     data.user.email,
         role:      data.user.role ?? null,
-        firstName: data.profile?.first_name ?? null,
-        lastName:  data.profile?.last_name  ?? null,
-        photoUrl:  data.profile?.photo_url  ?? null,
+        firstName: (data.profile as { first_name?: string } | null)?.first_name ?? null,
+        lastName:  (data.profile as { last_name?: string }  | null)?.last_name  ?? null,
+        photoUrl:  (data.profile as { photo_url?: string }  | null)?.photo_url  ?? null,
       })
       return data
     },

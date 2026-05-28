@@ -3,7 +3,7 @@
  * ---------
  * Instancia de axios configurada con:
  *   - baseURL del backend
- *   - Interceptor de request: inyecta Bearer token de Clerk
+ *   - Interceptor de request: inyecta Bearer token JWT
  *   - Interceptor de response: transforma errores a ApiError tipado
  *   - Timeout de 15 segundos
  *   - Retry automático en errores de red (1 intento)
@@ -17,7 +17,7 @@ import axios, {
 import { API_URL, TIMEOUTS } from '@constants/config'
 import { ApiError, extractErrorMessage, httpErrorMessage } from './errors'
 
-// Token getter — se inyecta desde el root layout después de que Clerk carga
+// Token getter — se inyecta desde el root layout después de verificar SecureStore
 let _getToken: (() => Promise<string | null>) | null = null
 
 export function setTokenGetter(fn: () => Promise<string | null>) {

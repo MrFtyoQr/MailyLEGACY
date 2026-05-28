@@ -4,20 +4,19 @@
  * Root layout de Expo Router.
  * Orden de providers (outer → inner):
  *   1. Sentry ErrorBoundary
- *   2. ClerkProvider
- *   3. QueryClientProvider
- *   4. GestureHandlerRootView
- *   5. SafeAreaProvider
- *   6. NotificationSocketInit (conecta WS cuando hay sesión)
- *   7. <Slot />
+ *   2. QueryClientProvider
+ *   3. GestureHandlerRootView
+ *   4. SafeAreaProvider
+ *   5. NativeAuthInit (conecta WS cuando hay sesión, inyecta token en axios)
+ *   6. <Slot />
+ *
+ * Clerk ha sido eliminado. La autenticación es propia vía JWT + SecureStore.
  */
 
 import 'react-native-gesture-handler'
 import React, { useEffect } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { ClerkProvider, useAuth } from '@clerk/clerk-expo'
-import * as SecureStore from 'expo-secure-store'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Slot, SplashScreen } from 'expo-router'
 import { StyleSheet } from 'react-native'
@@ -25,16 +24,14 @@ import { StyleSheet } from 'react-native'
 import { initSentry, SentryErrorBoundary } from '@lib/sentry'
 import * as Sentry from '@sentry/react-native'
 import { setTokenGetter } from '@lib/api/client'
+import { getAccessToken } from '@lib/auth/session'
 import { notificationSocket } from '@lib/ws/NotificationSocket'
-import { useWsStore } from '@store/ws.store'
+import { useWsStore }   from '@store/ws.store'
 import { useAuthStore } from '@store/auth.store'
-import { EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY } from '@constants/config'
 
 // Inicializar Sentry lo antes posible
 initSentry()
 
-// Evento de prueba para confirmar que Sentry recibe eventos
-// (solo en desarrollo, aparece en Issues → no en Logs)
 if (__DEV__) {
   Sentry.captureMessage('MailyT-Cuida: Sentry inicializado correctamente', 'info')
 }
@@ -46,9 +43,9 @@ SplashScreen.preventAutoHideAsync()
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry:            1,
+      retry:                1,
       refetchOnWindowFocus: false,
-      staleTime:        2 * 60 * 1000,
+      staleTime:            2 * 60 * 1000,
     },
     mutations: {
       retry: 0,
@@ -56,41 +53,27 @@ const queryClient = new QueryClient({
   },
 })
 
-// SecureStore adapter para Clerk (JWT en almacenamiento seguro)
-const tokenCache = {
-  async getToken(key: string) {
-    try { return await SecureStore.getItemAsync(key) }
-    catch { return null }
-  },
-  async saveToken(key: string, value: string) {
-    try { await SecureStore.setItemAsync(key, value) }
-    catch { /* silencioso */ }
-  },
-  async clearToken(key: string) {
-    try { await SecureStore.deleteItemAsync(key) }
-    catch { /* silencioso */ }
-  },
-}
-
 // ---------------------------------------------------------------------------
-// Sub-componente: conecta WS y Clerk token al cliente axios
+// Sub-componente: inyecta token en axios y conecta WS cuando hay sesión
 // ---------------------------------------------------------------------------
 
-function NotificationSocketInit() {
-  const { getToken, isSignedIn } = useAuth()
-  const setNotifStatus = useWsStore((s) => s.setNotifStatus)
+function NativeAuthInit() {
+  const isSignedIn      = useAuthStore((s) => s.isSignedIn)
+  const setSignedIn     = useAuthStore((s) => s.setSignedIn)
+  const setLoaded       = useAuthStore((s) => s.setLoaded)
+  const setNotifStatus  = useWsStore((s) => s.setNotifStatus)
   const incrementUnread = useWsStore((s) => s.incrementUnread)
-  const setSignedIn    = useAuthStore((s) => s.setSignedIn)
-  const setLoaded      = useAuthStore((s) => s.setLoaded)
 
   useEffect(() => {
-    // Sincronizar estado de auth con Zustand
-    setSignedIn(!!isSignedIn)
-    setLoaded(true)
+    // Inyectar el getter de token JWT en el cliente axios
+    setTokenGetter(getAccessToken)
 
-    // Inyectar getter de token en axios
-    setTokenGetter(() => getToken())
-  }, [isSignedIn, getToken, setSignedIn, setLoaded])
+    // Verificar si hay token en SecureStore → actualizar estado de auth
+    getAccessToken().then((token) => {
+      setSignedIn(!!token)
+      setLoaded(true)
+    })
+  }, [setSignedIn, setLoaded])
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -98,9 +81,9 @@ function NotificationSocketInit() {
       return
     }
 
-    // Conectar WS con token fresco de Clerk
+    // Conectar WS con el token almacenado
     let active = true
-    getToken().then((token) => {
+    getAccessToken().then((token) => {
       if (!token || !active) return
       notificationSocket.setCallbacks({
         onStatus: (s) => setNotifStatus(s),
@@ -116,7 +99,7 @@ function NotificationSocketInit() {
       active = false
       notificationSocket.disconnect()
     }
-  }, [isSignedIn, getToken, setNotifStatus, incrementUnread])
+  }, [isSignedIn, setNotifStatus, incrementUnread])
 
   return null
 }
@@ -128,19 +111,14 @@ function NotificationSocketInit() {
 export default function RootLayout() {
   return (
     <SentryErrorBoundary>
-      <ClerkProvider
-        publishableKey={EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}
-        tokenCache={tokenCache}
-      >
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={styles.flex}>
-            <SafeAreaProvider>
-              <NotificationSocketInit />
-              <Slot />
-            </SafeAreaProvider>
-          </GestureHandlerRootView>
-        </QueryClientProvider>
-      </ClerkProvider>
+      <QueryClientProvider client={queryClient}>
+        <GestureHandlerRootView style={styles.flex}>
+          <SafeAreaProvider>
+            <NativeAuthInit />
+            <Slot />
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </QueryClientProvider>
     </SentryErrorBoundary>
   )
 }

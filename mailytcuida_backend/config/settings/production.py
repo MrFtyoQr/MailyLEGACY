@@ -35,8 +35,11 @@ DEFAULT_FILE_STORAGE   = 'storages.backends.s3boto3.S3Boto3Storage'
 AWS_DEFAULT_ACL        = 'public-read'
 AWS_QUERYSTRING_AUTH   = False
 
-# Archivos estáticos (CSS/JS admin) — whitenoise los sirve directamente del container
-STATICFILES_STORAGE    = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Archivos estáticos (CSS/JS admin) — whitenoise sirve directamente desde /app/staticfiles/
+# Usamos CompressedStaticFilesStorage (sin manifest) para evitar problemas de hashing
+# con unfold y otros paquetes que referencian archivos con rutas relativas.
+STATICFILES_STORAGE    = 'whitenoise.storage.CompressedStaticFilesStorage'
+WHITENOISE_MANIFEST_STRICT = False
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOGGING = {

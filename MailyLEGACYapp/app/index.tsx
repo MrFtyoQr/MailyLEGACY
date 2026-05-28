@@ -5,8 +5,8 @@
  *
  * Flujo:
  *   1. Muestra animación del logo (Reanimated)
- *   2. Cuando Clerk termina de cargar:
- *      - Sin sesión   → /(auth)/sign-in
+ *   2. Cuando auth store termina de cargar (tokens leídos de SecureStore):
+ *      - Sin sesión   → /(auth)/onboarding (primera vez) | /(auth)/sign-in
  *      - Con sesión   → si perfil completo → /(rol)/ | si no → /(auth)/role-setup
  */
 
@@ -14,7 +14,6 @@ import React, { useEffect, useCallback, useState } from 'react'
 import { View, Image, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native'
 import { router } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useAuth } from '@clerk/clerk-expo'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -27,26 +26,26 @@ import Animated, {
 
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useAuthStore }  from '@store/auth.store'
-import { get }          from '@lib/api/client'
-import { EP }           from '@lib/api/endpoints'
-import { Colors }       from '@constants/colors'
+import { get }           from '@lib/api/client'
+import { EP }            from '@lib/api/endpoints'
+import { Colors }        from '@constants/colors'
 import { ONBOARDING_KEY } from './(auth)/onboarding'
 import type { MeResponse } from '@/types/api.types'
 
 const { width } = Dimensions.get('window')
 
 export default function SplashAnimatedScreen() {
-  const { isLoaded, isSignedIn } = useAuth()
+  const { isLoaded, isSignedIn } = useAuthStore()
   const setLoaded   = useAuthStore((s) => s.setLoaded)
   const setSignedIn = useAuthStore((s) => s.setSignedIn)
   const setUser     = useAuthStore((s) => s.setUser)
   const [networkError, setNetworkError] = useState(false)
 
   // Valores de animación
-  const logoScale   = useSharedValue(0.3)
-  const logoOpacity = useSharedValue(0)
-  const textOpacity = useSharedValue(0)
-  const tagOpacity  = useSharedValue(0)
+  const logoScale      = useSharedValue(0.3)
+  const logoOpacity    = useSharedValue(0)
+  const textOpacity    = useSharedValue(0)
+  const tagOpacity     = useSharedValue(0)
   const containerScale = useSharedValue(1)
 
   const logoStyle = useAnimatedStyle(() => ({
@@ -70,9 +69,6 @@ export default function SplashAnimatedScreen() {
   const navigate = useCallback(async () => {
     if (!isLoaded) return
 
-    setLoaded(true)
-    setSignedIn(!!isSignedIn)
-
     containerScale.value = withTiming(0.95, { duration: 200 })
     await new Promise((r) => setTimeout(r, 200))
     await SplashScreen.hideAsync()
@@ -90,12 +86,11 @@ export default function SplashAnimatedScreen() {
     const handleMe = async (me: MeResponse) => {
       setUser({
         id:        me.user.id,
-        clerkId:   me.user.clerk_id,
         email:     me.user.email,
         role:      me.user.role ?? null,
-        firstName: me.profile?.first_name ?? null,
-        lastName:  me.profile?.last_name  ?? null,
-        photoUrl:  me.profile?.photo_url  ?? null,
+        firstName: (me.profile as { first_name?: string } | null)?.first_name ?? null,
+        lastName:  (me.profile as { last_name?: string }  | null)?.last_name  ?? null,
+        photoUrl:  (me.profile as { photo_url?: string }  | null)?.photo_url  ?? null,
       })
       if (!me.is_complete || !me.user.role) {
         router.replace('/(auth)/role-setup')
@@ -118,25 +113,22 @@ export default function SplashAnimatedScreen() {
         return
       } catch {
         if (attempt === 0) {
-          // Esperar 1.5s y reintentar — el servidor puede estar arrancando
           await new Promise((r) => setTimeout(r, 1500))
         }
       }
     }
-    // Solo llegar aquí si ambos intentos fallaron
+    // Si ambos intentos fallaron — puede ser token expirado o sin red
     setNetworkError(true)
     await SplashScreen.hideAsync()
   }, [isLoaded, isSignedIn])
 
   useEffect(() => {
-    // Secuencia de entrada del logo
     logoOpacity.value = withTiming(1, { duration: 300 })
     logoScale.value   = withSpring(1, { damping: 12, stiffness: 120 })
 
     textOpacity.value = withDelay(300, withTiming(1, { duration: 350 }))
     tagOpacity.value  = withDelay(450, withTiming(1, { duration: 350 }))
 
-    // Cuando Clerk carga → navegar
     if (isLoaded) {
       const timer = setTimeout(() => {
         runOnJS(navigate)()
@@ -145,7 +137,6 @@ export default function SplashAnimatedScreen() {
     }
   }, [isLoaded])
 
-  // Error de red — mostrar en lugar del splash animado
   if (networkError) {
     return (
       <View style={styles.container}>

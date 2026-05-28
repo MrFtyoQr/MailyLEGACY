@@ -6,8 +6,8 @@ django-cors-headers==4.4.0
 django-environ==0.11.2
 gunicorn==23.0.0
 
-# Auth — Clerk
-clerk-backend-api==1.7.0
+# Auth — propio JWT (reemplaza Clerk)
+djangorestframework-simplejwt==5.3.1
 PyJWT==2.9.0
 cryptography==43.0.3
 requests==2.32.3
@@ -35,7 +35,7 @@ daphne==4.1.2
 boto3==1.35.68
 django-storages==1.14.4
 
-# Webhooks
+# Webhooks (svix conservado solo para webhook legado de Clerk — deprecado)
 svix==1.37.0
 
 # Logging

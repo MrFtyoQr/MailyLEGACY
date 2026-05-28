@@ -1,12 +1,13 @@
 /**
- * api.ts — Axios instance con Clerk JWT para el portal admin.
+ * api.ts — Axios instance con JWT propio para el portal admin.
  *
- * Uso (client components):
+ * Uso (client components / hooks):
  *   const { getToken } = useAuth()
  *   const data = await apiGet<DashboardData>(EP.adminDashboard, getToken)
  *
  * Uso (server components / Route Handlers):
- *   const { getToken } = auth()
+ *   import { cookies } from 'next/headers'
+ *   const token = (await cookies()).get('mc_admin_token')?.value
  *   const data = await serverApiGet<DashboardData>(EP.adminDashboard, token)
  */
 
@@ -34,31 +35,34 @@ export async function apiGet<T>(
   params?: Record<string, string | number | undefined>,
 ): Promise<T> {
   const token = await getToken()
-  if (!token) throw new Error('No auth token')
+  if (!token) throw new Error('No auth token — redirigir a /sign-in')
   const client = createClient(token)
   const res = await client.get<T>(url, { params })
   return res.data
 }
 
-// ── Server-side helper (usar en layout.tsx server components) ─────────────────
+// ── Server-side helper (usar en layout.tsx y server components) ───────────────
 
 export async function serverApiGet<T>(
   url: string,
   token: string,
   params?: Record<string, string>,
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${url}`, {
+  const searchParams = params
+    ? '?' + new URLSearchParams(params as Record<string, string>).toString()
+    : ''
+
+  const res = await fetch(`${API_URL}${url}${searchParams}`, {
     headers: {
       Authorization:  `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     cache: 'no-store',
-    ...(params
-      ? { }
-      : {}),
   })
+
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${url}`)
   }
+
   return res.json() as Promise<T>
 }

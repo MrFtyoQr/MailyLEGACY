@@ -1,24 +1,31 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
-// Protege todas las rutas bajo (admin)
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
-  '/audit(.*)',
-  '/specialists(.*)',
-  '/users(.*)',
-])
+/**
+ * Middleware de autenticación — reemplaza el de Clerk.
+ * Protege las rutas del portal admin verificando la cookie mc_admin_token.
+ * La verificación del rol ADMIN se hace en el server component (admin)/layout.tsx.
+ */
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect()
+const PROTECTED = ['/dashboard', '/audit', '/specialists', '/users']
+
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+  const isProtected  = PROTECTED.some(r => pathname.startsWith(r))
+
+  if (isProtected) {
+    const token = req.cookies.get('mc_admin_token')?.value
+    if (!token) {
+      const signIn = new URL('/sign-in', req.url)
+      return NextResponse.redirect(signIn)
+    }
   }
-})
+
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and static files
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes
     '/(api|trpc)(.*)',
   ],
 }

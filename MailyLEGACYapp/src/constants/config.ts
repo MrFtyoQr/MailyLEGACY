@@ -17,14 +17,10 @@ export const API_VERSION = '/api/v1'
 /** URL completa del API */
 export const API_URL = `${API_BASE_URL}${API_VERSION}`
 
-/** Clerk publishable key */
-export const CLERK_PUBLISHABLE_KEY: string =
-  (extra.clerkPublishableKey as string | undefined) ??
-  process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ??
-  ''
-
-/** Alias corto usado en _layout.tsx */
-export const EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = CLERK_PUBLISHABLE_KEY
+/** @deprecated Clerk ha sido eliminado — mantener para referencias residuales */
+export const CLERK_PUBLISHABLE_KEY = ''
+/** @deprecated */
+export const EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = ''
 
 /** Sentry DSN */
 export const SENTRY_DSN: string =

@@ -1,8 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useClerk } from '@clerk/nextjs'
+import { usePathname, useRouter } from 'next/navigation'
 
 interface NavItem {
   href:  string
@@ -21,7 +20,16 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar({ adminEmail }: { adminEmail: string }) {
   const pathname = usePathname()
-  const { signOut } = useClerk()
+  const router   = useRouter()
+
+  async function handleSignOut() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } finally {
+      router.push('/sign-in')
+      router.refresh()
+    }
+  }
 
   return (
     <aside
@@ -39,8 +47,8 @@ export function Sidebar({ adminEmail }: { adminEmail: string }) {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
         {NAV_ITEMS.map((item) => {
-          const isActive  = pathname.startsWith(item.href)
-          const isPhase2  = Boolean(item.badge)
+          const isActive = pathname.startsWith(item.href)
+          const isPhase2 = Boolean(item.badge)
           return (
             <Link
               key={item.href}
@@ -71,7 +79,7 @@ export function Sidebar({ adminEmail }: { adminEmail: string }) {
       <div className="px-4 py-4 border-t border-slate-700">
         <p className="text-xs text-slate-400 truncate mb-3">{adminEmail}</p>
         <button
-          onClick={() => signOut({ redirectUrl: '/sign-in' })}
+          onClick={handleSignOut}
           className="w-full text-left text-sm text-slate-400 hover:text-red-400 transition-colors flex items-center gap-2"
         >
           <span>🚪</span>

@@ -1,5 +1,6 @@
 import environ
 import sentry_sdk
+from datetime import timedelta
 from pathlib import Path
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
@@ -31,6 +32,8 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'axes',
     'channels',
@@ -72,7 +75,6 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'core.middleware.sanitize.InputSanitizationMiddleware',
-    'apps.accounts.middleware.clerk_auth.ClerkAuthMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.audit.middleware.AuditMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -143,15 +145,35 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'accounts.User'
 
-# ── Clerk ────────────────────────────────────────────────────────────────────
-CLERK_SECRET_KEY = env('CLERK_SECRET_KEY')
-CLERK_WEBHOOK_SECRET = env('CLERK_WEBHOOK_SECRET')
-CLERK_JWKS_URL = env('CLERK_JWKS_URL', default='https://api.clerk.com/v1/jwks')
+# ── Clerk (LEGADO — solo para webhook de migración; se puede quitar cuando
+#    todos los usuarios tengan contraseña en el nuevo sistema) ─────────────────
+CLERK_SECRET_KEY    = env('CLERK_SECRET_KEY',    default='')
+CLERK_WEBHOOK_SECRET = env('CLERK_WEBHOOK_SECRET', default='')
+CLERK_JWKS_URL      = env('CLERK_JWKS_URL', default='https://api.clerk.com/v1/jwks')
+
+# ── JWT propio ────────────────────────────────────────────────────────────────
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME':   timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME':  timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS':   True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN':       False,
+    'ALGORITHM':               'HS256',
+    # Firma con la SECRET_KEY de Django — rotarla invalida todos los tokens activos
+    'SIGNING_KEY':             None,   # None = usa settings.SECRET_KEY automáticamente
+    'AUTH_HEADER_TYPES':       ('Bearer',),
+    'USER_ID_FIELD':           'id',
+    'USER_ID_CLAIM':           'user_id',
+    'ISSUER':                  'mailytcuida-backend',
+    'AUDIENCE':                None,   # No audiencia por ahora
+    'AUTH_TOKEN_CLASSES':      ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM':        'token_type',
+}
 
 # ── REST Framework ────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'apps.accounts.middleware.clerk_auth.ClerkJWTAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',

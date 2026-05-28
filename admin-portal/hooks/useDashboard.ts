@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth } from '@/hooks/useAuth'
 import { apiGet } from '@/lib/api'
 import { EP } from '@/lib/endpoints'
 import type { DashboardData } from '@/types'

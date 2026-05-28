@@ -5,20 +5,23 @@ from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, clerk_id, role='PATIENT', **extra_fields):
+    def create_user(self, email, password=None, clerk_id=None, role='PATIENT', **extra_fields):
         if not email:
             raise ValueError('Email requerido')
         email = self.normalize_email(email)
         user = self.model(email=email, clerk_id=clerk_id, role=role, **extra_fields)
-        user.set_unusable_password()
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, clerk_id, **extra_fields):
+    def create_superuser(self, email, password, **extra_fields):
         extra_fields.setdefault('role', 'ADMIN')
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        return self.create_user(email, clerk_id, **extra_fields)
+        return self.create_user(email, password=password, **extra_fields)
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -30,7 +33,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         ADMIN      = 'ADMIN',      'Administrador'
 
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    clerk_id   = models.CharField(max_length=255, unique=True, db_index=True)
+    # clerk_id es nullable para soportar usuarios nativos (sin Clerk)
+    clerk_id   = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     email      = models.EmailField(unique=True)
     phone      = models.CharField(max_length=20, blank=True)
     role       = models.CharField(max_length=20, choices=Role.choices, default=Role.PATIENT)
@@ -42,7 +46,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD  = 'email'
-    REQUIRED_FIELDS = ['clerk_id']
+    REQUIRED_FIELDS = []  # email es USERNAME_FIELD; clerk_id ya no es requerido
 
     class Meta:
         db_table = 'accounts_user'

@@ -16,7 +16,6 @@ from .serializers import (
     SpecialistProfileSerializer, PartnerProfileSerializer,
     DoctorPatientSerializer, UserAdminSerializer, PhotoUploadSerializer,
 )
-from .middleware.clerk_auth import _verify_clerk_token
 
 
 # ── Auth me ───────────────────────────────────────────────────────────────────
@@ -72,26 +71,38 @@ class MeView(generics.RetrieveUpdateAPIView):
         })
 
 
-# ── Auth init (fallback si el webhook no creó al usuario) ────────────────────
+# ── Auth init (LEGADO — Clerk fallback, conservado para app móvil) ────────────
 
 class AuthInitView(APIView):
     """
     POST /api/v1/auth/init/
-    Registra al usuario en Django si todavía no existe (fallback ante webhook fallido).
-    Verifica el JWT de Clerk directamente; no requiere que el usuario exista en BD.
+    LEGADO: Registraba al usuario cuando llegaba un token Clerk.
+    Ahora redirige al sistema nativo si el cliente no usa Clerk.
+    Conservado para compatibilidad con la app móvil durante la migración.
     """
     authentication_classes = []
     permission_classes      = [permissions.AllowAny]
 
     def post(self, request):
+        # Intentar autenticación Clerk legada (si las claves están configuradas)
+        from django.conf import settings
+        if not settings.CLERK_JWKS_URL or not settings.CLERK_SECRET_KEY:
+            return Response(
+                {'error': 'Endpoint Clerk no disponible. Usar /auth/login/'},
+                status=status.HTTP_410_GONE,
+            )
+
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
             return Response({'error': 'Token requerido'}, status=status.HTTP_401_UNAUTHORIZED)
 
         token = auth_header.split(' ', 1)[1]
+
+        # Importar solo si Clerk sigue configurado
         try:
+            from .middleware.clerk_auth import _verify_clerk_token
             payload = _verify_clerk_token(token)
-        except AuthenticationFailed as exc:
+        except (ImportError, AuthenticationFailed) as exc:
             return Response({'error': str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
 
         clerk_id = payload.get('sub')
@@ -105,12 +116,10 @@ class AuthInitView(APIView):
             defaults={'email': email, 'role': User.Role.PATIENT},
         )
 
-        # Actualizar email si teníamos placeholder
         if not created and user.email.endswith('@pending.mailyt') and request.data.get('email'):
             user.email = request.data['email']
             user.save(update_fields=['email', 'updated_at'])
 
-        # Crear perfil de paciente si no existe
         if user.role == User.Role.PATIENT:
             PatientProfile.objects.get_or_create(
                 user=user,

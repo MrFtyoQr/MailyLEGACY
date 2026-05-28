@@ -13,7 +13,6 @@ import {
   Alert,
 } from 'react-native'
 import { router } from 'expo-router'
-import { useClerk } from '@clerk/clerk-expo'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Avatar } from '@components/ui/Avatar'
 import { Card } from '@components/ui/Card'
@@ -22,9 +21,8 @@ import { Colors } from '@constants/colors'
 import { useAuthStore } from '@store/auth.store'
 
 export default function SpecialistProfileScreen() {
-  const user      = useAuthStore((s) => s.user)
-  const clearUser = useAuthStore((s) => s.clear)
-  const { signOut } = useClerk()
+  const user    = useAuthStore((s) => s.user)
+  const signOut = useAuthStore((s) => s.signOut)
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Mi Perfil'
 
@@ -40,8 +38,6 @@ export default function SpecialistProfileScreen() {
           onPress: async () => {
             try {
               await signOut()
-              clearUser()
-              router.replace('/(auth)/sign-in')
             } catch {
               Alert.alert('Error', 'No se pudo cerrar sesión. Intenta de nuevo.')
             }

@@ -1,16 +1,18 @@
 /**
  * auth.store.ts
  * -------------
- * Estado de autenticación global sincronizado con Clerk.
- * Zustand store — sin persistencia (Clerk maneja el token en SecureStore).
+ * Estado de autenticación global.
+ * Reemplaza la integración con Clerk — gestiona tokens via expo-secure-store.
  */
 
-import { create } from 'zustand'
-import { UserRole } from '@constants/config'
+import { create }                               from 'zustand'
+import { router }                              from 'expo-router'
+import { API_URL }                             from '@constants/config'
+import type { UserRole }                       from '@constants/config'
+import { getAccessToken, getRefreshToken, clearTokens } from '@lib/auth/session'
 
 export interface AuthUser {
   id:        string   // UUID del backend
-  clerkId:   string
   email:     string
   role:      UserRole | null
   firstName: string | null
@@ -20,7 +22,7 @@ export interface AuthUser {
 
 interface AuthState {
   user:       AuthUser | null
-  isLoaded:   boolean   // Clerk terminó de cargar
+  isLoaded:   boolean   // Auth terminó de cargar (ex: tokens leídos de SecureStore)
   isSignedIn: boolean
 
   setUser:     (user: AuthUser | null) => void
@@ -28,6 +30,9 @@ interface AuthState {
   setLoaded:   (v: boolean) => void
   setSignedIn: (v: boolean) => void
   clear:       () => void
+
+  /** Cierra sesión: borra tokens, limpia estado y redirige al sign-in. */
+  signOut: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -40,4 +45,26 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoaded:   (v)       => set({ isLoaded: v }),
   setSignedIn: (v)       => set({ isSignedIn: v }),
   clear:       ()        => set({ user: null, isSignedIn: false }),
+
+  signOut: async () => {
+    // Fire & forget — blacklistear el refresh token en el servidor
+    try {
+      const [refresh, access] = await Promise.all([getRefreshToken(), getAccessToken()])
+      if (refresh) {
+        fetch(`${API_URL}/auth/logout/`, {
+          method:  'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(access ? { Authorization: `Bearer ${access}` } : {}),
+          },
+          body: JSON.stringify({ refresh }),
+        }).catch(() => { /* silencioso — no bloquear el logout si falla la red */ })
+      }
+    } catch { /* silencioso */ }
+
+    // Limpiar tokens locales y estado de inmediato
+    await clearTokens()
+    set({ user: null, isSignedIn: false })
+    router.replace('/(auth)/sign-in')
+  },
 }))

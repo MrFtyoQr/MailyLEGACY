@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { serverApiGet } from '@/lib/api'
@@ -10,10 +10,10 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  // 1. Clerk auth — si no hay sesión, middleware ya redirige a /sign-in
-  //    pero hacemos doble check aquí por seguridad
-  const { getToken } = await auth()
-  const token = await getToken()
+  // 1. Leer token desde cookie httpOnly (establecida por /api/auth/login)
+  const cookieStore = await cookies()
+  const token = cookieStore.get('mc_admin_token')?.value
+
   if (!token) {
     redirect('/sign-in')
   }

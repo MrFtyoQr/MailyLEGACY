@@ -13,7 +13,6 @@ import {
   Alert,
 } from 'react-native'
 import { router } from 'expo-router'
-import { useClerk } from '@clerk/clerk-expo'
 import { useQuery } from '@tanstack/react-query'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Avatar } from '@components/ui/Avatar'
@@ -41,9 +40,8 @@ const PLAN_ICONS: Record<string, string> = {
 }
 
 export default function PatientProfileScreen() {
-  const user      = useAuthStore((s) => s.user)
-  const clearUser = useAuthStore((s) => s.clear)
-  const { signOut } = useClerk()
+  const user     = useAuthStore((s) => s.user)
+  const signOut  = useAuthStore((s) => s.signOut)
 
   const { data: subscription } = useQuery<Subscription>({
     queryKey:  ['subscription'],
@@ -71,8 +69,6 @@ export default function PatientProfileScreen() {
           onPress: async () => {
             try {
               await signOut()
-              clearUser()
-              router.replace('/(auth)/sign-in')
             } catch {
               Alert.alert('Error', 'No se pudo cerrar sesión. Intenta de nuevo.')
             }

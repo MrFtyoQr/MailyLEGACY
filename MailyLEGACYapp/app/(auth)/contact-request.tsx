@@ -20,7 +20,7 @@ import {
   Platform,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
-import { useUser } from '@clerk/clerk-expo'
+import { useAuthStore }   from '@store/auth.store'
 import { ScreenWrapper }  from '@components/layout/ScreenWrapper'
 import { FormField }      from '@components/forms/FormField'
 import { ProtectedForm }  from '@components/forms/ProtectedForm'
@@ -38,17 +38,15 @@ const ROLE_LABELS: Record<RoleParam, { label: string; emoji: string; color: stri
 
 export default function ContactRequestScreen() {
   const { role } = useLocalSearchParams<{ role: string }>()
-  const { user } = useUser()
+  const authUser = useAuthStore((s) => s.user)
 
   const roleKey = (role === 'DOCTOR' || role === 'SPECIALIST') ? role as RoleParam : 'DOCTOR'
   const roleInfo = ROLE_LABELS[roleKey]
 
-  // Estado del formulario
-  const [firstName,    setFirstName]    = useState(user?.firstName ?? '')
-  const [lastName,     setLastName]     = useState(user?.lastName  ?? '')
-  const [email,        setEmail]        = useState(
-    user?.primaryEmailAddress?.emailAddress ?? '',
-  )
+  // Estado del formulario — pre-rellenar con datos de sesión si existen
+  const [firstName,    setFirstName]    = useState(authUser?.firstName ?? '')
+  const [lastName,     setLastName]     = useState(authUser?.lastName  ?? '')
+  const [email,        setEmail]        = useState(authUser?.email ?? '')
   const [specialty,    setSpecialty]    = useState('')
   const [phone,        setPhone]        = useState('')
   const [message,      setMessage]      = useState('')

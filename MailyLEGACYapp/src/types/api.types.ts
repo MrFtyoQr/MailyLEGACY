@@ -12,11 +12,11 @@ import { UserRole } from '@constants/config'
 // ---------------------------------------------------------------------------
 
 export interface BackendUser {
-  id:        string
-  clerk_id:  string
-  email:     string
-  role:      UserRole | null
-  is_active: boolean
+  id:         string
+  clerk_id:   string | null   // Nullable — usuarios nativos no tienen clerk_id
+  email:      string
+  role:       UserRole | null
+  is_active:  boolean
   created_at: string
 }
 
