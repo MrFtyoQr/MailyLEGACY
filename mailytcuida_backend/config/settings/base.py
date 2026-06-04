@@ -160,7 +160,7 @@ SIMPLE_JWT = {
     'UPDATE_LAST_LOGIN':       False,
     'ALGORITHM':               'HS256',
     # Firma con la SECRET_KEY de Django — rotarla invalida todos los tokens activos
-    'SIGNING_KEY':             None,   # None = usa settings.SECRET_KEY automáticamente
+    'SIGNING_KEY':             SECRET_KEY,  # explícito — PyJWT requiere string, no None
     'AUTH_HEADER_TYPES':       ('Bearer',),
     'USER_ID_FIELD':           'id',
     'USER_ID_CLAIM':           'user_id',

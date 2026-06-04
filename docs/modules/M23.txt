@@ -1,0 +1,140 @@
+================================================================================
+MÓDULO: M23 — Planes y Suscripción (App Móvil)
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-06-03
+SPRINT: CULMINACIÓN
+ESTADO: COMPLETADO
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN
+--------------------------------------------------------------------------------
+Módulo de selección y gestión de planes de suscripción dentro de la app móvil
+(React Native / Expo). Permite al paciente comparar y contratar los planes
+FREE, SILVER, GOLD y PLATINUM en modalidad Individual o Familiar.
+
+El módulo conecta con el backend de pagos (Stripe via Django) a través de los
+endpoints ya existentes en /payments/.
+
+--------------------------------------------------------------------------------
+FUNCIONALIDADES IMPLEMENTADAS
+--------------------------------------------------------------------------------
+[x] Toggle Individual / Familiar en la misma pantalla
+[x] Cards por tier (FREE / SILVER / GOLD / PLATINUM) con gradiente de color
+[x] Features expandibles por card (acordeón)
+[x] Beneficios resaltados (highlight) por tier
+[x] Badge "Más popular" en plan GOLD
+[x] Indicador de plan activo (badge verde + banner superior)
+[x] Botón de contratación → checkout Stripe vía URL externa
+[x] Fallback de contacto por email si backend no está disponible
+[x] Botón "Ver plan" / "Mejorar" en profile.tsx → navega a /plans
+[x] Nueva fila "Planes y suscripción" en menú de Configuración del perfil
+[x] Precios locales como fallback si backend no responde
+
+--------------------------------------------------------------------------------
+MATRIZ DE BENEFICIOS
+--------------------------------------------------------------------------------
+
+FREE (Gratis)
+  ✓ Registro de signos vitales (3/día)
+  ✓ Recordatorios de medicamentos
+  ✓ Historial clínico básico
+  ✓ Citas médicas (ver)
+  ✓ Documentos (5 archivos)
+  ✕ Miembros familiares
+  ✕ Análisis de IA
+  ✕ Resultados de laboratorio
+  ✕ Programas de bienestar
+
+SILVER ($5.99/mes individual | $9.99/mes familiar)
+  ✓ Signos vitales ilimitados ★
+  ✓ Recordatorios de medicamentos
+  ✓ Historial clínico completo
+  ✓ Agendar y gestionar citas ★
+  ✓ Documentos (50 archivos)
+  ✓ 1 miembro familiar ★
+  ✓ Análisis de IA básico
+  ✓ Resultados de laboratorio
+  ✓ Programas de bienestar (3)
+
+GOLD ($12.99/mes individual | $19.99/mes familiar)  ← MÁS POPULAR
+  ✓ Signos vitales ilimitados
+  ✓ Recordatorios inteligentes
+  ✓ Historial clínico + exportar PDF ★
+  ✓ Citas + teleconsulta ★
+  ✓ Documentos ilimitados
+  ✓ Hasta 3 miembros familiares ★
+  ✓ Análisis de IA avanzado ★
+  ✓ Laboratorios + alertas críticas
+  ✓ Todos los programas de bienestar
+
+PLATINUM ($24.99/mes individual | $34.99/mes familiar)
+  ✓ Todo lo de Gold incluido
+  ✓ Hasta 6 miembros familiares ★
+  ✓ Análisis de IA premium + insights ★
+  ✓ Soporte prioritario 24/7 ★
+  ✓ Especialistas sin referido ★
+  ✓ Gamificación y recompensas premium
+  ✓ Exportación completa de datos
+  ✓ Acceso anticipado a funciones
+  ✓ Consultor de salud personal ★
+
+  ★ = beneficio destacado
+
+--------------------------------------------------------------------------------
+ARCHIVOS CREADOS / MODIFICADOS
+--------------------------------------------------------------------------------
+MailyLEGACYapp/
+├── app/(patient)/plans.tsx               [NUEVO]  Pantalla principal de planes
+├── src/hooks/usePlans.ts                  [NUEVO]  Hook de datos + tipos
+└── app/(patient)/profile.tsx             [MOD]    Botón "Mejorar"→"Ver plan" +
+                                                    nueva fila "Planes y suscripción"
+
+--------------------------------------------------------------------------------
+STACK DEL MÓDULO (App)
+--------------------------------------------------------------------------------
+- React Native / Expo (expo-router v6)
+- NativeWind / StyleSheet
+- @tanstack/react-query v5 (usePlans, useSubscription, useCheckout)
+- expo-linear-gradient (gradientes por tier)
+- Zustand — auth.store (tier del usuario)
+- Linking (abrir checkout Stripe en browser externo)
+
+--------------------------------------------------------------------------------
+ENDPOINTS UTILIZADOS
+--------------------------------------------------------------------------------
+GET   /payments/plans/          → lista de planes disponibles (backend)
+GET   /payments/subscription/   → suscripción activa del usuario
+POST  /payments/checkout/       → genera URL de checkout Stripe
+POST  /payments/cancel/         → cancela suscripción activa
+
+--------------------------------------------------------------------------------
+DECISIONES DE DISEÑO
+--------------------------------------------------------------------------------
+1. Precios locales (FEATURE_MATRIX) como fallback — la UI funciona sin backend.
+2. El checkout abre una URL de Stripe en el browser del dispositivo via Linking.
+3. Cards con acordeón: solo un tier abierto a la vez (default: GOLD).
+4. El tier actual se resalta con borde verde y badge "Activo".
+5. Toggle Individual/Familiar cambia los precios en tiempo real.
+6. No se implementó cancelación en esta pantalla — queda en la siguiente iteración.
+
+--------------------------------------------------------------------------------
+PENDIENTES / PRÓXIMA ITERACIÓN
+--------------------------------------------------------------------------------
+[ ] Opción de cancelar suscripción dentro de la pantalla (con confirmación)
+[ ] Precio anual con descuento (badge "Ahorra X%")
+[ ] Deep link de retorno tras pago exitoso en Stripe
+[ ] WebhookView de Stripe ya existe en backend (M06) — conectar notificación push
+[ ] Test con Stripe sandbox (modo test)
+
+--------------------------------------------------------------------------------
+HISTORIAL DE CAMBIOS
+--------------------------------------------------------------------------------
+2026-06-03 | CREACIÓN INICIAL (Sprint Culminación)
+           | - Hook usePlans con tipos Plan, Subscription, PlanFeature, PlanMode
+           | - FEATURE_MATRIX local para todos los tiers
+           | - Screen plans.tsx: toggle, cards acordeón, CTA, precios, fallback
+           | - profile.tsx: botón "Mejorar"→"Ver plan" + fila "Planes y suscripción"
+
+================================================================================

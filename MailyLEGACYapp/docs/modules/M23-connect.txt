@@ -1,0 +1,90 @@
+================================================================================
+MÓDULO: M23 — Planes y Suscripción (Conexión App ↔ Backend)
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-06-03
+ESTADO: COMPLETADO
+
+--------------------------------------------------------------------------------
+RESUMEN DE CONEXIÓN
+--------------------------------------------------------------------------------
+La pantalla de planes (app/(patient)/plans.tsx) se conecta al backend Django
+a través del hook usePlans.ts usando el cliente Axios con JWT automático.
+
+La app funciona en modo offline/fallback con FEATURE_MATRIX local si el
+backend no está disponible.
+
+--------------------------------------------------------------------------------
+FLUJO DE DATOS
+--------------------------------------------------------------------------------
+
+1. Al abrir /plans:
+   useSubscription()  →  GET /payments/subscription/
+                         → muestra plan activo + fecha de vencimiento
+
+   usePlans()         →  GET /payments/plans/
+                         → si responde: usa precios del backend
+                         → si falla:    usa precios locales (TIER_META)
+
+2. Al presionar "Contratar":
+   useCheckout()      →  POST /payments/checkout/
+                         body: { planId: string }
+                         → devuelve { checkoutUrl: string }
+                         → Linking.openURL(checkoutUrl) abre Stripe
+
+3. Tras pago exitoso (Stripe webhook → backend):
+   → backend actualiza Subscription
+   → app invalida queryKey ['subscription'] al volver al foco
+
+--------------------------------------------------------------------------------
+CONTRATOS DE API ESPERADOS
+--------------------------------------------------------------------------------
+
+GET /payments/plans/
+  Response: Plan[]
+  Plan {
+    id:            string
+    name:          string
+    tier:          'FREE' | 'SILVER' | 'GOLD' | 'PLATINUM'
+    mode:          'individual' | 'family'
+    priceMonthly:  number
+    priceAnnual?:  number
+    currency:      string
+    stripePriceId: string
+    features?:     PlanFeature[]
+    popular?:      boolean
+  }
+
+GET /payments/subscription/
+  Response: Subscription
+  Subscription {
+    plan: { id, name, tier, mode } | null
+    status: 'ACTIVE' | 'CANCELLED' | 'PAST_DUE' | 'TRIALING' | null
+    currentPeriodEnd: string | null   (ISO 8601)
+    cancelAtPeriodEnd: boolean
+  }
+
+POST /payments/checkout/
+  Body:     { planId: string }
+  Response: { checkoutUrl: string }
+
+POST /payments/cancel/
+  Body:     {}
+  Response: 204 No Content
+
+--------------------------------------------------------------------------------
+ARCHIVOS APP RELEVANTES
+--------------------------------------------------------------------------------
+app/(patient)/plans.tsx           → Screen principal
+src/hooks/usePlans.ts             → Queries + tipos + FEATURE_MATRIX
+src/lib/api/endpoints.ts          → EP.plans, EP.subscription, EP.checkout, EP.cancelSubscription
+app/(patient)/profile.tsx         → Entrada desde perfil
+
+--------------------------------------------------------------------------------
+MÓDULOS BACKEND RELACIONADOS
+--------------------------------------------------------------------------------
+M06 — Payments & Subscriptions    → /payments/ endpoints, Stripe webhooks
+M01 — Auth & Security             → JWT token en interceptor del cliente Axios
+
+================================================================================

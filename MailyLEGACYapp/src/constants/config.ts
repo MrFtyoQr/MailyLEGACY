@@ -6,7 +6,7 @@ const extra = Constants.expoConfig?.extra ?? {}
 export const API_BASE_URL: string =
   (extra.apiUrl as string | undefined) ??
   process.env.EXPO_PUBLIC_API_URL ??
-  'https://mailyt-cuidalegacy-iihlu.sevalla.app'
+  'https://mailyt-cuidalegacy-wxnx5.sevalla.app'
 
 /** URL base para WebSockets — convierte https→wss, http→ws */
 export const WS_BASE_URL: string = API_BASE_URL.replace(/^http/, 'ws')

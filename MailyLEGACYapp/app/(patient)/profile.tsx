@@ -106,14 +106,13 @@ export default function PatientProfileScreen() {
             <Text style={styles.planLabel}>Plan activo</Text>
             <Text style={[styles.planName, { color: planColor }]}>{planName}</Text>
           </View>
-          {tier === 'FREE' && (
-            <TouchableOpacity
-              style={[styles.upgradeBtn, { backgroundColor: PLAN_COLORS.GOLD }]}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.upgradeBtnText}>Mejorar</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={[styles.upgradeBtn, { backgroundColor: tier === 'FREE' ? PLAN_COLORS.GOLD : PLAN_COLORS[tier] }]}
+            activeOpacity={0.8}
+            onPress={() => router.push('/(patient)/plans')}
+          >
+            <Text style={styles.upgradeBtnText}>{tier === 'FREE' ? 'Mejorar' : 'Ver plan'}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Info personal */}
@@ -129,9 +128,15 @@ export default function PatientProfileScreen() {
         <Text style={styles.sectionTitle}>Configuración</Text>
         <Card style={{ padding: 0 }}>
           <MenuRow
+            icon="💳"
+            label="Planes y suscripción"
+            onPress={() => router.push('/(patient)/plans')}
+          />
+          <MenuRow
             icon="🔔"
             label="Notificaciones"
             onPress={() => router.push('/(patient)/notifications')}
+            divider
           />
           <MenuRow
             icon="⭐"
