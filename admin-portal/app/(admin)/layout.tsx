@@ -19,9 +19,11 @@ export default async function AdminLayout({
   }
 
   // 2. Verificar rol ADMIN en el backend
+  // /auth/me/ devuelve { user: {...}, profile: {...}, is_complete: bool }
   let user: AdminUser | null = null
   try {
-    user = await serverApiGet<AdminUser>(EP.me, token)
+    const meData = await serverApiGet<{ user: AdminUser; is_complete: boolean }>(EP.me, token)
+    user = meData?.user ?? null
   } catch {
     redirect('/sign-in?error=unauthorized')
   }
