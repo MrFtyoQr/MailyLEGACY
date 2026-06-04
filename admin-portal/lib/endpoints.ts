@@ -9,6 +9,7 @@ export const EP = {
   adminDashboard:   '/auth/admin/dashboard/',
   adminUsers:       '/auth/admin/users/',
   adminUser: (id: string) => `/auth/admin/users/${id}/`,
+  adminPatients:    '/auth/admin/patients/',
 
   // Audit log
   audit:            '/audit/',

@@ -6,13 +6,14 @@ Solo accesibles con IsAdmin permission.
 """
 
 import logging
-from django.db.models import Count
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import generics, permissions
 
 from core.permissions import IsAdmin
-from .models import User
+from .models import User, PatientProfile
 
 logger = logging.getLogger(__name__)
 
@@ -119,4 +120,112 @@ class AdminDashboardView(APIView):
             'specialists': specialists_data,
             'subscriptions': subscriptions_data,
             'referrals': referrals_data,
+        })
+
+
+class AdminPatientListView(APIView):
+    """
+    GET /api/v1/auth/admin/patients/
+    Lista de pacientes para monitoreo del portal de administración.
+
+    Query params:
+      search   — filtra por nombre o email
+      ordering — last_activity | name | joined (default: last_activity)
+      page     — paginación (20 por página)
+
+    Respuesta por paciente:
+    {
+      id, email, first_name, last_name, photo_url,
+      joined_at, plan_tier,
+      last_vital_at, vital_count,
+      medication_count, last_checkin_at,
+      is_active
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        search   = request.query_params.get('search', '').strip()
+        ordering = request.query_params.get('ordering', 'last_activity')
+        page     = max(1, int(request.query_params.get('page', 1)))
+        page_size = 20
+
+        # Base queryset — solo pacientes
+        qs = User.objects.filter(role='PATIENT', is_active=True).select_related(
+            'patient_profile'
+        )
+
+        # Búsqueda
+        if search:
+            qs = qs.filter(
+                Q(email__icontains=search) |
+                Q(patient_profile__first_name__icontains=search) |
+                Q(patient_profile__last_name__icontains=search)
+            )
+
+        # Anotar última actividad (último vital)
+        try:
+            from apps.vitals.models import VitalSign
+            qs = qs.annotate(
+                last_vital_at=Max('vitalsign__recorded_at'),
+                vital_count=Count('vitalsign', distinct=True),
+            )
+        except Exception:
+            pass
+
+        try:
+            from apps.medications.models import Medication
+            qs = qs.annotate(
+                medication_count=Count('medication', distinct=True),
+            )
+        except Exception:
+            pass
+
+        # Ordenamiento
+        order_map = {
+            'last_activity': '-last_vital_at',
+            'name':          'patient_profile__first_name',
+            'joined':        '-created_at',
+        }
+        qs = qs.order_by(order_map.get(ordering, '-created_at'))
+
+        # Paginación manual
+        total   = qs.count()
+        offset  = (page - 1) * page_size
+        patients = qs[offset:offset + page_size]
+
+        # Plan tier
+        plan_tiers: dict = {}
+        try:
+            from apps.payments.models import Subscription
+            subs = Subscription.objects.filter(
+                patient__user__in=[p for p in patients],
+                status='ACTIVE'
+            ).select_related('plan', 'patient__user')
+            plan_tiers = {s.patient.user_id: s.plan.tier for s in subs}
+        except Exception:
+            pass
+
+        results = []
+        for p in patients:
+            profile = getattr(p, 'patient_profile', None)
+            results.append({
+                'id':               str(p.id),
+                'email':            p.email,
+                'first_name':       getattr(profile, 'first_name', '') or '',
+                'last_name':        getattr(profile, 'last_name',  '') or '',
+                'photo_url':        getattr(profile, 'photo_url',  None),
+                'joined_at':        p.created_at.isoformat(),
+                'plan_tier':        plan_tiers.get(p.id, 'FREE'),
+                'last_vital_at':    getattr(p, 'last_vital_at',    None),
+                'vital_count':      getattr(p, 'vital_count',       0),
+                'medication_count': getattr(p, 'medication_count',  0),
+                'is_active':        p.is_active,
+            })
+
+        return Response({
+            'count':    total,
+            'page':     page,
+            'pages':    -(-total // page_size),  # ceil division
+            'results':  results,
         })
