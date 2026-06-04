@@ -42,8 +42,19 @@ def generate_presigned_upload(patient_id: str, file_name: str,
         ExpiresIn=expires,
     )
 
-    # Build public URL (works for public-read buckets / R2 custom domains)
-    endpoint = settings.AWS_S3_ENDPOINT_URL.rstrip('/')
-    file_url = f'{endpoint}/{bucket}/{key}' if endpoint else presigned.split('?')[0]
+    # Build public URL
+    # Si hay un dominio público configurado (r2.dev o custom domain), usarlo.
+    # Si no, usar presigned GET URL para acceso privado.
+    custom_domain = getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', '')
+    if custom_domain:
+        file_url = f'https://{custom_domain}/{key}'
+    else:
+        # Fallback: presigned GET URL válida por 7 días
+        get_url = client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket, 'Key': key},
+            ExpiresIn=7 * 24 * 3600,
+        )
+        file_url = get_url
 
     return {'upload_url': presigned, 'file_url': file_url, 'key': key}
