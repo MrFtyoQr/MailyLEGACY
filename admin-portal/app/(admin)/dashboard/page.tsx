@@ -98,12 +98,114 @@ function Avatar({ patient }: { patient: Patient }) {
   )
 }
 
-function PatientRow({ patient }: { patient: Patient }) {
+// ─── Modal detalle del paciente ───────────────────────────────────────────────
+
+function PatientDetailModal({ patient, onClose }: { patient: Patient; onClose: () => void }) {
+  const fullName = [patient.first_name, patient.last_name].filter(Boolean).join(' ') || patient.email
+  const tier     = patient.plan_tier ?? 'FREE'
+  const [newTier,  setNewTier]  = useState(tier)
+  const [months,   setMonths]   = useState('3')
+  const [loading,  setLoading]  = useState(false)
+  const [msg,      setMsg]      = useState('')
+
+  async function grant() {
+    setLoading(true); setMsg('')
+    try {
+      const res = await fetch('/api/proxy/auth/admin/subscriptions/grant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: patient.id, tier: newTier, months: parseInt(months) }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error ?? 'Error')
+      setMsg(`✅ ${d.detail}`)
+    } catch (e: any) {
+      setMsg(`❌ ${e.message}`)
+    } finally { setLoading(false) }
+  }
+
+  const stats = [
+    { label: 'Vitales registrados', value: patient.vital_count,      icon: '❤️' },
+    { label: 'Medicamentos',        value: patient.medication_count,  icon: '💊' },
+    { label: 'Última actividad',    value: timeAgo(patient.last_vital_at), icon: '⏱️' },
+    { label: 'Registrado',          value: new Date(patient.joined_at).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' }), icon: '📅' },
+  ]
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center gap-4">
+            <Avatar patient={patient} />
+            <div className="flex-1 min-w-0">
+              <p className="text-lg font-bold text-slate-900 truncate">{fullName}</p>
+              <p className="text-sm text-slate-400 truncate">{patient.email}</p>
+            </div>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full shrink-0"
+                  style={{ backgroundColor: TIER_COLOR[tier] + '22', color: TIER_COLOR[tier] }}>
+              {TIER_ICON[tier]} {tier}
+            </span>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-px bg-slate-100">
+          {stats.map(s => (
+            <div key={s.label} className="bg-white px-4 py-3">
+              <p className="text-xs text-slate-400">{s.icon} {s.label}</p>
+              <p className="text-sm font-semibold text-slate-800 mt-0.5">{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Cambiar plan */}
+        <div className="p-6">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Cambiar plan manualmente</p>
+          <div className="flex gap-2 mb-2">
+            <select value={newTier} onChange={e => setNewTier(e.target.value)}
+              className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-400">
+              {['FREE','SILVER','GOLD','PLATINUM'].map(t => (
+                <option key={t} value={t}>{TIER_ICON[t]} {t}</option>
+              ))}
+            </select>
+            <select value={months} onChange={e => setMonths(e.target.value)}
+              className="w-28 border border-slate-200 rounded-lg px-2 py-2 text-sm focus:outline-none">
+              {[['1','1 mes'],['3','3 meses'],['6','6 meses'],['12','1 año']].map(([v,l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </div>
+          <button onClick={grant} disabled={loading}
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ backgroundColor: TIER_COLOR[newTier] }}>
+            {loading ? 'Aplicando…' : `Asignar ${TIER_ICON[newTier]} ${newTier}`}
+          </button>
+          {msg && (
+            <p className={`text-xs mt-2 text-center ${msg.startsWith('✅') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>
+          )}
+        </div>
+
+        <div className="px-6 pb-6">
+          <button onClick={onClose}
+            className="w-full py-2 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PatientRow({ patient, onSelect }: { patient: Patient; onSelect: (p: Patient) => void }) {
   const fullName = [patient.first_name, patient.last_name].filter(Boolean).join(' ') || '—'
   const tier     = patient.plan_tier ?? 'FREE'
 
   return (
-    <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+    <tr
+      className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+      onClick={() => onSelect(patient)}
+    >
       <td className="py-3 px-4">
         <div className="flex items-center gap-3">
           <Avatar patient={patient} />
@@ -123,36 +225,21 @@ function PatientRow({ patient }: { patient: Patient }) {
       </td>
       <td className="py-3 px-4 text-sm text-slate-600">
         {patient.vital_count > 0 ? (
-          <span className="flex items-center gap-1">
-            <span className="text-base">❤️</span>
-            {patient.vital_count} registros
-          </span>
-        ) : (
-          <span className="text-slate-300">—</span>
-        )}
+          <span className="flex items-center gap-1"><span className="text-base">❤️</span>{patient.vital_count} registros</span>
+        ) : <span className="text-slate-300">—</span>}
       </td>
       <td className="py-3 px-4 text-sm text-slate-600">
         {patient.medication_count > 0 ? (
-          <span className="flex items-center gap-1">
-            <span className="text-base">💊</span>
-            {patient.medication_count}
-          </span>
-        ) : (
-          <span className="text-slate-300">—</span>
-        )}
+          <span className="flex items-center gap-1"><span className="text-base">💊</span>{patient.medication_count}</span>
+        ) : <span className="text-slate-300">—</span>}
       </td>
       <td className="py-3 px-4">
-        <span
-          className="text-xs font-medium"
-          style={{ color: getActivityColor(patient.last_vital_at) }}
-        >
+        <span className="text-xs font-medium" style={{ color: getActivityColor(patient.last_vital_at) }}>
           {timeAgo(patient.last_vital_at)}
         </span>
       </td>
       <td className="py-3 px-4 text-xs text-slate-400">
-        {new Date(patient.joined_at).toLocaleDateString('es-MX', {
-          day: '2-digit', month: 'short', year: 'numeric',
-        })}
+        {new Date(patient.joined_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
       </td>
     </tr>
   )
@@ -173,9 +260,10 @@ function SkeletonRow() {
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [search,   setSearch]   = useState('')
-  const [ordering, setOrdering] = useState('last_activity')
-  const [page,     setPage]     = useState(1)
+  const [search,        setSearch]        = useState('')
+  const [ordering,      setOrdering]      = useState('last_activity')
+  const [page,          setPage]          = useState(1)
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
 
   const { data, isLoading, error, refetch } = useQuery<PatientListResponse>({
     queryKey:  ['admin-patients', search, ordering, page],
@@ -199,6 +287,10 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
+
+      {selectedPatient && (
+        <PatientDetailModal patient={selectedPatient} onClose={() => setSelectedPatient(null)} />
+      )}
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
@@ -289,7 +381,7 @@ export default function DashboardPage() {
             {isLoading
               ? Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
               : patients.length > 0
-              ? patients.map(p => <PatientRow key={p.id} patient={p} />)
+              ? patients.map(p => <PatientRow key={p.id} patient={p} onSelect={setSelectedPatient} />)
               : (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-slate-400 text-sm">

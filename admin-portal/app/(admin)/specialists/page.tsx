@@ -79,11 +79,106 @@ function SpecialistRow({ sp, onAction }: {
   )
 }
 
+// ─── Modal: Agregar especialista ──────────────────────────────────────────────
+
+const SPECIALTIES = [
+  ['CARDIOLOGY','Cardiología'],['ENDOCRINOLOGY','Endocrinología'],
+  ['NEUROLOGY','Neurología'],['DERMATOLOGY','Dermatología'],
+  ['GYNECOLOGY','Ginecología'],['PEDIATRICS','Pediatría'],
+  ['PSYCHIATRY','Psiquiatría'],['ORTHOPEDICS','Ortopedia'],
+  ['OPHTHALMOLOGY','Oftalmología'],['NUTRITION','Nutrición'],
+  ['LABORATORY','Laboratorio'],['IMAGING','Imagen diagnóstica'],
+  ['CLINIC','Clínica general'],['PHARMACY','Farmacia'],['OTHER','Otro'],
+]
+
+function AddSpecialistModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '', specialty_area: 'OTHER',
+    specialist_type: 'DOCTOR', license_number: '', bio: '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
+
+  function update(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function save() {
+    if (!form.name.trim()) return setError('El nombre es requerido')
+    setLoading(true); setError('')
+    try {
+      const res = await fetch('/api/proxy/auth/admin/specialists/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, verification_status: 'VERIFIED' }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(JSON.stringify(d))
+      onSuccess()
+    } catch (e: any) {
+      setError(e.message)
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-auto">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+        <h3 className="text-lg font-bold text-slate-900 mb-4">➕ Agregar especialista</h3>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          {[['name','Nombre completo *','text'],['email','Email','email'],['phone','Teléfono','tel'],['license_number','Cédula profesional','text']].map(([k,l,t]) => (
+            <div key={k} className={k === 'name' ? 'col-span-2' : ''}>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">{l}</label>
+              <input type={t} value={(form as any)[k]} onChange={e => update(k, e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-400" />
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Tipo</label>
+            <select value={form.specialist_type} onChange={e => update('specialist_type', e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+              {[['DOCTOR','Médico'],['LAB','Laboratorio'],['CLINIC','Clínica'],['PHARMACY','Farmacia'],['OTHER','Otro']].map(([v,l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Especialidad</label>
+            <select value={form.specialty_area} onChange={e => update('specialty_area', e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+              {SPECIALTIES.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <label className="block text-xs font-semibold text-slate-600 mb-1">Descripción / bio (opcional)</label>
+        <textarea value={form.bio} onChange={e => update('bio', e.target.value)} rows={2}
+          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:border-cyan-400 resize-none" />
+
+        {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+            Cancelar
+          </button>
+          <button onClick={save} disabled={loading}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ backgroundColor: '#00C5E3' }}>
+            {loading ? 'Guardando…' : 'Agregar especialista'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SpecialistsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [search,       setSearch]       = useState('')
   const [loading,      setLoading]      = useState(false)
   const [msg,          setMsg]          = useState('')
+  const [showAdd,      setShowAdd]      = useState(false)
   const qc = useQueryClient()
 
   const { data, isLoading, error, refetch } = useSpecialists({
@@ -117,6 +212,13 @@ export default function SpecialistsPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
+      {showAdd && (
+        <AddSpecialistModal
+          onClose={() => setShowAdd(false)}
+          onSuccess={() => { setShowAdd(false); setMsg('✅ Especialista agregado correctamente'); qc.invalidateQueries({ queryKey: ['admin-specialists'] }) }}
+        />
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Especialistas</h1>
@@ -125,10 +227,17 @@ export default function SpecialistsPage() {
             {pending > 0 && <span className="ml-2 text-amber-600 font-semibold">· {pending} pendientes</span>}
           </p>
         </div>
-        <button onClick={() => refetch()} disabled={isLoading}
-          className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
-          🔄 Actualizar
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowAdd(true)}
+            className="px-4 py-2 text-sm font-bold text-white rounded-lg"
+            style={{ backgroundColor: '#00C5E3' }}>
+            ➕ Agregar
+          </button>
+          <button onClick={() => refetch()} disabled={isLoading}
+            className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
+            🔄 Actualizar
+          </button>
+        </div>
       </div>
 
       {msg && (

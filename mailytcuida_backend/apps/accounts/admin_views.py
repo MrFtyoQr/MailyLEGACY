@@ -397,6 +397,39 @@ class AdminSendLabResultView(APIView):
 
 # ── Admin: Especialistas ──────────────────────────────────────────────────────
 
+class AdminAddSpecialistView(APIView):
+    """
+    POST /api/v1/auth/admin/specialists/add/
+    Crea un SpecialistProfile directamente desde el portal admin (ya verificado).
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        from apps.specialists.models import SpecialistProfile
+        data = request.data
+        if not data.get('name', '').strip():
+            return Response({'error': 'name es requerido'}, status=400)
+
+        sp = SpecialistProfile.objects.create(
+            name                = data.get('name', ''),
+            email               = data.get('email', ''),
+            phone               = data.get('phone', ''),
+            specialist_type     = data.get('specialist_type', 'DOCTOR'),
+            specialty_area      = data.get('specialty_area', 'OTHER'),
+            license_number      = data.get('license_number', ''),
+            bio                 = data.get('bio', ''),
+            verification_status = 'VERIFIED',
+            verified_at         = timezone.now(),
+            verified_by         = request.user,
+            is_active           = True,
+        )
+        return Response({
+            'id':   str(sp.pk),
+            'name': sp.name,
+            'detail': 'Especialista agregado y verificado',
+        }, status=status.HTTP_201_CREATED)
+
+
 class AdminSpecialistListView(APIView):
     """GET /api/v1/auth/admin/specialists/  — lista para el portal admin."""
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
