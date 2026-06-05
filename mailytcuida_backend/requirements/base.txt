@@ -47,3 +47,6 @@ whitenoise[brotli]==6.8.2
 # Utils
 Pillow==11.0.0
 python-dateutil==2.9.0
+
+# AI
+openai==1.56.0

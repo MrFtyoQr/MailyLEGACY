@@ -11,6 +11,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Modal,
+  ActivityIndicator,
+  Pressable,
 } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
@@ -18,7 +21,7 @@ import { Card }          from '@components/ui/Card'
 import { Badge }         from '@components/ui/Badge'
 import { Skeleton }      from '@components/ui/Skeleton'
 import { Colors }        from '@constants/colors'
-import { get }           from '@lib/api/client'
+import { get, post }     from '@lib/api/client'
 import { EP }            from '@lib/api/endpoints'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -147,10 +150,80 @@ export default function PrescriptionsScreen() {
   )
 }
 
-function PrescriptionCard({ prescription: p }: { prescription: Prescription }) {
-  const [expanded, setExpanded] = useState(false)
+// ── Modal IA para recetas ─────────────────────────────────────────────────────
+function RxAIModal({ visible, onClose, rxId, rxTitle }: {
+  visible: boolean; onClose: () => void
+  rxId: string;     rxTitle: string
+}) {
+  const [analysis,   setAnalysis]   = useState<string | null>(null)
+  const [disclaimer, setDisclaimer] = useState('')
+  const [loading,    setLoading]    = useState(false)
+  const [error,      setError]      = useState('')
+
+  async function analyze() {
+    setLoading(true); setError(''); setAnalysis(null)
+    try {
+      const res = await post<{ analysis: string; disclaimer: string }>(EP.aiAnalyze, {
+        type: 'prescription',
+        id:   rxId,
+      })
+      setAnalysis(res.analysis)
+      setDisclaimer(res.disclaimer)
+    } catch (e: any) {
+      setError(e?.message ?? 'No se pudo generar el análisis.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  React.useEffect(() => {
+    if (visible && !analysis && !loading) analyze()
+  }, [visible])
 
   return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable style={aiS.overlay} onPress={onClose} />
+      <View style={aiS.sheet}>
+        <View style={aiS.handle} />
+        <View style={aiS.header}>
+          <Text style={aiS.title} numberOfLines={1}>🤖 IA — {rxTitle || 'Receta'}</Text>
+          <TouchableOpacity onPress={onClose}><Text style={aiS.close}>✕</Text></TouchableOpacity>
+        </View>
+        <ScrollView style={aiS.body} showsVerticalScrollIndicator={false}>
+          {loading && (
+            <View style={aiS.center}>
+              <ActivityIndicator color={Colors.brand.primary} size="large" />
+              <Text style={aiS.loadingText}>Analizando tu receta con IA…</Text>
+            </View>
+          )}
+          {error ? <Text style={aiS.error}>{error}</Text>
+          : analysis ? (
+            <>
+              <Text style={aiS.analysis}>{analysis}</Text>
+              <View style={aiS.disclaimerBox}>
+                <Text style={aiS.disclaimerText}>{disclaimer}</Text>
+              </View>
+            </>
+          ) : null}
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </View>
+    </Modal>
+  )
+}
+
+function PrescriptionCard({ prescription: p }: { prescription: Prescription }) {
+  const [expanded, setExpanded] = useState(false)
+  const [aiOpen,   setAiOpen]   = useState(false)
+
+  return (
+    <>
+      <RxAIModal
+        visible={aiOpen}
+        onClose={() => setAiOpen(false)}
+        rxId={p.id}
+        rxTitle={p.doctor_name ? `Dr. ${p.doctor_name}` : 'Receta'}
+      />
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => setExpanded((v) => !v)}
@@ -217,10 +290,20 @@ function PrescriptionCard({ prescription: p }: { prescription: Prescription }) {
           </Text>
         )}
 
-        {/* Expandir/colapsar */}
-        <Text style={styles.expandHint}>{expanded ? '▲ Ver menos' : '▼ Ver detalle'}</Text>
+        {/* Acciones */}
+        <View style={styles.actionsRow}>
+          <Text style={styles.expandHint}>{expanded ? '▲ Ver menos' : '▼ Ver detalle'}</Text>
+          <TouchableOpacity
+            style={styles.aiBtn}
+            onPress={(e) => { e.stopPropagation(); setAiOpen(true) }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.aiBtnText}>🤖 Analizar con IA</Text>
+          </TouchableOpacity>
+        </View>
       </Card>
     </TouchableOpacity>
+    </>
   )
 }
 
@@ -279,10 +362,47 @@ const styles = StyleSheet.create({
   expiryText:    { fontSize: 12, color: Colors.light.textMuted },
   expiryExpired: { color: Colors.semantic.error },
 
-  expandHint: { fontSize: 12, color: Colors.brand.primary, fontWeight: '600', marginTop: 4 },
+  actionsRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  expandHint:  { fontSize: 12, color: Colors.brand.primary, fontWeight: '600' },
+  aiBtn: {
+    backgroundColor: Colors.brand.primary + '18',
+    borderRadius:    12, paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: Colors.brand.primary + '40',
+  },
+  aiBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brand.primary },
 
   emptyWrap:     { alignItems: 'center', marginTop: 80, gap: 12, paddingHorizontal: 20 },
   emptyEmoji:    { fontSize: 52 },
   emptyTitle:    { fontSize: 18, fontWeight: '700', color: Colors.light.textPrimary },
   emptySubtitle: { fontSize: 14, color: Colors.light.textMuted, textAlign: 'center', lineHeight: 21 },
+})
+
+const aiS = StyleSheet.create({
+  overlay:  { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: '82%', paddingBottom: 40,
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: Colors.light.border, alignSelf: 'center', marginTop: 10,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: Colors.light.border,
+  },
+  title:       { fontSize: 15, fontWeight: '700', color: Colors.light.textPrimary, flex: 1 },
+  close:       { fontSize: 20, color: Colors.light.textMuted, paddingLeft: 12 },
+  body:        { paddingHorizontal: 20, paddingTop: 16 },
+  center:      { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  loadingText: { fontSize: 14, color: Colors.light.textMuted },
+  error:       { fontSize: 14, color: Colors.semantic.error, textAlign: 'center', marginTop: 20 },
+  analysis:    { fontSize: 14, color: Colors.light.textPrimary, lineHeight: 22 },
+  disclaimerBox: {
+    marginTop: 16, backgroundColor: Colors.semantic.warningBg,
+    borderRadius: 10, padding: 12,
+  },
+  disclaimerText: { fontSize: 12, color: '#92400E', lineHeight: 18 },
 })

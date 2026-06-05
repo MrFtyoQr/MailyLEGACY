@@ -188,6 +188,7 @@ REST_FRAMEWORK = {
         'webhook':      '5/min',     # Stripe webhook (by IP)
         'checkout':     '10/min',    # Stripe checkout/portal (by user)
         'photo_upload': '20/hour',   # profile photo uploads (by user)
+        'ai_analyze':   '10/hour',   # OpenAI analysis — limitar costo
     },
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
     'PAGE_SIZE': 20,

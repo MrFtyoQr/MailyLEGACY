@@ -5,6 +5,7 @@ from .views import (
     InsightListView, InsightGenerateView,
     DoctorPatientDashboardView,
 )
+from .ai_analyze import AIAnalyzeView
 
 urlpatterns = [
     path('dashboard/',           PatientDashboardView.as_view(),   name='analytics-dashboard'),
@@ -14,4 +15,5 @@ urlpatterns = [
     path('insights/generate/',   InsightGenerateView.as_view(),     name='analytics-insights-generate'),
     path('patient/<uuid:patient_id>/dashboard/',
          DoctorPatientDashboardView.as_view(), name='analytics-doctor-dashboard'),
+    path('analyze/',              AIAnalyzeView.as_view(),           name='ai-analyze'),
 ]

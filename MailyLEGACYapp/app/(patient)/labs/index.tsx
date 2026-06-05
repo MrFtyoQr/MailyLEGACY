@@ -11,6 +11,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Modal,
+  ActivityIndicator,
+  Pressable,
 } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
@@ -18,12 +21,20 @@ import { Card }          from '@components/ui/Card'
 import { Badge }         from '@components/ui/Badge'
 import { Skeleton }      from '@components/ui/Skeleton'
 import { Colors }        from '@constants/colors'
-import { get }           from '@lib/api/client'
+import { get, post }     from '@lib/api/client'
 import { EP }            from '@lib/api/endpoints'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
+interface LabPanel {
+  id:          string
+  panel_name:  string
+  lab_name:    string
+  performed_at: string
+}
+
 interface LabResult {
   id:           string
+  panel:        { id: string; panel_name: string } | null
   panel_name:   string
   test_name:    string
   value:        number | string
@@ -53,9 +64,76 @@ interface AbnormalItem {
 
 type TabKey = 'summary' | 'abnormal' | 'all'
 
+// ── Modal de análisis IA ──────────────────────────────────────────────────────
+function AIModal({
+  visible, onClose, panelId, panelName,
+}: {
+  visible: boolean; onClose: () => void
+  panelId: string;  panelName: string
+}) {
+  const [analysis,   setAnalysis]   = useState<string | null>(null)
+  const [disclaimer, setDisclaimer] = useState('')
+  const [loading,    setLoading]    = useState(false)
+  const [error,      setError]      = useState('')
+
+  async function analyze() {
+    setLoading(true); setError(''); setAnalysis(null)
+    try {
+      const res = await post<{ analysis: string; disclaimer: string }>(EP.aiAnalyze, {
+        type: 'lab_panel',
+        id:   panelId,
+      })
+      setAnalysis(res.analysis)
+      setDisclaimer(res.disclaimer)
+    } catch (e: any) {
+      setError(e?.message ?? 'No se pudo generar el análisis.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Lanzar análisis automáticamente al abrir
+  React.useEffect(() => {
+    if (visible && !analysis && !loading) analyze()
+  }, [visible])
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable style={aiStyles.overlay} onPress={onClose} />
+      <View style={aiStyles.sheet}>
+        <View style={aiStyles.handle} />
+        <View style={aiStyles.header}>
+          <Text style={aiStyles.title}>🤖 Análisis IA — {panelName || 'Laboratorio'}</Text>
+          <TouchableOpacity onPress={onClose}><Text style={aiStyles.close}>✕</Text></TouchableOpacity>
+        </View>
+        <ScrollView style={aiStyles.body} showsVerticalScrollIndicator={false}>
+          {loading && (
+            <View style={aiStyles.center}>
+              <ActivityIndicator color={Colors.brand.primary} size="large" />
+              <Text style={aiStyles.loadingText}>Analizando con IA…</Text>
+            </View>
+          )}
+          {error ? (
+            <Text style={aiStyles.error}>{error}</Text>
+          ) : analysis ? (
+            <>
+              <Text style={aiStyles.analysis}>{analysis}</Text>
+              <View style={aiStyles.disclaimerBox}>
+                <Text style={aiStyles.disclaimerText}>{disclaimer}</Text>
+              </View>
+            </>
+          ) : null}
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </View>
+    </Modal>
+  )
+}
+
 export default function LabsScreen() {
   const [tab, setTab]           = useState<TabKey>('summary')
   const [refreshing, setRefreshing] = useState(false)
+  const [aiPanel, setAiPanel]   = useState<{ id: string; name: string } | null>(null)
 
   const summaryQ = useQuery<LabSummary[]>({
     queryKey:  ['labs-summary'],
@@ -93,14 +171,38 @@ export default function LabsScreen() {
   return (
     <ScreenWrapper noPadding edges={['top', 'left', 'right']}>
 
+      {/* Modal IA */}
+      {aiPanel && (
+        <AIModal
+          visible={!!aiPanel}
+          onClose={() => setAiPanel(null)}
+          panelId={aiPanel.id}
+          panelName={aiPanel.name}
+        />
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🔬 Laboratorio</Text>
-        {(abnormalQ.data?.length ?? 0) > 0 && (
-          <View style={styles.alertBadge}>
-            <Text style={styles.alertBadgeText}>{abnormalQ.data!.length} alertas</Text>
-          </View>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {(abnormalQ.data?.length ?? 0) > 0 && (
+            <View style={styles.alertBadge}>
+              <Text style={styles.alertBadgeText}>{abnormalQ.data!.length} alertas</Text>
+            </View>
+          )}
+          {allQ.data?.results?.[0]?.panel?.id && (
+            <TouchableOpacity
+              style={styles.aiBtn}
+              onPress={() => setAiPanel({
+                id:   allQ.data!.results[0].panel!.id,
+                name: allQ.data!.results[0].panel!.panel_name,
+              })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.aiBtnText}>🤖 IA</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Tabs */}
@@ -346,4 +448,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 19,
   },
+  aiBtn: {
+    backgroundColor: Colors.brand.primary,
+    borderRadius:    16,
+    paddingHorizontal: 12,
+    paddingVertical:   5,
+  },
+  aiBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+})
+
+const aiStyles = StyleSheet.create({
+  overlay:  { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: '80%', paddingBottom: 40,
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: Colors.light.border, alignSelf: 'center', marginTop: 10,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: Colors.light.border,
+  },
+  title:    { fontSize: 15, fontWeight: '700', color: Colors.light.textPrimary, flex: 1 },
+  close:    { fontSize: 20, color: Colors.light.textMuted, paddingLeft: 12 },
+  body:     { paddingHorizontal: 20, paddingTop: 16 },
+  center:   { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  loadingText: { fontSize: 14, color: Colors.light.textMuted },
+  error:    { fontSize: 14, color: Colors.semantic.error, textAlign: 'center', marginTop: 20 },
+  analysis: { fontSize: 14, color: Colors.light.textPrimary, lineHeight: 22 },
+  disclaimerBox: {
+    marginTop: 16, backgroundColor: Colors.semantic.warningBg,
+    borderRadius: 10, padding: 12,
+  },
+  disclaimerText: { fontSize: 12, color: '#92400E', lineHeight: 18 },
 })

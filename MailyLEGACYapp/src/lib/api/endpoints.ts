@@ -119,6 +119,7 @@ export const EP = {
   analyticsAdherence:    '/analytics/adherence/',
   analyticsInsights:     '/analytics/insights/',
   analyticsInsightsGenerate: '/analytics/insights/generate/',
+  aiAnalyze:             '/analytics/analyze/',
 
   // ── Especialistas & Referidos ─────────────────────────────────────────────
   specialistsList:       '/specialists/',
