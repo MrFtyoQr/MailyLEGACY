@@ -42,64 +42,99 @@ function BarChart({
   if (readings.length === 0) {
     return (
       <View style={chartStyles.empty}>
-        <Text style={chartStyles.emptyText}>
-          Sin registros suficientes para mostrar gráfica.
-        </Text>
+        <Text style={chartStyles.emptyText}>Sin registros suficientes para mostrar gráfica.</Text>
       </View>
     )
   }
 
-  const vals    = readings.map(r => r.value)
-  const maxVal  = Math.max(...vals, meta.normal.max) * 1.05
-  const minVal  = Math.min(...vals, meta.normal.min) * 0.95
-  const range   = maxVal - minVal || 1
+  const vals = readings.map(r => r.value)
 
-  const bandTop = ((maxVal - meta.normal.max) / range) * CHART_H
-  const bandH   = ((meta.normal.max - meta.normal.min) / range) * CHART_H
+  // Escala: siempre incluye el rango normal + 15% de margen extra
+  const dataMin = Math.min(...vals)
+  const dataMax = Math.max(...vals)
+  const yMin = Math.min(dataMin, meta.normal.min) * 0.88
+  const yMax = Math.max(dataMax, meta.normal.max) * 1.12
+  const range = yMax - yMin || 1
 
-  // Ancho fijo por barra, nunca más de 28px
-  const BAR_W   = Math.min(Math.floor((CHART_W - 16) / Math.max(readings.length, 1)) - 4, 28)
-  const BAR_GAP = Math.max(Math.floor((CHART_W - readings.length * BAR_W) / (readings.length + 1)), 3)
+  // Posición de la banda de rango normal (desde arriba)
+  const bandTop = ((yMax - meta.normal.max) / range) * CHART_H
+  const bandH   = Math.max(((meta.normal.max - meta.normal.min) / range) * CHART_H, 2)
+
+  // Ancho de barras adaptativo
+  const BAR_W   = Math.min(Math.floor((CHART_W - 48) / Math.max(readings.length, 1)) - 3, 26)
+  const BAR_GAP = Math.max(Math.floor((CHART_W - 48 - readings.length * BAR_W) / (readings.length + 1)), 2)
+
+  // Etiquetas eje Y
+  const yLabels = [
+    { label: `${Math.round(yMax)}`, top: 0 },
+    { label: `${Math.round((yMax + yMin) / 2)}`, top: CHART_H / 2 - 7 },
+    { label: `${Math.round(yMin)}`, top: CHART_H - 14 },
+  ]
 
   return (
-    <View style={{ width: CHART_W, height: CHART_H + 28 }}>
-      <View style={{ width: CHART_W, height: CHART_H, position: 'relative', overflow: 'hidden' }}>
+    <View style={{ width: CHART_W }}>
+      <View style={{ flexDirection: 'row' }}>
+        {/* Eje Y */}
+        <View style={{ width: 38, height: CHART_H, justifyContent: 'space-between', paddingVertical: 0 }}>
+          {yLabels.map((l, i) => (
+            <Text key={i} style={chartStyles.yLabel}>{l.label}</Text>
+          ))}
+        </View>
 
-        {/* Banda de rango normal */}
-        <View style={[chartStyles.normalBand, { top: bandTop, height: Math.max(bandH, 2) }]} />
-        <View style={[chartStyles.guideLine, { top: bandTop }]} />
-        <View style={[chartStyles.guideLine, { top: bandTop + bandH }]} />
+        {/* Área de barras */}
+        <View style={{ flex: 1, height: CHART_H, position: 'relative', overflow: 'hidden' }}>
+          {/* Líneas horizontales guía */}
+          <View style={[chartStyles.gridLine, { top: 0 }]} />
+          <View style={[chartStyles.gridLine, { top: CHART_H / 2 }]} />
+          <View style={[chartStyles.gridLine, { top: CHART_H - 1 }]} />
 
-        {/* Barras — centradas si hay pocas */}
-        <View style={[chartStyles.barsRow, readings.length <= 3 && { justifyContent: 'center' }]}>
-          {readings.map((r, i) => {
-            const heightPct = (r.value - minVal) / range
-            const barH      = Math.max(heightPct * CHART_H, 6)
-            const color     = getColor(r.value, meta)
-            return (
-              <View key={i} style={[chartStyles.barWrap, { width: BAR_W, marginHorizontal: BAR_GAP / 2 }]}>
-                <View style={[chartStyles.bar, { height: barH, width: BAR_W, backgroundColor: color, borderRadius: BAR_RADIUS }]} />
-              </View>
-            )
-          })}
+          {/* Banda de rango normal */}
+          <View style={[chartStyles.normalBand, { top: bandTop, height: bandH }]} />
+          {/* Línea superior del rango */}
+          <View style={[chartStyles.guideLine, { top: bandTop }]}>
+            <Text style={chartStyles.rangeLineLabel}>{meta.normal.max}</Text>
+          </View>
+          {/* Línea inferior del rango */}
+          <View style={[chartStyles.guideLine, { top: bandTop + bandH }]}>
+            <Text style={chartStyles.rangeLineLabel}>{meta.normal.min}</Text>
+          </View>
+
+          {/* Barras */}
+          <View style={[chartStyles.barsRow, readings.length <= 3 && { justifyContent: 'center' }]}>
+            {readings.map((r, i) => {
+              const heightPct = (r.value - yMin) / range
+              const barH      = Math.max(heightPct * CHART_H, 4)
+              const color     = getColor(r.value, meta)
+              return (
+                <View key={i} style={[chartStyles.barWrap, { width: BAR_W, marginHorizontal: BAR_GAP / 2 }]}>
+                  {/* Valor encima de la barra si hay pocas lecturas */}
+                  {readings.length <= 5 && (
+                    <Text style={[chartStyles.barLabel, { color }]}>{r.value}</Text>
+                  )}
+                  <View style={{ height: barH, width: BAR_W, backgroundColor: color, borderRadius: BAR_RADIUS }} />
+                </View>
+              )
+            })}
+          </View>
         </View>
       </View>
 
       {/* Etiquetas eje X */}
-      {readings.length >= 2 && (
-        <View style={chartStyles.xLabels}>
-          {[0, Math.floor((readings.length - 1) / 2), readings.length - 1].map((idx, i) => (
-            <Text key={i} style={chartStyles.xLabel}>
-              {new Date(readings[idx].date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
-            </Text>
-          ))}
-        </View>
-      )}
-      {readings.length === 1 && (
-        <Text style={[chartStyles.xLabel, { textAlign: 'center', marginTop: 6 }]}>
-          {new Date(readings[0].date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
-        </Text>
-      )}
+      <View style={{ marginLeft: 38 }}>
+        {readings.length >= 2 ? (
+          <View style={chartStyles.xLabels}>
+            {[0, Math.floor((readings.length - 1) / 2), readings.length - 1].map((idx, i) => (
+              <Text key={i} style={chartStyles.xLabel}>
+                {new Date(readings[idx].date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+              </Text>
+            ))}
+          </View>
+        ) : (
+          <Text style={[chartStyles.xLabel, { textAlign: 'center', marginTop: 6 }]}>
+            {new Date(readings[0].date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </Text>
+        )}
+      </View>
     </View>
   )
 }
@@ -296,33 +331,38 @@ const chartStyles = StyleSheet.create({
   empty: {
     height: CHART_H, alignItems: 'center', justifyContent: 'center',
   },
-  emptyText: {
-    fontSize: 13, color: Colors.light.textMuted, textAlign: 'center',
+  emptyText: { fontSize: 13, color: Colors.light.textMuted, textAlign: 'center' },
+  yLabel:    { fontSize: 9, color: Colors.light.textMuted, textAlign: 'right', paddingRight: 4 },
+  gridLine: {
+    position: 'absolute', left: 0, right: 0,
+    height: 1, backgroundColor: Colors.light.border,
   },
   normalBand: {
     position: 'absolute', left: 0, right: 0,
-    backgroundColor: Colors.semantic.success + '18',
+    backgroundColor: Colors.semantic.success + '1A',
   },
   guideLine: {
     position: 'absolute', left: 0, right: 0,
-    height: 1, backgroundColor: Colors.semantic.success + '50',
+    height: 1, backgroundColor: Colors.semantic.success + '70',
+  },
+  rangeLineLabel: {
+    position: 'absolute', right: 2, top: -10,
+    fontSize: 8, color: Colors.semantic.success, fontWeight: '600',
   },
   barsRow: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   barWrap: {
     alignItems: 'center', justifyContent: 'flex-end', height: CHART_H,
   },
-  bar: {},
+  barLabel: { fontSize: 8, fontWeight: '700', marginBottom: 1 },
   xLabels: {
     flexDirection: 'row', justifyContent: 'space-between',
-    paddingHorizontal: 4, marginTop: 6,
+    paddingHorizontal: 2, marginTop: 5,
   },
-  xLabel: {
-    fontSize: 10, color: Colors.light.textMuted,
-  },
+  xLabel: { fontSize: 10, color: Colors.light.textMuted },
 })
 
 // ── Estilos pantalla ──────────────────────────────────────────────────────────

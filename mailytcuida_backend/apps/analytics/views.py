@@ -21,11 +21,17 @@ class PatientDashboardView(APIView):
 
     def get(self, request):
         patient = request.user.patient_profile
+        today   = date.today()
 
-        # Adherence 7 days
-        adherence = calculate_adherence(patient, days=7)
+        # ── Adherence ─────────────────────────────────────────────────────────
+        adherence_dict = calculate_adherence(patient, days=7)
+        # Promediar en un solo número para el frontend (0-100)
+        adherence_pct = None
+        if adherence_dict:
+            vals = [v for v in adherence_dict.values() if isinstance(v, (int, float))]
+            adherence_pct = round(sum(vals) / len(vals)) if vals else None
 
-        # Latest vitals (one per type)
+        # ── Vitales recientes ─────────────────────────────────────────────────
         from apps.vitals.models import VitalSign
         vitals_qs = VitalSign.objects.filter(patient=patient).order_by('vital_type', '-recorded_at')
         seen, latest_vitals = set(), []
@@ -39,10 +45,27 @@ class PatientDashboardView(APIView):
                     'recorded_at': v.recorded_at.isoformat(),
                 })
 
-        # Active medications count
-        active_meds = patient.medications.filter(is_active=True).count()
+        # ── Medicamentos tomados hoy ──────────────────────────────────────────
+        from apps.medications.models import MedicationHistory
+        today_history = MedicationHistory.objects.filter(patient=patient, scheduled_date=today)
+        meds_taken = today_history.filter(status='TAKEN').count()
+        meds_total = today_history.count()
 
-        # Next appointment
+        # ── Racha de días consecutivos con vital registrado ───────────────────
+        streak_days = 0
+        check_date  = today
+        for _ in range(365):
+            has_vital = VitalSign.objects.filter(
+                patient=patient,
+                recorded_at__date=check_date,
+            ).exists()
+            if has_vital:
+                streak_days += 1
+                check_date -= timedelta(days=1)
+            else:
+                break
+
+        # ── Próxima cita ──────────────────────────────────────────────────────
         next_appt = patient.appointments.filter(
             scheduled_at__gt=timezone.now(),
             status__in=['PENDING', 'CONFIRMED'],
@@ -53,30 +76,45 @@ class PatientDashboardView(APIView):
                 'id':           str(next_appt.pk),
                 'scheduled_at': next_appt.scheduled_at.isoformat(),
                 'doctor_name':  f'{next_appt.doctor.first_name} {next_appt.doctor.last_name}',
+                'specialty':    getattr(next_appt.doctor, 'specialty', ''),
                 'type':         next_appt.appointment_type,
                 'status':       next_appt.status,
             }
 
-        # Abnormal lab count (last 90 days)
+        # ── Labs anormales ────────────────────────────────────────────────────
         from apps.lab_results.models import LabResult
         abnormal_count = LabResult.objects.filter(
             patient=patient,
-            performed_at__gte=date.today() - timedelta(days=90),
+            performed_at__gte=today - timedelta(days=90),
             status__in=['ABNORMAL_LOW', 'ABNORMAL_HIGH', 'CRITICAL'],
         ).count()
 
-        # Last insight
-        last_insight = HealthInsight.objects.filter(patient=patient).first()
+        # ── Último insight ────────────────────────────────────────────────────
+        last_insight = HealthInsight.objects.filter(patient=patient).order_by('-generated_at').first()
 
-        data = {
-            'adherence_7d':       adherence,
-            'latest_vitals':      latest_vitals,
-            'active_medications': active_meds,
-            'next_appointment':   next_appt_data,
-            'abnormal_labs':      abnormal_count,
-            'last_insight':       last_insight,
-        }
-        return Response(DashboardSerializer(data).data)
+        return Response({
+            # Formato que consume el frontend de la app móvil
+            'medications_today': {
+                'taken':  meds_taken,
+                'missed': meds_total - meds_taken,
+                'total':  meds_total,
+            },
+            'streak_days':      streak_days,
+            'adherence_pct':    adherence_pct,
+            'next_appointment': next_appt_data,
+            'latest_vitals':    latest_vitals,
+            'abnormal_labs':    abnormal_count,
+            'last_insight': {
+                'id':            str(last_insight.pk),
+                'insight_type':  last_insight.insight_type,
+                'title':         last_insight.title,
+                'content':       last_insight.content,
+                'generated_at':  last_insight.generated_at.isoformat(),
+            } if last_insight else None,
+            # Compat — mantener campos legacy que otros endpoints puedan usar
+            'adherence_7d':       adherence_dict,
+            'active_medications': patient.medications.filter(is_active=True).count(),
+        })
 
 
 # ── Adherence ─────────────────────────────────────────────────────────────────

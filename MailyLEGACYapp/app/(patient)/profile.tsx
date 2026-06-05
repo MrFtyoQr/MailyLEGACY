@@ -3,7 +3,7 @@
  * Perfil del paciente: info, foto y cerrar sesión.
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { router } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
@@ -22,6 +24,8 @@ import { Colors } from '@constants/colors'
 import { useAuthStore } from '@store/auth.store'
 import { get } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
+import { API_URL } from '@constants/config'
+import { getAccessToken } from '@lib/auth/session'
 
 interface Subscription {
   plan: { name: string; tier: 'FREE' | 'SILVER' | 'GOLD' | 'PLATINUM' } | null
@@ -40,8 +44,50 @@ const PLAN_ICONS: Record<string, string> = {
 }
 
 export default function PatientProfileScreen() {
-  const user     = useAuthStore((s) => s.user)
-  const signOut  = useAuthStore((s) => s.signOut)
+  const user      = useAuthStore((s) => s.user)
+  const signOut   = useAuthStore((s) => s.signOut)
+  const updateUser = useAuthStore((s) => s.updateUser)
+  const [photoLoading, setPhotoLoading] = useState(false)
+
+  async function handlePickPhoto() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para cambiar la foto de perfil.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+    if (result.canceled) return
+
+    const asset = result.assets[0]
+    setPhotoLoading(true)
+    try {
+      const token = await getAccessToken()
+      const form  = new FormData()
+      form.append('photo', {
+        uri:  asset.uri,
+        name: 'profile.jpg',
+        type: asset.mimeType ?? 'image/jpeg',
+      } as unknown as Blob)
+
+      const res = await fetch(`${API_URL}${EP.profilePatientPhoto}`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body:    form,
+      })
+      if (!res.ok) throw new Error('Upload failed')
+      const data = await res.json() as { photo_url: string }
+      updateUser({ photoUrl: data.photo_url })
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar la foto. Intenta de nuevo.')
+    } finally {
+      setPhotoLoading(false)
+    }
+  }
 
   const { data: subscription } = useQuery<Subscription>({
     queryKey:  ['subscription'],
@@ -82,12 +128,15 @@ export default function PatientProfileScreen() {
     <ScreenWrapper noPadding edges={['top', 'left', 'right']}>
       {/* Header con avatar */}
       <View style={styles.profileHeader}>
-        <Avatar
-          uri={user?.photoUrl}
-          name={fullName}
-          size={88}
-          bgColor={Colors.role.patient}
-        />
+        <TouchableOpacity onPress={handlePickPhoto} activeOpacity={0.8} disabled={photoLoading}>
+          <View style={styles.avatarWrap}>
+            <Avatar uri={user?.photoUrl} name={fullName} size={88} bgColor={Colors.role.patient} />
+            {photoLoading
+              ? <View style={styles.avatarOverlay}><ActivityIndicator color="#fff" /></View>
+              : <View style={styles.avatarEditBadge}><Text style={styles.avatarEditIcon}>📷</Text></View>
+            }
+          </View>
+        </TouchableOpacity>
         <Text style={styles.name}>{fullName}</Text>
         {user?.email && (
           <Text style={styles.email}>{user.email}</Text>
@@ -215,6 +264,19 @@ const mr = StyleSheet.create({
 })
 
 const styles = StyleSheet.create({
+  avatarWrap: { position: 'relative' },
+  avatarOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 44, backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarEditBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    backgroundColor: Colors.brand.primary, borderRadius: 12,
+    width: 24, height: 24, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#fff',
+  },
+  avatarEditIcon: { fontSize: 11 },
   profileHeader: {
     alignItems:        'center',
     paddingTop:        24,

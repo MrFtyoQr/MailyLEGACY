@@ -164,19 +164,18 @@ class AdminPatientListView(APIView):
             )
 
         # Anotar última actividad (último vital)
+        # User → PatientProfile → vital_signs (related_name en VitalSign.patient)
         try:
-            from apps.vitals.models import VitalSign
             qs = qs.annotate(
-                last_vital_at=Max('vitalsign__recorded_at'),
-                vital_count=Count('vitalsign', distinct=True),
+                last_vital_at=Max('patient_profile__vital_signs__recorded_at'),
+                vital_count=Count('patient_profile__vital_signs', distinct=True),
             )
         except Exception:
             pass
 
         try:
-            from apps.medications.models import Medication
             qs = qs.annotate(
-                medication_count=Count('medication', distinct=True),
+                medication_count=Count('patient_profile__medications', distinct=True),
             )
         except Exception:
             pass

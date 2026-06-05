@@ -99,6 +99,10 @@ export default function PatientLayout() {
       <Tabs.Screen name="profile"              options={{ href: null }} />
       <Tabs.Screen name="gamification"         options={{ href: null }} />
       <Tabs.Screen name="family-care/index"    options={{ href: null }} />
+      <Tabs.Screen name="documents/index"      options={{ href: null }} />
+      <Tabs.Screen name="plans"                options={{ href: null }} />
+      <Tabs.Screen name="ai-chat"              options={{ href: null }} />
+      <Tabs.Screen name="settings"             options={{ href: null }} />
     </Tabs>
   )
 }
