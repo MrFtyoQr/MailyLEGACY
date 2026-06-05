@@ -10,6 +10,11 @@ export const EP = {
   adminUsers:       '/auth/admin/users/',
   adminUser: (id: string) => `/auth/admin/users/${id}/`,
   adminPatients:    '/auth/admin/patients/',
+  adminGrantSub:    '/auth/admin/subscriptions/grant/',
+  adminSendRx:      '/auth/admin/prescriptions/send/',
+  adminSendLab:     '/auth/admin/labs/send/',
+  adminSpecialists: '/auth/admin/specialists/',
+  adminSpecialistVerify: (id: string) => `/auth/admin/specialists/${id}/verify/`,
 
   // Audit log
   audit:            '/audit/',

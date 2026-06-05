@@ -7,7 +7,11 @@ from .views import (
     DoctorPatientListCreateView, DoctorPatientDetailView,
     AdminUserListView, AdminUserDetailView,
 )
-from .admin_views import AdminDashboardView, AdminPatientListView
+from .admin_views import (
+    AdminDashboardView, AdminPatientListView,
+    AdminGrantSubscriptionView, AdminSendPrescriptionView,
+    AdminSendLabResultView, AdminSpecialistListView, AdminSpecialistVerifyView,
+)
 from .webhooks.clerk_webhooks import ClerkWebhookView
 from .auth_views import (
     RegisterView, LoginView, LogoutView,
@@ -47,6 +51,11 @@ urlpatterns = [
     # ── Admin ──────────────────────────────────────────────────────────────────
     path('admin/users/', AdminUserListView.as_view(), name='admin-users'),
     path('admin/users/<uuid:pk>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
-    path('admin/dashboard/', AdminDashboardView.as_view(),    name='admin-dashboard'),
-    path('admin/patients/',  AdminPatientListView.as_view(), name='admin-patients'),
+    path('admin/dashboard/',                AdminDashboardView.as_view(),         name='admin-dashboard'),
+    path('admin/patients/',                 AdminPatientListView.as_view(),        name='admin-patients'),
+    path('admin/subscriptions/grant/',      AdminGrantSubscriptionView.as_view(),  name='admin-grant-sub'),
+    path('admin/prescriptions/send/',       AdminSendPrescriptionView.as_view(),   name='admin-send-rx'),
+    path('admin/labs/send/',                AdminSendLabResultView.as_view(),      name='admin-send-lab'),
+    path('admin/specialists/',              AdminSpecialistListView.as_view(),     name='admin-specialists'),
+    path('admin/specialists/<uuid:pk>/verify/', AdminSpecialistVerifyView.as_view(), name='admin-specialist-verify'),
 ]

@@ -6,11 +6,13 @@ Solo accesibles con IsAdmin permission.
 """
 
 import logging
+from datetime import timedelta
+from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 
 from core.permissions import IsAdmin
 from .models import User, PatientProfile
@@ -228,3 +230,234 @@ class AdminPatientListView(APIView):
             'pages':    -(-total // page_size),  # ceil division
             'results':  results,
         })
+
+
+# ── Admin: Expedir licencia manual ────────────────────────────────────────────
+
+class AdminGrantSubscriptionView(APIView):
+    """
+    POST /api/v1/auth/admin/subscriptions/grant/
+    { user_id, tier, months }
+    Asigna o actualiza una suscripción activa sin pasar por Stripe.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        user_id = request.data.get('user_id', '').strip()
+        tier    = request.data.get('tier', '').strip().upper()
+        months  = int(request.data.get('months', 1))
+
+        if tier not in ('FREE', 'SILVER', 'GOLD', 'PLATINUM'):
+            return Response({'error': 'tier inválido'}, status=400)
+        if months < 1 or months > 24:
+            return Response({'error': 'months debe ser 1–24'}, status=400)
+
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=404)
+
+        try:
+            from apps.payments.models import Plan, Subscription
+            plan = Plan.objects.get(tier=tier)
+        except Exception:
+            return Response({'error': f'Plan {tier} no encontrado'}, status=404)
+
+        sub, created = Subscription.objects.get_or_create(
+            user=user,
+            defaults={'plan': plan, 'status': 'ACTIVE'},
+        )
+        sub.plan                  = plan
+        sub.status                = 'ACTIVE'
+        sub.current_period_end    = timezone.now() + timedelta(days=30 * months)
+        sub.cancel_at_period_end  = False
+        sub.save(update_fields=['plan', 'status', 'current_period_end', 'cancel_at_period_end'])
+
+        return Response({
+            'detail':   f'Licencia {tier} otorgada por {months} mes(es)',
+            'tier':     tier,
+            'ends_at':  sub.current_period_end.isoformat(),
+        })
+
+
+# ── Admin: Enviar receta al paciente ─────────────────────────────────────────
+
+class AdminSendPrescriptionView(APIView):
+    """
+    POST /api/v1/auth/admin/prescriptions/send/
+    { patient_id, prescribed_by, notes, medications_listed, expires_at? }
+    Crea una receta en nombre del admin y notifica al paciente.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        patient_id = request.data.get('patient_id', '').strip()
+        if not patient_id:
+            return Response({'error': 'patient_id requerido'}, status=400)
+
+        try:
+            patient = PatientProfile.objects.get(pk=patient_id)
+        except PatientProfile.DoesNotExist:
+            return Response({'error': 'Paciente no encontrado'}, status=404)
+
+        from apps.prescriptions.models import Prescription, PrescriptionSource, PrescriptionStatus
+        rx = Prescription.objects.create(
+            patient       = patient,
+            source        = PrescriptionSource.MAILYSOFT,
+            prescribed_by = request.data.get('prescribed_by', ''),
+            notes         = request.data.get('notes', ''),
+            medications_listed = request.data.get('medications_listed', []),
+            expires_at    = request.data.get('expires_at') or None,
+            status        = PrescriptionStatus.ACTIVE,
+            title         = request.data.get('title', 'Receta del portal de administración'),
+        )
+
+        # Notificar al paciente
+        try:
+            from apps.notifications.models import Notification
+            Notification.objects.create(
+                user       = patient.user,
+                title      = '📋 Nueva receta disponible',
+                body       = f'El administrador ha enviado una receta de {rx.prescribed_by or "tu médico"}.',
+                notif_type = 'PRESCRIPTION_RECEIVED',
+                data       = {'prescription_id': str(rx.pk)},
+            )
+        except Exception:
+            logger.warning('AdminSendPrescription: no se pudo crear notificación')
+
+        return Response({'detail': 'Receta enviada', 'prescription_id': str(rx.pk)},
+                        status=status.HTTP_201_CREATED)
+
+
+# ── Admin: Enviar resultados de laboratorio ───────────────────────────────────
+
+class AdminSendLabResultView(APIView):
+    """
+    POST /api/v1/auth/admin/labs/send/
+    {
+      patient_id, panel_name, lab_name, performed_at,
+      results: [{parameter, value, unit, ref_min?, ref_max?}]
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        patient_id = request.data.get('patient_id', '').strip()
+        results    = request.data.get('results', [])
+
+        if not patient_id:
+            return Response({'error': 'patient_id requerido'}, status=400)
+        if not results:
+            return Response({'error': 'results no puede estar vacío'}, status=400)
+
+        try:
+            patient = PatientProfile.objects.get(pk=patient_id)
+        except PatientProfile.DoesNotExist:
+            return Response({'error': 'Paciente no encontrado'}, status=404)
+
+        from apps.lab_results.models import LabPanel, LabResult
+        with transaction.atomic():
+            panel = LabPanel.objects.create(
+                patient      = patient,
+                panel_name   = request.data.get('panel_name', 'Resultados de laboratorio'),
+                lab_name     = request.data.get('lab_name', ''),
+                performed_at = request.data.get('performed_at', timezone.localdate()),
+                source       = 'INTEGRATION',
+                notes        = request.data.get('notes', ''),
+            )
+            for r in results:
+                LabResult.objects.create(
+                    patient      = patient,
+                    panel        = panel,
+                    parameter    = r.get('parameter', ''),
+                    value        = r.get('value', 0),
+                    unit         = r.get('unit', ''),
+                    ref_min      = r.get('ref_min') or None,
+                    ref_max      = r.get('ref_max') or None,
+                    performed_at = panel.performed_at,
+                    notes        = r.get('notes', ''),
+                )
+
+        # Notificar
+        try:
+            from apps.notifications.models import Notification
+            Notification.objects.create(
+                user       = patient.user,
+                title      = '🔬 Nuevos resultados de laboratorio',
+                body       = f'Se han cargado tus resultados de {panel.panel_name}.',
+                notif_type = 'LAB_RESULT_NEW',
+                data       = {'panel_id': str(panel.pk)},
+            )
+        except Exception:
+            logger.warning('AdminSendLab: no se pudo crear notificación')
+
+        return Response({'detail': 'Resultados enviados', 'panel_id': str(panel.pk)},
+                        status=status.HTTP_201_CREATED)
+
+
+# ── Admin: Especialistas ──────────────────────────────────────────────────────
+
+class AdminSpecialistListView(APIView):
+    """GET /api/v1/auth/admin/specialists/  — lista para el portal admin."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from apps.specialists.models import SpecialistProfile
+        qs = SpecialistProfile.objects.select_related('user').order_by('-created_at')
+
+        vstatus   = request.query_params.get('status')
+        specialty = request.query_params.get('specialty')
+        search    = request.query_params.get('search', '').strip()
+
+        if vstatus:
+            qs = qs.filter(verification_status=vstatus.upper())
+        if specialty:
+            qs = qs.filter(specialty_area=specialty.upper())
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(email__icontains=search))
+
+        page      = max(1, int(request.query_params.get('page', 1)))
+        page_size = 20
+        total     = qs.count()
+        items     = qs[(page - 1) * page_size : page * page_size]
+
+        results = [{
+            'id':                  str(sp.pk),
+            'name':                sp.name,
+            'email':               sp.email,
+            'specialist_type':     sp.specialist_type,
+            'specialty_area':      sp.specialty_area,
+            'license_number':      sp.license_number,
+            'verification_status': sp.verification_status,
+            'verified_at':         sp.verified_at.isoformat() if sp.verified_at else None,
+            'is_active':           sp.is_active,
+            'created_at':          sp.created_at.isoformat(),
+            'avatar_url':          sp.avatar_url or None,
+        } for sp in items]
+
+        return Response({'count': total, 'page': page,
+                         'pages': -(-total // page_size), 'results': results})
+
+
+class AdminSpecialistVerifyView(APIView):
+    """POST /api/v1/auth/admin/specialists/{pk}/verify/  { action: VERIFIED|REJECTED }"""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        from apps.specialists.models import SpecialistProfile
+        try:
+            sp = SpecialistProfile.objects.get(pk=pk)
+        except SpecialistProfile.DoesNotExist:
+            return Response({'error': 'Especialista no encontrado'}, status=404)
+
+        action = request.data.get('action', '').upper()
+        if action not in ('VERIFIED', 'REJECTED'):
+            return Response({'error': 'action debe ser VERIFIED o REJECTED'}, status=400)
+
+        sp.verification_status = action
+        if action == 'VERIFIED':
+            sp.verified_at = timezone.now()
+            sp.verified_by = request.user
+        sp.save(update_fields=['verification_status', 'verified_at', 'verified_by'])
+
+        return Response({'detail': f'Especialista {action.lower()}', 'status': action})

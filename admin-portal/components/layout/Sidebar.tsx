@@ -11,11 +11,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', icon: '🏥', label: 'Pacientes' },
-  { href: '/audit',     icon: '📋', label: 'Audit Log' },
-  // Fase 2
-  { href: '/specialists', icon: '🏥', label: 'Especialistas', badge: 'F2' },
-  { href: '/users',       icon: '👥', label: 'Usuarios',       badge: 'F2' },
+  { href: '/dashboard',   icon: '🏥', label: 'Pacientes' },
+  { href: '/users',       icon: '👥', label: 'Usuarios' },
+  { href: '/specialists', icon: '🔬', label: 'Especialistas' },
+  { href: '/send-docs',   icon: '📤', label: 'Enviar docs' },
+  { href: '/audit',       icon: '📋', label: 'Audit Log' },
 ]
 
 export function Sidebar({ adminEmail }: { adminEmail: string }) {

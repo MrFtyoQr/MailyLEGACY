@@ -146,13 +146,60 @@ class MeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'clerk_id', 'role', 'created_at', 'updated_at']
 
 
-# ── Admin — lista de usuarios ─────────────────────────────────────────────────
+# ── Admin — lista de usuarios (enriquecido) ───────────────────────────────────
 
 class UserAdminSerializer(serializers.ModelSerializer):
+    first_name  = serializers.SerializerMethodField()
+    last_name   = serializers.SerializerMethodField()
+    photo_url   = serializers.SerializerMethodField()
+    birth_date  = serializers.SerializerMethodField()
+    plan_tier   = serializers.SerializerMethodField()
+    plan_name   = serializers.SerializerMethodField()
+    vital_count = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'clerk_id', 'email', 'phone', 'role', 'is_active', 'created_at']
+        fields = [
+            'id', 'email', 'phone', 'role', 'is_active', 'created_at',
+            'first_name', 'last_name', 'photo_url', 'birth_date',
+            'plan_tier', 'plan_name', 'vital_count',
+        ]
         read_only_fields = fields
+
+    def _profile(self, obj):
+        return getattr(obj, 'patient_profile', None)
+
+    def get_first_name(self, obj):
+        p = self._profile(obj); return getattr(p, 'first_name', '') or ''
+
+    def get_last_name(self, obj):
+        p = self._profile(obj); return getattr(p, 'last_name', '') or ''
+
+    def get_photo_url(self, obj):
+        p = self._profile(obj); return getattr(p, 'photo_url', None)
+
+    def get_birth_date(self, obj):
+        p = self._profile(obj)
+        bd = getattr(p, 'birth_date', None)
+        return bd.isoformat() if bd else None
+
+    def get_plan_tier(self, obj):
+        try:
+            return obj.subscription.plan.tier
+        except Exception:
+            return 'FREE'
+
+    def get_plan_name(self, obj):
+        try:
+            return obj.subscription.plan.name
+        except Exception:
+            return 'Plan Gratuito'
+
+    def get_vital_count(self, obj):
+        try:
+            return obj.patient_profile.vital_signs.count()
+        except Exception:
+            return 0
 
 
 # ── Upload foto ───────────────────────────────────────────────────────────────
