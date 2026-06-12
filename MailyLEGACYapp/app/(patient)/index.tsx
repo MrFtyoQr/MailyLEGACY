@@ -3,7 +3,7 @@
  * Home del paciente — saludo, stats del dashboard, tips de salud y acceso al chat IA.
  */
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import {
   ScrollView,
   View,
@@ -93,8 +93,9 @@ function getDayGreeting(hour: number): string {
 }
 
 export default function PatientHome() {
-  const user   = useAuthStore((s) => s.user)
-  const unread = useWsStore((s) => s.unreadCount)
+  const user       = useAuthStore((s) => s.user)
+  const updateUser = useAuthStore((s) => s.updateUser)
+  const unread     = useWsStore((s) => s.unreadCount)
   const [menuVisible, setMenuVisible] = useState(false)
 
   const { data: dashboard, isLoading } = useQuery<DashboardData>({
@@ -103,9 +104,28 @@ export default function PatientHome() {
     queryFn:   () => get<DashboardData>(EP.analyticsDashboard),
   })
 
+  // Si el nombre no está en el store (edge case de inicio rápido),
+  // lo cargamos directamente desde /auth/me/ y actualizamos el store.
+  useEffect(() => {
+    if (!user?.firstName && !user?.lastName) {
+      get<{ user: { id: string; email: string; role: string }; profile: { first_name?: string; last_name?: string; photo_url?: string } | null }>(EP.authMe)
+        .then(me => {
+          if (me.profile?.first_name || me.profile?.last_name) {
+            updateUser({
+              firstName: me.profile?.first_name ?? null,
+              lastName:  me.profile?.last_name  ?? null,
+              photoUrl:  me.profile?.photo_url  ?? null,
+            })
+          }
+        })
+        .catch(() => { /* silencioso */ })
+    }
+  }, [user?.firstName, user?.lastName])
+
   const hour       = new Date().getHours()
   const greeting   = getDayGreeting(hour)
-  const firstName  = user?.firstName ?? 'Paciente'
+  // Mostrar solo el primer nombre en el saludo, no el nombre completo
+  const firstName  = user?.firstName ?? (user?.lastName ?? 'Paciente')
 
   // Tip del día rotativo por día del mes
   const todayTip    = useMemo(() => HEALTH_TIPS[new Date().getDate() % HEALTH_TIPS.length], [])

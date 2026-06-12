@@ -63,8 +63,10 @@ const MOOD_COLOR = (score: number) => {
 
 const SLEEP_EMOJIS = ['😴', '💤', '🌙', '⭐', '🌟']
 
-/** Django devuelve microsegundos en el ISO string — iOS no los parsea. */
-function safeDate(iso: string): Date {
+/** Django devuelve microsegundos en el ISO string — iOS no los parsea.
+ *  Acepta undefined/null y devuelve fecha inválida en lugar de crashear. */
+function safeDate(iso: string | null | undefined): Date {
+  if (!iso) return new Date(NaN)
   return new Date(iso.replace(/\.\d{1,6}(?=[+-Z]|$)/, ''))
 }
 
@@ -303,7 +305,7 @@ export default function ActivitiesScreen() {
                       {entry.score}
                     </Text>
                     <Text style={styles.moodDayDate}>
-                      {safeDate(entry.recorded_at).toLocaleDateString('es-MX', { weekday: 'short' })}
+                      {(() => { const d = safeDate(entry.recorded_at); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-MX', { weekday: 'short' }) })()}
                     </Text>
                   </View>
                 ))}
@@ -328,7 +330,7 @@ export default function ActivitiesScreen() {
               </View>
               <Text style={styles.progressLabel}>{e.progress_pct}% completado</Text>
               <Text style={styles.programDate}>
-                Inicio: {safeDate(e.started_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+                Inicio: {(() => { const d = safeDate(e.started_at); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) })()}
               </Text>
             </Card>
           ))

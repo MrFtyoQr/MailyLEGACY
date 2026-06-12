@@ -111,13 +111,21 @@ export default function SplashAnimatedScreen() {
         setNetworkError(false)
         await handleMe(me)
         return
-      } catch {
+      } catch (err: any) {
+        const status = err?.status ?? err?.response?.status ?? 0
+        // 401 / 403 → token inválido o expirado → ir al login, no mostrar "sin conexión"
+        if (status === 401 || status === 403) {
+          await SplashScreen.hideAsync()
+          const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY)
+          router.replace(onboardingDone ? '/(auth)/sign-in' : '/(auth)/onboarding')
+          return
+        }
         if (attempt === 0) {
           await new Promise((r) => setTimeout(r, 1500))
         }
       }
     }
-    // Si ambos intentos fallaron — puede ser token expirado o sin red
+    // Si ambos intentos fallaron por error de red real
     setNetworkError(true)
     await SplashScreen.hideAsync()
   }, [isLoaded, isSignedIn])
