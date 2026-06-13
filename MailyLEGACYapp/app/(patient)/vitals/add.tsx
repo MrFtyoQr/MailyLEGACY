@@ -14,6 +14,9 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import { router, useFocusEffect } from 'expo-router'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
+import { Button }        from '@components/ui/Button'
+import { IconBadge }     from '@components/ui/IconBadge'
+import { AppIcon }       from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
 import { post } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
@@ -24,6 +27,7 @@ import {
   type VitalType,
   type AddVitalPayload,
 } from '@hooks/useVitals'
+import { getStatusBadge, getVitalStatus } from '@lib/vitals/statusColors'
 
 type FormState      = Partial<Record<VitalType, string>>
 type SecondaryState = Partial<Record<VitalType, string>>
@@ -225,17 +229,23 @@ export default function AddVitalScreen() {
 
           {pendingPayloads.map((p) => {
             const meta = VITAL_META[p.vital_type]
-            const isInNormal = p.value >= meta.normal.min && p.value <= meta.normal.max
+            const status = getVitalStatus(p.vital_type, p.value, p.secondary_value)
+            const badge = getStatusBadge(status)
             return (
               <View key={p.vital_type} style={styles.reviewCard}>
                 <View style={styles.reviewLeft}>
-                  <Text style={styles.vitalIcon}>{meta.icon}</Text>
+                  <IconBadge name={meta.icon} size={18} color={badge.color} bgColor={badge.bg} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.vitalLabel}>{meta.label}</Text>
-                    <Text style={[styles.reviewValue, { color: isInNormal ? Colors.semantic.success : Colors.semantic.warning }]}>
+                    <Text style={[styles.reviewValue, { color: badge.color }]}>
                       {p.value}{p.secondary_value != null ? `/${p.secondary_value}` : ''} {meta.unit}
                     </Text>
-                    {p.notes ? <Text style={styles.reviewNote} numberOfLines={1}>📝 {p.notes}</Text> : null}
+                    {p.notes ? (
+                      <View style={styles.reviewNoteRow}>
+                        <AppIcon name="note" size={14} color={Colors.light.textMuted} />
+                        <Text style={styles.reviewNote} numberOfLines={1}>{p.notes}</Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
                 {p.photo_url ? (
@@ -248,28 +258,21 @@ export default function AddVitalScreen() {
             )
           })}
 
-          <TouchableOpacity
-            style={[styles.saveBtn, addVitals.isPending && styles.saveBtnDisabled]}
+          <Button
+            label={`Confirmar y guardar ${pendingPayloads.length} signo${pendingPayloads.length > 1 ? 's' : ''}`}
+            variant="primary"
+            fullWidth
+            loading={addVitals.isPending}
             onPress={handleConfirmSubmit}
-            activeOpacity={0.85}
-            disabled={addVitals.isPending}
-          >
-            {addVitals.isPending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.saveBtnText}>
-                Confirmar y guardar {pendingPayloads.length} signo{pendingPayloads.length > 1 ? 's' : ''}
-              </Text>
-            )}
-          </TouchableOpacity>
+          />
 
-          <TouchableOpacity
-            style={styles.editBtn}
+          <Button
+            label="Editar valores"
+            variant="ghost"
+            fullWidth
             onPress={() => setStep('form')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.editBtnText}>← Editar valores</Text>
-          </TouchableOpacity>
+            style={styles.editBtn}
+          />
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -312,12 +315,18 @@ export default function AddVitalScreen() {
             const photo  = photos[type]
             const isUp   = !!uploading[type]
             const hasUrl = !!photoUrls[type]
+            const numVal = filled ? parseFloat(val.replace(',', '.')) : null
+            const numSec = type === 'BLOOD_PRESSURE' && secVal.trim()
+              ? parseFloat(secVal.replace(',', '.'))
+              : null
+            const status = getVitalStatus(type, numVal, numSec)
+            const badge  = getStatusBadge(status)
 
             return (
               <View key={type} style={[styles.vitalCard, filled && styles.vitalCardFilled]}>
                 {/* Cabecera */}
                 <View style={styles.vitalHeader}>
-                  <Text style={styles.vitalIcon}>{meta.icon}</Text>
+                  <IconBadge name={meta.icon} size={20} color={badge.color} bgColor={badge.bg} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.vitalLabel}>{meta.label}</Text>
                     <Text style={styles.vitalHint}>
@@ -385,7 +394,10 @@ export default function AddVitalScreen() {
                     onPress={() => pickPhoto(type)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.photoBtnText}>📷 Adjuntar foto de evidencia</Text>
+                    <View style={styles.photoBtnInner}>
+                      <AppIcon name="camera" size={18} color={Colors.light.textSecondary} />
+                      <Text style={styles.photoBtnText}>Adjuntar foto de evidencia</Text>
+                    </View>
                   </TouchableOpacity>
                 )}
               </View>
@@ -407,20 +419,17 @@ export default function AddVitalScreen() {
           </View>
 
           {/* Botón → revisión */}
-          <TouchableOpacity
-            style={[styles.saveBtn,
-              (filledCount === 0 || VITAL_TYPES_ORDERED.some(t => uploading[t])) &&
-              styles.saveBtnDisabled]}
-            onPress={handleGoToReview}
-            activeOpacity={0.85}
+          <Button
+            label={
+              filledCount > 0
+                ? `Revisar ${filledCount} signo${filledCount > 1 ? 's' : ''} →`
+                : 'Revisar signos vitales →'
+            }
+            variant="primary"
+            fullWidth
             disabled={filledCount === 0 || VITAL_TYPES_ORDERED.some(t => uploading[t])}
-          >
-            <Text style={styles.saveBtnText}>
-              Revisar {filledCount > 0
-                ? `${filledCount} signo${filledCount > 1 ? 's' : ''}`
-                : 'signos vitales'} →
-            </Text>
-          </TouchableOpacity>
+            onPress={handleGoToReview}
+          />
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -461,7 +470,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.brand.primary + '05',
   },
   vitalHeader:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  vitalIcon:    { fontSize: 22 },
   vitalLabel:   { fontSize: 14, fontWeight: '600', color: Colors.light.textPrimary },
   vitalHint:    { fontSize: 11, color: Colors.light.textMuted, marginTop: 1 },
   filledCheck:  { fontSize: 16, color: Colors.brand.primary, fontWeight: '700' },
@@ -481,6 +489,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed', paddingVertical: 10,
     alignItems: 'center', backgroundColor: Colors.light.bg,
   },
+  photoBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   photoBtnText: { fontSize: 13, color: Colors.light.textSecondary },
 
   photoPreviewWrap: { borderRadius: 10, overflow: 'hidden', height: 140 },
@@ -510,12 +519,11 @@ const styles = StyleSheet.create({
   },
   notesInput: { minHeight: 72, textAlignVertical: 'top' },
 
-  saveBtn: {
-    backgroundColor: Colors.brand.primary, borderRadius: 16,
-    paddingVertical: 16, alignItems: 'center', marginTop: 4,
+  editBtn: {
+    marginTop:       4,
+    alignItems:      'center',
+    paddingVertical: 8,
   },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText:     { fontSize: 16, fontWeight: '700', color: '#fff' },
 
   // Review
   reviewCard: {
@@ -542,21 +550,18 @@ const styles = StyleSheet.create({
   reviewNote: {
     fontSize: 12,
     color:    Colors.light.textSecondary,
-    marginTop: 2,
+    flex:     1,
+  },
+  reviewNoteRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           6,
+    marginTop:     2,
   },
   reviewThumb: {
     width:        64,
     height:       64,
     borderRadius: 10,
     resizeMode:   'cover',
-  },
-  editBtn: {
-    alignItems:    'center',
-    paddingVertical: 14,
-  },
-  editBtnText: {
-    fontSize:   15,
-    color:      Colors.light.textSecondary,
-    fontWeight: '500',
   },
 })

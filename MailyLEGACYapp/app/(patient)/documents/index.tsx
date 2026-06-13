@@ -32,6 +32,8 @@ import axios from 'axios'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { EmptyState } from '@components/ui/EmptyState'
 import { Badge } from '@components/ui/Badge'
+import { IconBadge } from '@components/ui/IconBadge'
+import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
 import { get, post, del } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
@@ -85,13 +87,13 @@ const CATEGORY_LABELS: Record<DocCategory, string> = {
   OTHER:         'Otro',
 }
 
-const CATEGORY_ICONS: Record<DocCategory, string> = {
-  LAB_RESULT:    '🧪',
-  PRESCRIPTION:  '💊',
-  IMAGING:       '🩻',
-  CLINICAL_NOTE: '📋',
-  INSURANCE:     '🛡️',
-  OTHER:         '📄',
+const CATEGORY_ICONS: Record<DocCategory, AppIconName> = {
+  LAB_RESULT:    'lab',
+  PRESCRIPTION:  'pill',
+  IMAGING:       'image',
+  CLINICAL_NOTE: 'clipboard',
+  INSURANCE:     'shield',
+  OTHER:         'document',
 }
 
 const CATEGORY_COLORS: Record<DocCategory, string> = {
@@ -301,7 +303,7 @@ export default function DocumentsScreen() {
             activeOpacity={0.7}
           >
             <Text style={[styles.chipText, filterCat === cat && styles.chipTextActive]}>
-              {CATEGORY_ICONS[cat]} {CATEGORY_LABELS[cat]}
+              {CATEGORY_LABELS[cat]}
             </Text>
           </TouchableOpacity>
         ))}
@@ -326,7 +328,7 @@ export default function DocumentsScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <EmptyState
-              icon="🗂️"
+              icon="folder"
               title="Sin documentos"
               subtitle="Sube tus recetas, análisis de laboratorio o imágenes médicas para tenerlos siempre a la mano."
             />
@@ -356,9 +358,10 @@ export default function DocumentsScreen() {
 
             {pendingFile && (
               <View style={styles.fileRow}>
-                <Text style={styles.fileIcon}>
-                  {(pendingFile.mimeType ?? '').includes('pdf') ? '📄' : '🖼️'}
-                </Text>
+                <IconBadge
+                  name={(pendingFile.mimeType ?? '').includes('pdf') ? 'document' : 'image'}
+                  size={18}
+                />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.fileName} numberOfLines={1}>{pendingFile.name}</Text>
                   <Text style={styles.fileSize}>{formatBytes(pendingFile.size ?? null)}</Text>
@@ -396,7 +399,7 @@ export default function DocumentsScreen() {
                     styles.catChipText,
                     uploadCategory === cat && styles.catChipTextActive,
                   ]}>
-                    {CATEGORY_ICONS[cat]} {CATEGORY_LABELS[cat]}
+                    {CATEGORY_LABELS[cat]}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -439,7 +442,7 @@ function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void
     >
       {/* Top row */}
       <View style={styles.cardTop}>
-        <Text style={styles.cardIcon}>{CATEGORY_ICONS[doc.category]}</Text>
+        <IconBadge name={CATEGORY_ICONS[doc.category]} size={18} />
         <View style={{ flex: 1 }}>
           <Text style={styles.cardTitle} numberOfLines={expanded ? undefined : 1}>
             {doc.title}
@@ -458,7 +461,7 @@ function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void
             onPress={(e) => { e.stopPropagation(); onDelete() }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.deleteBtn}>🗑️</Text>
+            <AppIcon name="trash" size={18} color={Colors.semantic.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -477,7 +480,7 @@ function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void
       {/* OCR text (if expanded and available) */}
       {expanded && doc.ocr_text ? (
         <View style={styles.ocrBox}>
-          <Text style={styles.ocrLabel}>📝 Texto extraído (OCR)</Text>
+          <Text style={styles.ocrLabel}>Texto extraído (OCR)</Text>
           <Text style={styles.ocrText}>{doc.ocr_text}</Text>
         </View>
       ) : null}
@@ -487,7 +490,7 @@ function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void
       ) : null}
 
       {expanded && doc.status === 'PROCESSING' ? (
-        <Text style={styles.noOcr}>⏳ Procesando OCR…</Text>
+        <Text style={styles.noOcr}>Procesando OCR…</Text>
       ) : null}
     </TouchableOpacity>
   )
@@ -587,7 +590,6 @@ const styles = StyleSheet.create({
     alignItems:    'flex-start',
     gap:           10,
   },
-  cardIcon:  { fontSize: 22, marginTop: 2 },
   cardTitle: {
     fontSize:   15,
     fontWeight: '600',
@@ -603,7 +605,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap:        6,
   },
-  deleteBtn: { fontSize: 16, marginTop: 2 },
   cardMetas: {
     flexDirection: 'row',
     gap:           4,
@@ -680,7 +681,6 @@ const styles = StyleSheet.create({
     borderRadius:    10,
     padding:         10,
   },
-  fileIcon: { fontSize: 24 },
   fileName: {
     fontSize:   14,
     fontWeight: '600',

@@ -24,13 +24,15 @@ import Animated, {
 } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '@constants/colors'
+import { IconBadge } from '@components/ui/IconBadge'
+import type { AppIconName } from '@components/ui/AppIcon'
 
 const { width, height } = Dimensions.get('window')
 export const ONBOARDING_KEY = '@mailyt_onboarding_done'
 
 interface Slide {
   id:       string
-  emoji:    string
+  icon:     AppIconName
   tag:      string
   title:    string
   subtitle: string
@@ -40,7 +42,7 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     id:       '1',
-    emoji:    '❤️',
+    icon:     'heart',
     tag:      'La salud familiar',
     title:    'a un toque de ti',
     subtitle: 'Registra signos vitales, medicamentos y resultados de laboratorio desde un solo lugar. Tu historial siempre disponible.',
@@ -48,7 +50,7 @@ const SLIDES: Slide[] = [
   },
   {
     id:       '2',
-    emoji:    '🩺',
+    icon:     'stethoscope',
     tag:      'Cuidado y seguimiento',
     title:    'personalizado',
     subtitle: 'Recibe recordatorios de tus medicamentos, monitorea tus signos y lleva un control completo de tu salud día a día.',
@@ -56,7 +58,7 @@ const SLIDES: Slide[] = [
   },
   {
     id:       '3',
-    emoji:    '👨‍👩‍👧',
+    icon:     'family',
     tag:      'Conectado con',
     title:    'toda tu familia',
     subtitle: 'Comparte el acceso con familiares de confianza para un cuidado integral y coordinado. Cuida a quienes amas.',
@@ -64,7 +66,7 @@ const SLIDES: Slide[] = [
   },
   {
     id:       '4',
-    emoji:    '🤖',
+    icon:     'robot',
     tag:      'Asistente de salud',
     title:    'con IA a tu lado',
     subtitle: 'Consulta a nuestro asistente inteligente sobre tus datos de salud, obtén recomendaciones y alertas en tiempo real.',
@@ -141,7 +143,7 @@ export default function OnboardingScreen() {
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.slideInner}>
-              <Text style={styles.emoji}>{item.emoji}</Text>
+              <IconBadge name={item.icon} size={40} shape="circle" style={styles.slideIcon} />
               <View style={styles.textBlock}>
                 <Text style={styles.tag}>{item.tag}</Text>
                 <Text style={styles.title}>{item.title}</Text>
@@ -173,7 +175,7 @@ export default function OnboardingScreen() {
           activeOpacity={0.85}
         >
           <Text style={styles.mainBtnText}>
-            {isLast ? 'Comenzar ahora →' : 'Siguiente →'}
+            {isLast ? 'Comenzar ahora' : 'Siguiente'}
           </Text>
         </TouchableOpacity>
 
@@ -204,8 +206,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     gap:               28,
   },
-  emoji: {
-    fontSize: 80,
+  slideIcon: {
+    marginBottom: 8,
   },
   textBlock: {
     alignItems: 'center',

@@ -11,6 +11,11 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { ScreenWrapper }  from '@components/layout/ScreenWrapper'
+import { IconBadge }      from '@components/ui/IconBadge'
+import { PointsCoin }     from '@components/ui/PointsCoin'
+import { InfoCard }       from '@components/ui/InfoCard'
+import { EmptyState }     from '@components/ui/EmptyState'
+import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors }         from '@constants/colors'
 import {
   usePlayerProfile, useTransactions, useAvailableBadges, useRewardProducts,
@@ -36,15 +41,27 @@ function getLevelProgress(totalPoints: number, level: number) {
 
 // ── Labels de fuente de puntos ────────────────────────────────────────────────
 const SOURCE_LABEL: Record<string, string> = {
-  MEDICATION_TAKEN:   '💊 Medicamento tomado',
-  VITAL_LOGGED:       '🩺 Signo vital registrado',
-  LAB_UPLOADED:       '🔬 Resultado lab subido',
-  APPOINTMENT_KEPT:   '📅 Cita completada',
-  STREAK_BONUS:       '🔥 Bonus por racha',
-  REFERRAL_COMPLETED: '👨‍⚕️ Referido completado',
-  PROFILE_COMPLETED:  '✅ Perfil completado',
-  MILESTONE:          '🏆 Hito desbloqueado',
-  MANUAL_ADJUSTMENT:  '⚙️ Ajuste manual',
+  MEDICATION_TAKEN:   'Medicamento tomado',
+  VITAL_LOGGED:       'Signo vital registrado',
+  LAB_UPLOADED:       'Resultado lab subido',
+  APPOINTMENT_KEPT:   'Cita completada',
+  STREAK_BONUS:       'Bonus por racha',
+  REFERRAL_COMPLETED: 'Referido completado',
+  PROFILE_COMPLETED:  'Perfil completado',
+  MILESTONE:          'Hito desbloqueado',
+  MANUAL_ADJUSTMENT:  'Ajuste manual',
+}
+
+const SOURCE_ICON: Record<string, AppIconName> = {
+  MEDICATION_TAKEN:   'pill',
+  VITAL_LOGGED:       'stethoscope',
+  LAB_UPLOADED:       'lab',
+  APPOINTMENT_KEPT:   'calendar',
+  STREAK_BONUS:       'fire',
+  REFERRAL_COMPLETED: 'doctor',
+  PROFILE_COMPLETED:  'check',
+  MILESTONE:          'trophy',
+  MANUAL_ADJUSTMENT:  'cog',
 }
 
 // ── Hints de categoría de badge ───────────────────────────────────────────────
@@ -68,7 +85,7 @@ function BadgeChip({ item, locked }: { item: EarnedBadge | null; locked?: Badge 
   if (locked) {
     return (
       <View style={[styles.badgeChip, styles.badgeLocked]}>
-        <Text style={[styles.badgeEmoji, { opacity: 0.25 }]}>🔒</Text>
+        <IconBadge name="lock-closed" size={22} style={{ opacity: 0.35 }} />
         <Text style={[styles.badgeName, { opacity: 0.4 }]} numberOfLines={2}>{locked.name}</Text>
         <Text style={[styles.badgeDate, { opacity: 0.4 }]}>
           {locked.threshold} {BADGE_CATEGORY_HINT[locked.category] ?? 'para desbloquear'}
@@ -82,7 +99,7 @@ function BadgeChip({ item, locked }: { item: EarnedBadge | null; locked?: Badge 
       {item.badge.icon_url ? (
         <Image source={{ uri: item.badge.icon_url }} style={styles.badgeIcon} />
       ) : (
-        <Text style={styles.badgeEmoji}>🏅</Text>
+        <IconBadge name="medal" size={22} />
       )}
       <Text style={styles.badgeName} numberOfLines={2}>{item.badge.name}</Text>
       <Text style={styles.badgeDate}>{fmtDate(item.earned_at)}</Text>
@@ -92,8 +109,10 @@ function BadgeChip({ item, locked }: { item: EarnedBadge | null; locked?: Badge 
 
 function TxRow({ item }: { item: PointTransaction }) {
   const plus = item.points > 0
+  const icon = SOURCE_ICON[item.source]
   return (
     <View style={styles.txRow}>
+      {icon && <IconBadge name={icon} size={16} style={styles.txBadge} />}
       <View style={styles.txLeft}>
         <Text style={styles.txLabel}>
           {SOURCE_LABEL[item.source] ?? item.source_display}
@@ -123,13 +142,16 @@ function RewardCard({ item }: { item: RewardProduct }) {
         <Image source={{ uri: item.image_url }} style={styles.rewardImage} />
       ) : (
         <View style={[styles.rewardImage, styles.rewardImagePlaceholder]}>
-          <Text style={{ fontSize: 32 }}>🎁</Text>
+          <IconBadge name="gift" size={24} />
         </View>
       )}
       <View style={styles.rewardInfo}>
         <Text style={styles.rewardName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.rewardStock}>{stockLabel}</Text>
-        <Text style={styles.rewardCost}>⭐ {item.points_cost} pts</Text>
+        <View style={styles.rewardCostRow}>
+          <PointsCoin size={14} />
+          <Text style={styles.rewardCost}>{item.points_cost} pts</Text>
+        </View>
       </View>
     </View>
   )
@@ -166,7 +188,7 @@ export default function GamificationScreen() {
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
           <Text style={styles.back}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Mis Puntos ⭐</Text>
+        <Text style={styles.title}>Mis Puntos</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -185,7 +207,10 @@ export default function GamificationScreen() {
             <View style={styles.heroMainRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.heroPointsLabel}>Puntos totales</Text>
-                <Text style={styles.heroPoints}>⭐ {profile.total_points.toLocaleString('es-MX')}</Text>
+                <View style={styles.heroPointsRow}>
+                  <PointsCoin size={24} />
+                  <Text style={styles.heroPoints}>{profile.total_points.toLocaleString('es-MX')}</Text>
+                </View>
               </View>
               <View style={styles.levelBadge}>
                 <Text style={styles.levelBadgeNum}>{profile.level}</Text>
@@ -198,7 +223,7 @@ export default function GamificationScreen() {
               <View style={styles.progressSection}>
                 <View style={styles.progressLabelRow}>
                   <Text style={styles.progressLabel}>
-                    Nv. {profile.level} → Nv. {Math.min(profile.level + 1, MAX_LEVEL)}
+                    Nv. {profile.level} a Nv. {Math.min(profile.level + 1, MAX_LEVEL)}
                   </Text>
                   {profile.level < MAX_LEVEL && (
                     <Text style={styles.progressLabel}>
@@ -218,11 +243,17 @@ export default function GamificationScreen() {
             <View style={styles.heroDivider} />
             <View style={styles.heroStatsRow}>
               <View style={styles.heroStat}>
-                <Text style={styles.heroStatVal}>🔥 {profile.current_streak}d</Text>
+                <View style={styles.heroStatRow}>
+                  <AppIcon name="fire" size={16} color="#FFFFFF" />
+                  <Text style={styles.heroStatVal}>{profile.current_streak}d</Text>
+                </View>
                 <Text style={styles.heroLabel}>racha actual</Text>
               </View>
               <View style={styles.heroStat}>
-                <Text style={styles.heroStatVal}>🏆 {profile.longest_streak}d</Text>
+                <View style={styles.heroStatRow}>
+                  <AppIcon name="trophy" size={16} color="#FFFFFF" />
+                  <Text style={styles.heroStatVal}>{profile.longest_streak}d</Text>
+                </View>
                 <Text style={styles.heroLabel}>racha récord</Text>
               </View>
               <View style={styles.heroStat}>
@@ -236,16 +267,18 @@ export default function GamificationScreen() {
         ) : null}
 
         {/* ── Tip: foto de evidencia ── */}
-        <View style={styles.tipCard}>
-          <Text style={styles.tipEmoji}>📷</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.tipTitle}>+10 pts por foto de evidencia</Text>
-            <Text style={styles.tipText}>
-              Al registrar un signo vital con foto obtienes 10 pts en vez de 5.
-              ¡Adjunta una foto la próxima vez!
-            </Text>
+        <InfoCard style={styles.tipCard}>
+          <View style={styles.tipCardInner}>
+            <IconBadge name="camera" size={20} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tipTitle}>+10 pts por foto de evidencia</Text>
+              <Text style={styles.tipText}>
+                Al registrar un signo vital con foto obtienes 10 pts en vez de 5.
+                ¡Adjunta una foto la próxima vez!
+              </Text>
+            </View>
           </View>
-        </View>
+        </InfoCard>
 
         {/* ── Insignias ganadas + bloqueadas ── */}
         <View style={styles.section}>
@@ -301,15 +334,13 @@ export default function GamificationScreen() {
 
         {/* ── Productos canjeables ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Canjea tus puntos 🎁</Text>
+          <Text style={styles.sectionTitle}>Canjea tus puntos</Text>
           {rewardList.length === 0 ? (
-            <View style={styles.rewardPlaceholder}>
-              <Text style={{ fontSize: 40, marginBottom: 8 }}>🎁</Text>
-              <Text style={styles.rewardPlaceholderTitle}>Próximamente</Text>
-              <Text style={styles.rewardPlaceholderText}>
-                Podrás canjear tus puntos por productos y beneficios de salud.
-              </Text>
-            </View>
+            <EmptyState
+              icon="gift"
+              title="Próximamente"
+              subtitle="Podrás canjear tus puntos por productos y beneficios de salud."
+            />
           ) : (
             rewardList.map((r) => <RewardCard key={r.id} item={r} />)
           )}
@@ -356,6 +387,11 @@ const styles = StyleSheet.create({
     color:    'rgba(255,255,255,0.7)',
     fontWeight: '500',
     marginBottom: 2,
+  },
+  heroPointsRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           6,
   },
   heroPoints: {
     fontSize:   28,
@@ -419,6 +455,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap:        3,
   },
+  heroStatRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+  },
   heroStatVal: {
     fontSize:   18,
     fontWeight: '700',
@@ -435,16 +476,13 @@ const styles = StyleSheet.create({
 
   // Tip card
   tipCard: {
-    flexDirection:   'row',
-    alignItems:      'flex-start',
-    gap:             12,
-    backgroundColor: Colors.semantic.successBg ?? '#EFF9F0',
-    borderRadius:    14,
-    padding:         14,
-    borderWidth:     1,
-    borderColor:     Colors.semantic.success + '30',
+    marginBottom: 0,
   },
-  tipEmoji: { fontSize: 24 },
+  tipCardInner: {
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    gap:           12,
+  },
   tipTitle: {
     fontSize:   14,
     fontWeight: '700',
@@ -489,7 +527,6 @@ const styles = StyleSheet.create({
   },
   badgeLocked: { opacity: 0.7 },
   badgeIcon:   { width: 36, height: 36, borderRadius: 8 },
-  badgeEmoji:  { fontSize: 28 },
   badgeName:   {
     fontSize:   11,
     fontWeight: '600',
@@ -517,7 +554,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.border,
+    gap:              10,
   },
+  txBadge: { flexShrink: 0 },
   txLeft:  { flex: 1, gap: 2 },
   txRight: { alignItems: 'flex-end', gap: 2 },
   txLabel: {
@@ -548,26 +587,6 @@ const styles = StyleSheet.create({
   },
 
   // Rewards
-  rewardPlaceholder: {
-    backgroundColor: Colors.light.surface,
-    borderRadius:    16,
-    padding:         32,
-    alignItems:      'center',
-    borderWidth:     1,
-    borderColor:     Colors.light.border,
-    borderStyle:     'dashed',
-  },
-  rewardPlaceholderTitle: {
-    fontSize:     16,
-    fontWeight:   '700',
-    color:        Colors.light.textPrimary,
-    marginBottom: 4,
-  },
-  rewardPlaceholderText: {
-    fontSize:  13,
-    color:     Colors.light.textSecondary,
-    textAlign: 'center',
-  },
   rewardCard: {
     flexDirection:   'row',
     backgroundColor: Colors.light.surface,
@@ -590,10 +609,15 @@ const styles = StyleSheet.create({
     color:      Colors.light.textPrimary,
   },
   rewardStock: { fontSize: 12, color: Colors.light.textSecondary },
+  rewardCostRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+    marginTop:     4,
+  },
   rewardCost:  {
     fontSize:   14,
     fontWeight: '700',
     color:      Colors.brand.primary,
-    marginTop:  4,
   },
 })

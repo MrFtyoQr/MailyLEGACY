@@ -37,6 +37,7 @@ import {
 } from '@schemas/auth.schema'
 import { Colors }          from '@constants/colors'
 import { API_URL }         from '@constants/config'
+import { AppIcon }         from '@components/ui/AppIcon'
 import { parseApiResponse } from '@lib/api/parseResponse'
 import { setTokens }       from '@lib/auth/session'
 import { useAuthStore }    from '@store/auth.store'
@@ -145,6 +146,7 @@ export default function SignUpScreen() {
             keyboardType="email-address"
             autoComplete="email"
             autoCapitalize="none"
+            leftIcon={<AppIcon name="mail" size={20} color={Colors.light.textMuted} />}
             required
           />
           <FormField
@@ -154,6 +156,7 @@ export default function SignUpScreen() {
             onChangeText={(t) => { clearErrors(); updateStrength(t) }}
             error={fieldErrors.password}
             secureTextEntry
+            leftIcon={<AppIcon name="lock" size={20} color={Colors.light.textMuted} />}
             required
           />
 
@@ -176,6 +179,7 @@ export default function SignUpScreen() {
             onChangeText={(t) => { clearErrors(); setConfirm(t) }}
             error={fieldErrors.confirmPassword}
             secureTextEntry
+            leftIcon={<AppIcon name="lock" size={20} color={Colors.light.textMuted} />}
             required
           />
 

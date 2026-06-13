@@ -1,51 +1,82 @@
 import React from 'react'
 import { View, StyleSheet, type ViewProps } from 'react-native'
 import { Colors } from '@constants/colors'
+import { DuoColors, DuoDepth } from '@constants/duoTheme'
 
 interface CardProps extends ViewProps {
-  variant?: 'default' | 'elevated' | 'outlined'
-  padding?: number
+  variant?:  'default' | 'elevated' | 'outlined'
+  padding?:  number
+  /** Color de la cara (default blanco) */
+  faceColor?: string
+  /** Color de la sombra 3D inferior */
+  shadowColor?: string
 }
 
-export function Card({ variant = 'default', padding = 16, style, children, ...rest }: CardProps) {
+export function Card({
+  variant     = 'default',
+  padding     = 16,
+  faceColor,
+  shadowColor,
+  style,
+  children,
+  ...rest
+}: CardProps) {
+  const face   = faceColor   ?? DuoColors.card.face
+  const shadow = shadowColor ?? DuoColors.card.shadow
+  const d      = variant === 'outlined' ? DuoDepth.sm : DuoDepth.md
+
+  if (variant === 'outlined') {
+    return (
+      <View style={[styles.wrap, { marginBottom: d }, style]} {...rest}>
+        <View
+          style={[
+            styles.shadow,
+            { top: d, borderRadius: 16, backgroundColor: shadow },
+          ]}
+        />
+        <View
+          style={[
+            styles.face,
+            styles.outlined,
+            { padding, borderRadius: 16, backgroundColor: face, marginBottom: d },
+          ]}
+        >
+          {children}
+        </View>
+      </View>
+    )
+  }
+
   return (
-    <View
-      style={[
-        styles.base,
-        styles[variant],
-        { padding },
-        style,
-      ]}
-      {...rest}
-    >
-      {children}
+    <View style={[styles.wrap, { marginBottom: d }, style]} {...rest}>
+      <View
+        style={[
+          styles.shadow,
+          {
+            top: d,
+            borderRadius: 16,
+            backgroundColor: variant === 'elevated' ? '#CBD5E1' : shadow,
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.face,
+          { padding, borderRadius: 16, backgroundColor: face, marginBottom: d },
+        ]}
+      >
+        {children}
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  base: {
-    borderRadius: 16,
-    backgroundColor: Colors.light.card,
-  },
-  default: {
-    shadowColor:   '#000',
-    shadowOffset:  { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius:  8,
-    elevation:     3,
-  },
-  elevated: {
-    shadowColor:   '#000',
-    shadowOffset:  { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius:  16,
-    elevation:     6,
-  },
+  wrap:   { position: 'relative' },
+  shadow: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  face:   { overflow: 'hidden' },
   outlined: {
-    borderWidth:    1,
-    borderColor:    Colors.light.border,
-    shadowOpacity:  0,
-    elevation:      0,
+    borderWidth: 2,
+    borderColor: Colors.light.border,
   },
 })

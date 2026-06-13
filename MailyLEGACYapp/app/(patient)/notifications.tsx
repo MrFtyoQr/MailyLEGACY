@@ -67,7 +67,7 @@ export default function NotificationsScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <EmptyState
-              icon="🔔"
+              icon="bell"
               title="Sin notificaciones"
               subtitle="Aquí aparecerán tus alertas de medicamentos, citas y signos vitales."
             />

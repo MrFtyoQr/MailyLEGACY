@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { get, post, del } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
+import type { AppIconName } from '@components/ui/AppIcon'
 
 // ── Tipos que coinciden con el modelo real del backend ────────────────────────
 
@@ -72,38 +73,38 @@ export const VITAL_META: Record<VitalType, {
   unit:      string
   min:       number
   max:       number
-  icon:      string
+  icon:      AppIconName
   normal:    { min: number; max: number }
   secondary?: { label: string; min: number; max: number }
 }> = {
-  BLOOD_PRESSURE: { label: 'Presión arterial', unit: 'mmHg', min: 60,  max: 250, icon: '🫀',
+  BLOOD_PRESSURE: { label: 'Presión arterial', unit: 'mmHg', min: 60,  max: 250, icon: 'heart',
     normal: { min: 90, max: 140 },
     secondary: { label: 'Diastólica', min: 40, max: 120 } },
-  HEART_RATE:     { label: 'Frec. cardíaca',   unit: 'bpm',  min: 30,  max: 250, icon: '💓',
+  HEART_RATE:     { label: 'Frec. cardíaca',   unit: 'bpm',  min: 30,  max: 250, icon: 'activity',
     normal: { min: 60, max: 100 } },
-  OXYGEN_SAT:     { label: 'Saturación O₂',    unit: '%',    min: 50,  max: 100, icon: '🫁',
+  OXYGEN_SAT:     { label: 'Saturación O₂',    unit: '%',    min: 50,  max: 100, icon: 'lungs',
     normal: { min: 95, max: 100 } },
-  RESPIRATORY:    { label: 'Frec. respiratoria', unit: 'rpm', min: 8,  max: 60,  icon: '🌬️',
+  RESPIRATORY:    { label: 'Frec. respiratoria', unit: 'rpm', min: 8,  max: 60,  icon: 'wind',
     normal: { min: 12, max: 20 } },
-  GLUCOSE:        { label: 'Glucosa',           unit: 'mg/dL', min: 40, max: 600, icon: '🩸',
+  GLUCOSE:        { label: 'Glucosa',           unit: 'mg/dL', min: 40, max: 600, icon: 'syringe',
     normal: { min: 70, max: 140 } },
-  GLUCOSE_FAST:   { label: 'Glucosa en ayuno',  unit: 'mg/dL', min: 40, max: 600, icon: '🩸',
+  GLUCOSE_FAST:   { label: 'Glucosa en ayuno',  unit: 'mg/dL', min: 40, max: 600, icon: 'syringe',
     normal: { min: 70, max: 100 } },
-  WEIGHT:         { label: 'Peso',              unit: 'kg',   min: 1,   max: 600, icon: '⚖️',
+  WEIGHT:         { label: 'Peso',              unit: 'kg',   min: 1,   max: 600, icon: 'scale',
     normal: { min: 40, max: 120 } },
-  HEIGHT:         { label: 'Talla',             unit: 'cm',   min: 30,  max: 300, icon: '📏',
+  HEIGHT:         { label: 'Talla',             unit: 'cm',   min: 30,  max: 300, icon: 'ruler',
     normal: { min: 150, max: 200 } },
-  BMI:            { label: 'IMC',               unit: 'kg/m²', min: 10, max: 60,  icon: '📊',
+  BMI:            { label: 'IMC',               unit: 'kg/m²', min: 10, max: 60,  icon: 'chart',
     normal: { min: 18.5, max: 25 } },
-  WAIST:          { label: 'Cintura',           unit: 'cm',   min: 40,  max: 200, icon: '📐',
+  WAIST:          { label: 'Cintura',           unit: 'cm',   min: 40,  max: 200, icon: 'ruler',
     normal: { min: 60, max: 94 } },
-  HIP:            { label: 'Cadera',            unit: 'cm',   min: 40,  max: 200, icon: '📐',
+  HIP:            { label: 'Cadera',            unit: 'cm',   min: 40,  max: 200, icon: 'ruler',
     normal: { min: 80, max: 110 } },
-  TEMPERATURE:    { label: 'Temperatura',       unit: '°C',   min: 25,  max: 45,  icon: '🌡️',
+  TEMPERATURE:    { label: 'Temperatura',       unit: '°C',   min: 25,  max: 45,  icon: 'thermometer',
     normal: { min: 36, max: 37.5 } },
-  STEPS:          { label: 'Pasos',             unit: 'pasos', min: 0, max: 50000, icon: '🦶',
+  STEPS:          { label: 'Pasos',             unit: 'pasos', min: 0, max: 50000, icon: 'footsteps',
     normal: { min: 7000, max: 10000 } },
-  SLEEP_HOURS:    { label: 'Horas de sueño',    unit: 'h',    min: 0,   max: 24,  icon: '😴',
+  SLEEP_HOURS:    { label: 'Horas de sueño',    unit: 'h',    min: 0,   max: 24,  icon: 'sleep',
     normal: { min: 7, max: 9 } },
 }
 

@@ -17,6 +17,7 @@ import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Avatar } from '@components/ui/Avatar'
 import { Card } from '@components/ui/Card'
 import { Badge } from '@components/ui/Badge'
+import { InfoRow } from '@components/ui/InfoRow'
 import { Colors } from '@constants/colors'
 import { useAuthStore } from '@store/auth.store'
 
@@ -68,9 +69,9 @@ export default function SpecialistProfileScreen() {
       >
         <Text style={styles.sectionTitle}>Información</Text>
         <Card>
-          <InfoRow icon="👤" label="Nombre" value={fullName} />
-          {user?.email && <InfoRow icon="✉️" label="Email" value={user.email} divider />}
-          <InfoRow icon="🏷️" label="Rol" value="Especialista" divider />
+          <InfoRow icon="user" label="Nombre" value={fullName} />
+          {user?.email && <InfoRow icon="mail" label="Email" value={user.email} divider />}
+          <InfoRow icon="tag" label="Rol" value="Especialista" divider />
         </Card>
 
         <TouchableOpacity
@@ -78,7 +79,7 @@ export default function SpecialistProfileScreen() {
           onPress={handleSignOut}
           activeOpacity={0.75}
         >
-          <Text style={styles.signOutText}>🚪 Cerrar sesión</Text>
+          <Text style={styles.signOutText}>Cerrar sesión</Text>
         </TouchableOpacity>
 
         <Text style={styles.version}>MailyT-Cuida v1.0</Text>
@@ -87,29 +88,6 @@ export default function SpecialistProfileScreen() {
     </ScreenWrapper>
   )
 }
-
-function InfoRow({
-  icon, label, value, divider,
-}: { icon: string; label: string; value: string; divider?: boolean }) {
-  return (
-    <View>
-      {divider && <View style={ir.divider} />}
-      <View style={ir.row}>
-        <Text style={ir.icon}>{icon}</Text>
-        <Text style={ir.label}>{label}</Text>
-        <Text style={ir.value} numberOfLines={1}>{value}</Text>
-      </View>
-    </View>
-  )
-}
-
-const ir = StyleSheet.create({
-  row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
-  divider: { height: 1, backgroundColor: Colors.light.border },
-  icon:    { fontSize: 18, width: 26 },
-  label:   { fontSize: 14, color: Colors.light.textSecondary, flex: 1 },
-  value:   { fontSize: 14, color: Colors.light.textPrimary, fontWeight: '500', flex: 2, textAlign: 'right' },
-})
 
 const styles = StyleSheet.create({
   profileHeader: {

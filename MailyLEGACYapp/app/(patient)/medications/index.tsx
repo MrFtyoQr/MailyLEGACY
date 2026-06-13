@@ -111,7 +111,7 @@ export default function MedicationsScreen() {
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <EmptyState
-                icon="💊"
+                icon="pill"
                 title="Sin medicamentos hoy"
                 subtitle="No tienes medicamentos programados para hoy."
               />
@@ -155,7 +155,7 @@ export default function MedicationsScreen() {
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <EmptyState
-                icon="💊"
+                icon="pill"
                 title="Sin medicamentos"
                 subtitle="Tu médico aún no ha asignado medicamentos."
               />

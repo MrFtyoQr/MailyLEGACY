@@ -27,6 +27,7 @@ import { createRateLimiter } from '@lib/security/rateLimiter'
 import { signInSchema, type SignInForm } from '@schemas/auth.schema'
 import { Colors }          from '@constants/colors'
 import { API_URL }         from '@constants/config'
+import { AppIcon }         from '@components/ui/AppIcon'
 import { parseApiResponse } from '@lib/api/parseResponse'
 import { setTokens }       from '@lib/auth/session'
 import { useAuthStore }    from '@store/auth.store'
@@ -121,6 +122,7 @@ export default function SignInScreen() {
             keyboardType="email-address"
             autoComplete="email"
             autoCapitalize="none"
+            leftIcon={<AppIcon name="mail" size={20} color={Colors.light.textMuted} />}
             required
           />
           <FormField
@@ -130,6 +132,7 @@ export default function SignInScreen() {
             onChangeText={(t) => { clearErrors(); setPassword(t) }}
             error={fieldErrors.password}
             secureTextEntry
+            leftIcon={<AppIcon name="lock" size={20} color={Colors.light.textMuted} />}
             required
           />
 

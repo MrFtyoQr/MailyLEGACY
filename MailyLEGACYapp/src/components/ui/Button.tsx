@@ -1,47 +1,54 @@
 /**
  * Button.tsx
  * ----------
- * Botón reutilizable con variantes:
- *   primary   → gradiente azul-cyan (brand)
- *   secondary → borde brand, fondo transparente
- *   ghost     → solo texto
- *   danger    → rojo semántico
- *
- * Usa LinearGradient para la variante primary.
+ * Botón con efecto 3D plano estilo Duolingo.
+ * Variantes: primary | secondary | ghost | danger
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 import {
-  TouchableOpacity,
+  Pressable,
   Text,
   ActivityIndicator,
   StyleSheet,
   View,
   type ViewStyle,
-  type TouchableOpacityProps,
+  type PressableProps,
 } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated'
 import { Colors } from '@constants/colors'
+import { DuoColors, DuoDepth } from '@constants/duoTheme'
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type ButtonSize    = 'sm' | 'md' | 'lg'
 
-interface ButtonProps extends Omit<TouchableOpacityProps, 'style'> {
-  variant?:  ButtonVariant
-  size?:     ButtonSize
-  label:     string
-  loading?:  boolean
-  leftIcon?: React.ReactNode
+interface ButtonProps extends Omit<PressableProps, 'style'> {
+  variant?:   ButtonVariant
+  size?:      ButtonSize
+  label:      string
+  loading?:   boolean
+  leftIcon?:  React.ReactNode
   fullWidth?: boolean
-  style?:    ViewStyle
+  style?:     ViewStyle
 }
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity)
+const FACE: Record<ButtonVariant, string> = {
+  primary:   DuoColors.button.primaryFace,
+  secondary: DuoColors.button.secondaryFace,
+  ghost:     'transparent',
+  danger:    DuoColors.button.dangerFace,
+}
+const SHADOW: Record<ButtonVariant, string> = {
+  primary:   DuoColors.button.primaryShadow,
+  secondary: DuoColors.button.secondaryShadow,
+  ghost:     'transparent',
+  danger:    DuoColors.button.dangerShadow,
+}
+const TEXT: Record<ButtonVariant, string> = {
+  primary:   DuoColors.button.primaryText,
+  secondary: Colors.brand.primary,
+  ghost:     Colors.brand.primary,
+  danger:    DuoColors.button.dangerText,
+}
 
 export function Button({
   variant   = 'primary',
@@ -55,32 +62,22 @@ export function Button({
   style,
   ...rest
 }: ButtonProps) {
-  const scale = useSharedValue(1)
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }))
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.96, { damping: 15, stiffness: 300 })
-  }
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 })
-  }
-
+  const [pressed, setPressed] = useState(false)
   const isDisabled = disabled || loading
+  const d = variant === 'ghost' ? 0 : DuoDepth.md
+  const offset = pressed && !isDisabled ? d : 0
 
   const content = (
     <View style={styles.inner}>
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'primary' ? '#fff' : Colors.brand.primary}
+          color={TEXT[variant]}
         />
       ) : (
         <>
           {leftIcon && <View style={styles.iconWrap}>{leftIcon}</View>}
-          <Text style={[styles.label, styles[`label_${variant}`], styles[`label_${size}`]]}>
+          <Text style={[styles.label, styles[`label_${size}`], { color: TEXT[variant] }]}>
             {label}
           </Text>
         </>
@@ -88,62 +85,66 @@ export function Button({
     </View>
   )
 
-  if (variant === 'primary') {
+  if (variant === 'ghost') {
     return (
-      <AnimatedTouchable
+      <Pressable
         onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
         disabled={isDisabled}
-        activeOpacity={1}
-        style={[animStyle, fullWidth && styles.fullWidth, style]}
+        style={[fullWidth && styles.fullWidth, isDisabled && styles.disabled, style]}
         {...rest}
       >
-        <LinearGradient
-          colors={Colors.gradients.primary as [string, string]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[
-            styles.base,
-            styles[`size_${size}`],
-            isDisabled && styles.disabled,
-          ]}
-        >
-          {content}
-        </LinearGradient>
-      </AnimatedTouchable>
+        {content}
+      </Pressable>
     )
   }
 
   return (
-    <AnimatedTouchable
+    <Pressable
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       disabled={isDisabled}
-      activeOpacity={1}
-      style={[
-        animStyle,
-        styles.base,
-        styles[`size_${size}`],
-        styles[`variant_${variant}`],
-        isDisabled && styles.disabled,
-        fullWidth && styles.fullWidth,
-        style,
-      ]}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={[fullWidth && styles.fullWidth, isDisabled && styles.disabled, style]}
       {...rest}
     >
-      {content}
-    </AnimatedTouchable>
+      <View style={[styles.wrap, { marginBottom: d }]}>
+        <View
+          style={[
+            styles.shadowLayer,
+            { top: d, borderRadius: 14, backgroundColor: SHADOW[variant] },
+          ]}
+        />
+        <View
+          style={[
+            styles.face,
+            styles[`size_${size}`],
+            {
+              borderRadius:    14,
+              backgroundColor: FACE[variant],
+              marginBottom:    d - offset,
+              transform:       [{ translateY: offset }],
+            },
+            variant === 'secondary' && styles.secondaryBorder,
+          ]}
+        >
+          {content}
+        </View>
+      </View>
+    </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
-  base: {
-    borderRadius:   12,
+  wrap: { position: 'relative' },
+  shadowLayer: {
+    position: 'absolute',
+    left:     0,
+    right:    0,
+    bottom:   0,
+  },
+  face: {
     alignItems:     'center',
     justifyContent: 'center',
-    overflow:       'hidden',
   },
   inner: {
     flexDirection:  'row',
@@ -151,45 +152,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap:            8,
   },
-  iconWrap: {
-    marginRight: 4,
+  iconWrap: { marginRight: 2 },
+  fullWidth: { alignSelf: 'stretch' },
+  disabled: { opacity: 0.55 },
+  secondaryBorder: {
+    borderWidth: 2,
+    borderColor: Colors.light.border,
   },
-  fullWidth: {
-    alignSelf: 'stretch',
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-
-  // Sizes
-  size_sm: { paddingVertical: 8,  paddingHorizontal: 16 },
+  size_sm: { paddingVertical: 10, paddingHorizontal: 18 },
   size_md: { paddingVertical: 14, paddingHorizontal: 24 },
   size_lg: { paddingVertical: 18, paddingHorizontal: 32 },
-
-  // Variant backgrounds (non-primary)
-  variant_secondary: {
-    borderWidth: 1.5,
-    borderColor: Colors.brand.primary,
-    backgroundColor: 'transparent',
-  },
-  variant_ghost: {
-    backgroundColor: 'transparent',
-  },
-  variant_danger: {
-    backgroundColor: Colors.semantic.error,
-  },
-
-  // Label base
-  label: {
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  label_primary:   { color: '#FFFFFF' },
-  label_secondary: { color: Colors.brand.primary },
-  label_ghost:     { color: Colors.brand.primary },
-  label_danger:    { color: '#FFFFFF' },
-
-  // Label sizes
+  label: { fontWeight: '700', letterSpacing: 0.2 },
   label_sm: { fontSize: 13 },
   label_md: { fontSize: 15 },
   label_lg: { fontSize: 17 },

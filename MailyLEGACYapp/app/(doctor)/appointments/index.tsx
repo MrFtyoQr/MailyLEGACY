@@ -133,7 +133,7 @@ export default function DoctorAppointmentsScreen() {
               </View>
               <Text style={styles.apptDoctor}>{item.doctor_name}</Text>
               <Text style={styles.apptSpec}>{item.specialty}</Text>
-              <Text style={styles.apptDuration}>⏱ {item.duration_min} min</Text>
+              <Text style={styles.apptDuration}>{item.duration_min} min</Text>
 
               {/* Acciones */}
               <View style={styles.actionsRow}>
@@ -143,7 +143,7 @@ export default function DoctorAppointmentsScreen() {
                     onPress={() => handleConfirm(item.id)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.actionBtnText}>✅ Confirmar</Text>
+                    <Text style={styles.actionBtnText}>Confirmar</Text>
                   </TouchableOpacity>
                 )}
                 {item.status === 'CONFIRMED' && (
@@ -153,7 +153,7 @@ export default function DoctorAppointmentsScreen() {
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.actionBtnText, { color: Colors.semantic.success }]}>
-                      ✓ Completar
+                      Completar
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -166,7 +166,7 @@ export default function DoctorAppointmentsScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <EmptyState
-            icon="📅"
+            icon="calendar"
             title="Sin citas"
             subtitle="No tienes citas en tu agenda."
           />

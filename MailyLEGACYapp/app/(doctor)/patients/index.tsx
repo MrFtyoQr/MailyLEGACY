@@ -15,6 +15,7 @@ import {
 import { router } from 'expo-router'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { EmptyState } from '@components/ui/EmptyState'
+import { AppIcon } from '@components/ui/AppIcon'
 import { PatientCard } from '@components/patients/PatientCard'
 import { Colors } from '@constants/colors'
 import { usePatients } from '@hooks/usePatients'
@@ -47,7 +48,7 @@ export default function PatientsListScreen() {
 
       {/* Búsqueda */}
       <View style={styles.searchBox}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <AppIcon name="search" size={18} color={Colors.light.textMuted} />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar por nombre o email…"
@@ -84,13 +85,13 @@ export default function PatientsListScreen() {
           ListEmptyComponent={
             query ? (
               <EmptyState
-                icon="🔍"
+                icon="search"
                 title="Sin resultados"
                 subtitle={`No se encontraron pacientes para "${query}".`}
               />
             ) : (
               <EmptyState
-                icon="👥"
+                icon="users"
                 title="Sin pacientes"
                 subtitle="Aún no tienes pacientes asignados."
               />
@@ -132,7 +133,6 @@ const styles = StyleSheet.create({
     borderWidth:       1,
     borderColor:       Colors.light.border,
   },
-  searchIcon: { fontSize: 16 },
   searchInput: {
     flex:      1,
     fontSize:  15,

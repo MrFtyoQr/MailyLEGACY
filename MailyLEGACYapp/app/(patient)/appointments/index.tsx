@@ -88,7 +88,7 @@ export default function AppointmentsScreen() {
         stickySectionHeadersEnabled={false}
         ListEmptyComponent={
           <EmptyState
-            icon="📅"
+            icon="calendar"
             title="Sin citas"
             subtitle="Aún no tienes citas programadas con tu médico."
           />

@@ -46,10 +46,10 @@ const URGENCY_BADGE: Record<Referral['urgency'], { label: string; variant: 'neut
 }
 
 const STATUS_LABEL: Record<Referral['status'], string> = {
-  pending:     '⏳ Pendiente',
-  in_progress: '🔄 En progreso',
-  completed:   '✅ Completado',
-  rejected:    '❌ Rechazado',
+  pending:     'Pendiente',
+  in_progress: 'En progreso',
+  completed:   'Completado',
+  rejected:    'Rechazado',
 }
 
 export default function ReferralsScreen() {
@@ -142,9 +142,9 @@ export default function ReferralsScreen() {
   const done       = (referrals ?? []).filter((r) => r.status === 'completed' || r.status === 'rejected')
 
   const sections: Section[] = []
-  if (pending.length)    sections.push({ title: '⏳ Pendientes',    data: pending    })
-  if (inProgress.length) sections.push({ title: '🔄 En progreso',   data: inProgress })
-  if (done.length)       sections.push({ title: '✅ Completados',   data: done       })
+  if (pending.length)    sections.push({ title: 'Pendientes',    data: pending    })
+  if (inProgress.length) sections.push({ title: 'En progreso',   data: inProgress })
+  if (done.length)       sections.push({ title: 'Completados',   data: done       })
 
   return (
     <ScreenWrapper noPadding edges={['top', 'left', 'right']}>
@@ -208,7 +208,7 @@ export default function ReferralsScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <EmptyState
-            icon="📋"
+            icon="clipboard"
             title="Sin referidos"
             subtitle="No tienes referidos entrantes en este momento."
           />

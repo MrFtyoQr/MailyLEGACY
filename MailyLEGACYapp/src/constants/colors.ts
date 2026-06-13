@@ -16,8 +16,8 @@ export const Colors = {
   },
 
   light: {
-    bg:            '#FFFFFF',
-    surface:       '#F8FAFC',
+    bg:            '#F5F7FA',
+    surface:       '#FFFFFF',
     card:          '#FFFFFF',
     border:        '#E2E8F0',
     borderFocus:   '#00C5E3',

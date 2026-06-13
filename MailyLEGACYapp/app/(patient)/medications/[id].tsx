@@ -19,6 +19,9 @@ import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Card } from '@components/ui/Card'
 import { Badge } from '@components/ui/Badge'
 import { Skeleton } from '@components/ui/Skeleton'
+import { IconBadge } from '@components/ui/IconBadge'
+import { InfoCard } from '@components/ui/InfoCard'
+import { InfoRow } from '@components/ui/InfoRow'
 import { Colors } from '@constants/colors'
 import { get } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
@@ -49,7 +52,7 @@ export default function MedicationDetailScreen() {
     setLoadingAction(historyId)
     try {
       await takeMed.mutateAsync(historyId)
-      Alert.alert('✅ Registrado', 'Medicamento marcado como tomado.')
+      Alert.alert('Registrado', 'Medicamento marcado como tomado.')
     } catch {
       Alert.alert('Error', 'No se pudo registrar. Intenta de nuevo.')
     } finally {
@@ -123,7 +126,7 @@ export default function MedicationDetailScreen() {
         {/* Info principal */}
         <Card>
           <View style={styles.medHeader}>
-            <Text style={styles.medEmoji}>💊</Text>
+            <IconBadge name="pill" size={28} />
             <View style={styles.medInfo}>
               <Text style={styles.medName}>{med.name}</Text>
               <Text style={styles.medDose}>{med.dose}</Text>
@@ -156,7 +159,7 @@ export default function MedicationDetailScreen() {
                 <View key={s.id}>
                   {idx > 0 && <View style={styles.divider} />}
                   <View style={styles.scheduleRow}>
-                    <Text style={styles.scheduleIcon}>⏰</Text>
+                    <IconBadge name="time" size={16} />
                     <Text style={styles.scheduleTime}>{s.time_of_day}</Text>
                     {s.day_of_week && (
                       <Text style={styles.scheduleDay}>{s.day_of_week}</Text>
@@ -170,11 +173,14 @@ export default function MedicationDetailScreen() {
 
         {/* Info adicional sobre tomar/saltar */}
         {med.is_active && (
-          <Card style={styles.actionHint}>
-            <Text style={styles.actionHintText}>
-              💡 Para registrar una toma, usa la vista "Hoy" en la pestaña de Medicamentos.
-            </Text>
-          </Card>
+          <InfoCard style={styles.actionHint}>
+            <View style={styles.actionHintInner}>
+              <IconBadge name="bulb" size={18} />
+              <Text style={styles.actionHintText}>
+                Para registrar una toma, usa la vista "Hoy" en la pestaña de Medicamentos.
+              </Text>
+            </View>
+          </InfoCard>
         )}
 
         <View style={{ height: 80 }} />
@@ -182,21 +188,6 @@ export default function MedicationDetailScreen() {
     </ScreenWrapper>
   )
 }
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={ir.row}>
-      <Text style={ir.label}>{label}</Text>
-      <Text style={ir.value}>{value}</Text>
-    </View>
-  )
-}
-
-const ir = StyleSheet.create({
-  row:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, gap: 12 },
-  label: { fontSize: 14, color: Colors.light.textSecondary, flex: 1 },
-  value: { fontSize: 14, color: Colors.light.textPrimary, fontWeight: '500', flex: 2, textAlign: 'right' },
-})
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('es-MX', {
@@ -231,7 +222,6 @@ const styles = StyleSheet.create({
     alignItems:    'center',
     gap:           12,
   },
-  medEmoji: { fontSize: 36 },
   medInfo:  { flex: 1 },
   medName:  { fontSize: 18, fontWeight: '700', color: Colors.light.textPrimary },
   medDose:  { fontSize: 14, color: Colors.light.textSecondary, marginTop: 2 },
@@ -247,11 +237,15 @@ const styles = StyleSheet.create({
     gap:           10,
     paddingVertical: 6,
   },
-  scheduleIcon: { fontSize: 18 },
   scheduleTime: { fontSize: 15, fontWeight: '600', color: Colors.light.textPrimary, flex: 1 },
   scheduleDay:  { fontSize: 13, color: Colors.light.textSecondary },
   actionHint: {
-    backgroundColor: Colors.light.surface,
+    marginTop: 0,
+  },
+  actionHintInner: {
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    gap:           10,
   },
   actionHintText: {
     fontSize:   13,

@@ -14,7 +14,12 @@ import { router, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { ScreenWrapper }    from '@components/layout/ScreenWrapper'
 import { Skeleton }         from '@components/ui/Skeleton'
+import { Button }           from '@components/ui/Button'
+import { AppIcon }          from '@components/ui/AppIcon'
+import { IconBadge }        from '@components/ui/IconBadge'
+import { PointsCoin }       from '@components/ui/PointsCoin'
 import { Colors }           from '@constants/colors'
+import { DuoColors }        from '@constants/duoTheme'
 import { get }              from '@lib/api/client'
 import { EP }               from '@lib/api/endpoints'
 import {
@@ -22,20 +27,10 @@ import {
   VITAL_META, VITAL_TYPES_ORDERED,
   type VitalLatest, type VitalType,
 } from '@hooks/useVitals'
+import { getStatusBadge, getVitalStatus, getBmiStatus } from '@lib/vitals/statusColors'
 
 const { width } = Dimensions.get('window')
 const CARD_W    = (width - 48 - 10) / 2  // 2 columnas con padding + gap
-
-// ── Colores de estado ─────────────────────────────────────────────────────────
-function statusColor(type: VitalType, value: number): string {
-  const meta = VITAL_META[type]
-  if (!meta) return Colors.light.textMuted
-  if (value < meta.normal.min || value > meta.normal.max) return Colors.semantic.error
-  const span   = meta.normal.max - meta.normal.min
-  const margin = span * 0.1
-  if (value < meta.normal.min + margin || value > meta.normal.max - margin) return Colors.semantic.warning
-  return Colors.semantic.success
-}
 
 // ── Tarjeta de IMC calculado ──────────────────────────────────────────────────
 function BmiCard({ weight, height }: { weight?: number; height?: number }) {
@@ -43,19 +38,20 @@ function BmiCard({ weight, height }: { weight?: number; height?: number }) {
   const bmi     = hasBoth ? weight! / Math.pow(height! / 100, 2) : null
   const bmiStr  = bmi != null ? bmi.toFixed(1) : '—'
 
-  let color  = Colors.light.textMuted
+  let status = getBmiStatus(bmi)
   let label  = 'Sin datos'
   if (bmi != null) {
-    if      (bmi < 18.5) { color = Colors.semantic.warning; label = 'Bajo peso' }
-    else if (bmi < 25)   { color = Colors.semantic.success; label = 'Normal' }
-    else if (bmi < 30)   { color = Colors.semantic.warning; label = 'Sobrepeso' }
-    else                 { color = Colors.semantic.error;   label = 'Obesidad' }
+    if      (bmi < 18.5) label = 'Bajo peso'
+    else if (bmi < 25)   label = 'Normal'
+    else if (bmi < 30)   label = 'Sobrepeso'
+    else                 label = 'Obesidad'
   }
+  const badge = getStatusBadge(status)
 
   return (
-    <View style={[styles.vitalCard, bmi != null && { borderLeftColor: color, borderLeftWidth: 3 }]}>
-      <Text style={styles.vitalIcon}>📊</Text>
-      <Text style={[styles.vitalValue, { color: bmi != null ? color : Colors.light.textMuted }]}>
+    <View style={styles.vitalCard}>
+      <IconBadge name="chart" size={18} color={badge.color} bgColor={badge.bg} />
+      <Text style={[styles.vitalValue, { color: bmi != null ? badge.color : Colors.light.textMuted }]}>
         {bmiStr}
       </Text>
       <Text style={styles.vitalUnit}>kg/m²</Text>
@@ -72,7 +68,11 @@ function BmiCard({ weight, height }: { weight?: number; height?: number }) {
 function VitalSignCard({ type, latest }: { type: VitalType; latest?: VitalLatest }) {
   const meta      = VITAL_META[type]
   const hasValue  = !!latest
-  const color     = hasValue ? statusColor(type, latest!.value) : Colors.light.textMuted
+  const status    = hasValue
+    ? getVitalStatus(type, latest!.value, latest!.secondary_value)
+    : 'muted' as const
+  const badge     = getStatusBadge(status)
+  const color     = badge.color
   const valueStr  = hasValue
     ? type === 'BLOOD_PRESSURE' && latest!.secondary_value != null
       ? `${latest!.value}/${latest!.secondary_value}`
@@ -81,11 +81,11 @@ function VitalSignCard({ type, latest }: { type: VitalType; latest?: VitalLatest
 
   return (
     <TouchableOpacity
-      style={[styles.vitalCard, hasValue && { borderLeftColor: color, borderLeftWidth: 3 }]}
+      style={styles.vitalCard}
       onPress={() => router.push(`/(patient)/vitals/${type}` as any)}
       activeOpacity={0.75}
     >
-      <Text style={styles.vitalIcon}>{meta.icon}</Text>
+      <IconBadge name={meta.icon} size={18} color={badge.color} bgColor={badge.bg} />
       <Text style={[styles.vitalValue, { color: hasValue ? color : Colors.light.textMuted }]}>
         {valueStr}
       </Text>
@@ -153,13 +153,13 @@ export default function VitalsScreen() {
             </Text>
           )}
         </View>
-        <TouchableOpacity
-          style={styles.addBtn}
+        <Button
+          label="Registrar"
+          size="sm"
+          variant="primary"
+          leftIcon={<AppIcon name="plus" size={14} color={DuoColors.button.primaryText} />}
           onPress={() => router.push('/(patient)/vitals/add')}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.addBtnText}>+ Registrar</Text>
-        </TouchableOpacity>
+        />
       </View>
 
       <ScrollView
@@ -184,9 +184,12 @@ export default function VitalsScreen() {
               onPress={() => router.push('/(patient)/gamification' as any)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.statValue, { color: Colors.brand.primary }]}>
-                ⭐ {playerProfile.total_points}
-              </Text>
+              <View style={styles.pointsRow}>
+                <PointsCoin size={16} />
+                <Text style={[styles.statValue, { color: Colors.brand.primary }]}>
+                  {playerProfile.total_points}
+                </Text>
+              </View>
               <Text style={styles.statLabel}>pts · Nv.{playerProfile.level}</Text>
             </TouchableOpacity>
           )}
@@ -237,27 +240,25 @@ export default function VitalsScreen() {
         )}
 
         {/* Historial colapsable */}
-        <TouchableOpacity
-          style={styles.historyToggle}
+        <Button
+          label={showHistory ? 'Ocultar historial' : 'Ver historial de registros'}
+          variant={showHistory ? 'secondary' : 'primary'}
+          fullWidth
           onPress={() => setShowHistory(v => !v)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.historyToggleText}>
-            {showHistory ? '▲ Ocultar historial' : '▼ Ver historial de registros'}
-          </Text>
-        </TouchableOpacity>
+        />
 
         {showHistory && history && history.length > 0 && (
           <View style={styles.historyList}>
             {history.slice(0, 30).map(r => {
               const meta = VITAL_META[r.vital_type]
-              const color = statusColor(r.vital_type, r.value)
+              const status = getVitalStatus(r.vital_type, r.value, r.secondary_value)
+              const badge = getStatusBadge(status)
               const valStr = r.vital_type === 'BLOOD_PRESSURE' && r.secondary_value != null
                 ? `${r.value}/${r.secondary_value}`
                 : `${r.value}`
               return (
                 <View key={r.id} style={styles.historyRow}>
-                  <Text style={styles.historyIcon}>{meta?.icon ?? '📊'}</Text>
+                  <IconBadge name={meta?.icon ?? 'chart'} size={16} color={badge.color} bgColor={badge.bg} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.historyName}>{meta?.label ?? r.vital_type}</Text>
                     <Text style={styles.historyDate}>
@@ -268,11 +269,11 @@ export default function VitalsScreen() {
                       })}
                     </Text>
                     {r.notes && (
-                      <Text style={styles.historyNotes} numberOfLines={1}>📝 {r.notes}</Text>
+                      <Text style={styles.historyNotes} numberOfLines={1}>{r.notes}</Text>
                     )}
                   </View>
                   <View style={styles.historyValWrap}>
-                    <Text style={[styles.historyVal, { color }]}>{valStr}</Text>
+                    <Text style={[styles.historyVal, { color: badge.color }]}>{valStr}</Text>
                     <Text style={styles.historyUnit}>{r.unit}</Text>
                   </View>
                 </View>
@@ -313,6 +314,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', gap: 2,
   },
   statChipPoints:  { borderWidth: 1.5, borderColor: Colors.brand.primary + '40' },
+  pointsRow:       { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statValue:       { fontSize: 18, fontWeight: '800', color: Colors.light.textPrimary },
   statLabel:       { fontSize: 10, color: Colors.light.textMuted, textAlign: 'center' },
 
@@ -337,18 +339,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  vitalIcon:  { fontSize: 22 },
   vitalValue: { fontSize: 20, fontWeight: '800', marginTop: 2 },
   vitalUnit:  { fontSize: 10, color: Colors.light.textMuted },
   vitalName:  { fontSize: 11, fontWeight: '600', color: Colors.light.textSecondary, marginTop: 2 },
   vitalTime:    { fontSize: 10, color: Colors.light.textMuted },
   vitalChevron: { fontSize: 14, color: Colors.light.textMuted, alignSelf: 'flex-end', marginTop: 2 },
-
-  historyToggle: {
-    backgroundColor: Colors.light.surface, borderRadius: 12,
-    paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center',
-  },
-  historyToggleText: { fontSize: 13, fontWeight: '600', color: Colors.brand.primary },
 
   historyList:  { gap: 1, borderRadius: 14, overflow: 'hidden' },
   historyRow: {
@@ -356,7 +351,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: 14,
     borderBottomWidth: 1, borderBottomColor: Colors.light.border,
   },
-  historyIcon:    { fontSize: 20, marginTop: 1 },
   historyName:    { fontSize: 13, fontWeight: '600', color: Colors.light.textPrimary },
   historyDate:    { fontSize: 11, color: Colors.light.textMuted, marginTop: 1 },
   historyNotes:   { fontSize: 11, color: Colors.light.textSecondary, marginTop: 2, fontStyle: 'italic' },

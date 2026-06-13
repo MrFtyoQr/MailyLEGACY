@@ -20,6 +20,8 @@ import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Card }          from '@components/ui/Card'
 import { Badge }         from '@components/ui/Badge'
 import { Skeleton }      from '@components/ui/Skeleton'
+import { EmptyState }    from '@components/ui/EmptyState'
+import { IconBadge }     from '@components/ui/IconBadge'
 import { Colors }        from '@constants/colors'
 import { get, post }     from '@lib/api/client'
 import { EP }            from '@lib/api/endpoints'
@@ -49,19 +51,12 @@ interface MoodEntry {
   recorded_at: string
 }
 
-// ── Emojis de ánimo ───────────────────────────────────────────────────────────
-const MOOD_EMOJIS: Record<number, string> = {
-  1: '😞', 2: '😟', 3: '😕', 4: '🙁', 5: '😐',
-  6: '🙂', 7: '😊', 8: '😄', 9: '😁', 10: '🤩',
-}
-
+// ── Colores de ánimo ───────────────────────────────────────────────────────────
 const MOOD_COLOR = (score: number) => {
   if (score <= 3) return Colors.semantic.error
   if (score <= 6) return Colors.semantic.warning
   return Colors.semantic.success
 }
-
-const SLEEP_EMOJIS = ['😴', '💤', '🌙', '⭐', '🌟']
 
 /** Django devuelve microsegundos en el ISO string — iOS no los parsea.
  *  Acepta undefined/null y devuelve fecha inválida en lugar de crashear. */
@@ -176,11 +171,14 @@ export default function ActivitiesScreen() {
     <ScreenWrapper noPadding edges={['top', 'left', 'right']}>
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🏃 Actividades</Text>
+        <View style={styles.headerTitleRow}>
+          <IconBadge name="run" size={20} />
+          <Text style={styles.headerTitle}>Actividades</Text>
+        </View>
         {avgMood != null && (
           <View style={styles.moodBadge}>
-            <Text style={styles.moodBadgeText}>
-              {MOOD_EMOJIS[avgMood]} Ánimo promedio: {avgMood}/10
+            <Text style={[styles.moodBadgeText, { color: MOOD_COLOR(avgMood) }]}>
+              Ánimo promedio: {avgMood}/10
             </Text>
           </View>
         )}
@@ -198,18 +196,17 @@ export default function ActivitiesScreen() {
 
         {alreadyDone ? (
           <Card style={styles.doneCard}>
-            <Text style={styles.doneEmoji}>✅</Text>
+            <IconBadge name="check" size={24} />
             <View style={{ flex: 1 }}>
               <Text style={styles.doneTitle}>¡Check-in de ánimo completado!</Text>
               <Text style={styles.doneSub}>
-                Ánimo: {MOOD_EMOJIS[todayCheckin?.mood_score ?? moodScore]}{' '}
-                {todayCheckin?.mood_score ?? moodScore}/10
+                Ánimo: {todayCheckin?.mood_score ?? moodScore}/10
                 {'  ·  '}
                 Sueño: {todayCheckin?.sleep_hours ?? sleepHours}h
               </Text>
               {sleepDoneToday && (
                 <Text style={styles.sleepNote}>
-                  💤 Sueño de hoy registrado — próxima anotación: mañana a partir de las 00:00
+                  Sueño de hoy registrado — próxima anotación: mañana a partir de las 00:00
                 </Text>
               )}
             </View>
@@ -217,7 +214,9 @@ export default function ActivitiesScreen() {
         ) : (
           <Card style={styles.checkinCard}>
             {/* Ánimo */}
-            <Text style={styles.fieldLabel}>¿Cómo te sientes? {MOOD_EMOJIS[moodScore]}</Text>
+            <Text style={styles.fieldLabel}>
+              ¿Cómo te sientes? <Text style={{ color: MOOD_COLOR(moodScore), fontWeight: '700' }}>{moodScore}/10</Text>
+            </Text>
             <View style={styles.moodSlider}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                 <TouchableOpacity
@@ -241,7 +240,7 @@ export default function ActivitiesScreen() {
 
             {/* Horas de sueño */}
             <Text style={styles.fieldLabel}>
-              ¿Cuántas horas dormiste? {SLEEP_EMOJIS[Math.min(Math.floor(sleepHours / 2), 4)]} {sleepHours}h
+              ¿Cuántas horas dormiste? <Text style={{ fontWeight: '700' }}>{sleepHours}h</Text>
             </Text>
             <View style={styles.sleepSlider}>
               {[4, 5, 6, 7, 8, 9, 10].map((h) => (
@@ -300,7 +299,7 @@ export default function ActivitiesScreen() {
               <View style={styles.moodWeekRow}>
                 {moodEntries.slice(0, 7).reverse().map((entry) => (
                   <View key={entry.id} style={styles.moodDay}>
-                    <Text style={styles.moodDayEmoji}>{MOOD_EMOJIS[entry.score]}</Text>
+                    <View style={[styles.moodDayDot, { backgroundColor: MOOD_COLOR(entry.score) }]} />
                     <Text style={[styles.moodDayScore, { color: MOOD_COLOR(entry.score) }]}>
                       {entry.score}
                     </Text>
@@ -335,13 +334,11 @@ export default function ActivitiesScreen() {
             </Card>
           ))
         ) : (
-          <View style={styles.emptyPrograms}>
-            <Text style={styles.emptyProgramsEmoji}>🌱</Text>
-            <Text style={styles.emptyProgramsText}>Sin programas activos</Text>
-            <Text style={styles.emptyProgramsSub}>
-              Tu médico puede inscribirte en programas de bienestar personalizados.
-            </Text>
-          </View>
+          <EmptyState
+            icon="run"
+            title="Sin programas activos"
+            subtitle="Tu médico puede inscribirte en programas de bienestar personalizados."
+          />
         )}
 
         <View style={{ height: 120 }} />
@@ -356,7 +353,8 @@ const styles = StyleSheet.create({
     paddingTop:        16,
     paddingBottom:     12,
   },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.light.textPrimary, marginBottom: 4 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.light.textPrimary },
   moodBadge: {
     alignSelf:       'flex-start',
     backgroundColor: Colors.light.surface,
@@ -380,7 +378,6 @@ const styles = StyleSheet.create({
   },
 
   doneCard:  { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  doneEmoji: { fontSize: 32 },
   doneTitle: { fontSize: 16, fontWeight: '700', color: Colors.light.textPrimary },
   doneSub:   { fontSize: 13, color: Colors.light.textSecondary, marginTop: 2 },
   sleepNote: { fontSize: 12, color: Colors.light.textMuted, marginTop: 6, lineHeight: 17 },
@@ -438,7 +435,7 @@ const styles = StyleSheet.create({
   moodWeekCard: {},
   moodWeekRow: { flexDirection: 'row', justifyContent: 'space-around' },
   moodDay:    { alignItems: 'center', gap: 4 },
-  moodDayEmoji: { fontSize: 20 },
+  moodDayDot: { width: 10, height: 10, borderRadius: 5 },
   moodDayScore: { fontSize: 13, fontWeight: '700' },
   moodDayDate:  { fontSize: 10, color: Colors.light.textMuted, textTransform: 'capitalize' },
 
@@ -459,9 +456,4 @@ const styles = StyleSheet.create({
   },
   progressLabel: { fontSize: 12, color: Colors.light.textMuted },
   programDate:   { fontSize: 12, color: Colors.light.textMuted },
-
-  emptyPrograms:    { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  emptyProgramsEmoji: { fontSize: 40 },
-  emptyProgramsText:  { fontSize: 16, fontWeight: '700', color: Colors.light.textPrimary },
-  emptyProgramsSub:   { fontSize: 13, color: Colors.light.textMuted, textAlign: 'center', lineHeight: 20 },
 })

@@ -17,6 +17,8 @@ import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Card } from '@components/ui/Card'
 import { Avatar } from '@components/ui/Avatar'
 import { Skeleton } from '@components/ui/Skeleton'
+import { IconBadge } from '@components/ui/IconBadge'
+import type { AppIconName } from '@components/ui/AppIcon'
 import { AppointmentCard } from '@components/appointments/AppointmentCard'
 import { Colors } from '@constants/colors'
 import { useAuthStore } from '@store/auth.store'
@@ -46,7 +48,7 @@ export default function DoctorHome() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hola, Dr. {lastName || firstName} 👋</Text>
+          <Text style={styles.greeting}>Hola, Dr. {lastName || firstName}</Text>
           <Text style={styles.subGreeting}>Panel médico</Text>
         </View>
         <Avatar
@@ -65,14 +67,14 @@ export default function DoctorHome() {
         {/* Stats rápidas */}
         <View style={styles.statsRow}>
           <StatCard
-            icon="👥"
+            icon="users"
             value={patients?.length ?? '—'}
             label="Pacientes"
             color={Colors.role.doctor}
             isLoading={loadingPatients}
           />
           <StatCard
-            icon="📅"
+            icon="calendar"
             value={upcomingAppts?.length ?? '—'}
             label="Citas hoy"
             color={Colors.brand.primary}
@@ -175,10 +177,10 @@ const sh = StyleSheet.create({
 
 function StatCard({
   icon, value, label, color, isLoading,
-}: { icon: string; value: number | string; label: string; color: string; isLoading: boolean }) {
+}: { icon: AppIconName; value: number | string; label: string; color: string; isLoading: boolean }) {
   return (
     <Card style={[sc.card, { borderTopColor: color }]}>
-      <Text style={sc.icon}>{icon}</Text>
+      <IconBadge name={icon} size={20} accent={color} />
       {isLoading ? (
         <ActivityIndicator size="small" color={color} />
       ) : (
@@ -197,7 +199,6 @@ const sc = StyleSheet.create({
     borderTopWidth: 3,
     paddingVertical: 14,
   },
-  icon:  { fontSize: 24 },
   value: { fontSize: 26, fontWeight: '700' },
   label: { fontSize: 12, color: Colors.light.textMuted, fontWeight: '500' },
 })

@@ -15,6 +15,9 @@ import * as Location     from 'expo-location'
 import * as ImagePicker  from 'expo-image-picker'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Card }          from '@components/ui/Card'
+import { IconBadge }     from '@components/ui/IconBadge'
+import { MenuRow }       from '@components/ui/MenuRow'
+import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors }        from '@constants/colors'
 
 type PermStatus = 'granted' | 'denied' | 'undetermined' | 'loading'
@@ -104,7 +107,7 @@ export default function SettingsScreen() {
         <Text style={styles.sectionLabel}>Permisos del dispositivo</Text>
         <Card style={styles.card}>
           <PermRow
-            icon="🔔"
+            icon="bell"
             label="Notificaciones"
             desc="Recibe recordatorios de medicamentos y alertas de salud"
             status={notifStatus}
@@ -112,7 +115,7 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <PermRow
-            icon="📍"
+            icon="location"
             label="Ubicación"
             desc="Encuentra clínicas y médicos cercanos a ti"
             status={locStatus}
@@ -120,7 +123,7 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <PermRow
-            icon="🖼️"
+            icon="image"
             label="Fotos y archivos"
             desc="Sube documentos médicos e imágenes de evidencia"
             status={photoStatus}
@@ -132,13 +135,13 @@ export default function SettingsScreen() {
         <Text style={styles.sectionLabel}>Soporte</Text>
         <Card style={styles.card}>
           <MenuRow
-            icon="💬"
+            icon="chat"
             label="Contactar soporte"
             onPress={() => Linking.openURL('mailto:soporte@mailytcuida.com')}
           />
           <View style={styles.divider} />
           <MenuRow
-            icon="🐛"
+            icon="bug"
             label="Reportar un problema"
             onPress={() => Linking.openURL('mailto:soporte@mailytcuida.com?subject=Reporte%20de%20problema')}
           />
@@ -148,13 +151,13 @@ export default function SettingsScreen() {
         <Text style={styles.sectionLabel}>Legal</Text>
         <Card style={styles.card}>
           <MenuRow
-            icon="🔒"
+            icon="lock-closed"
             label="Política de Privacidad"
             onPress={() => Linking.openURL('https://mailytcuida.com/privacidad')}
           />
           <View style={styles.divider} />
           <MenuRow
-            icon="📄"
+            icon="document"
             label="Términos y Condiciones"
             onPress={() => Linking.openURL('https://mailytcuida.com/terminos')}
           />
@@ -185,12 +188,12 @@ export default function SettingsScreen() {
 function PermRow({
   icon, label, desc, status, onToggle,
 }: {
-  icon: string; label: string; desc: string
+  icon: AppIconName; label: string; desc: string
   status: PermStatus; onToggle: () => void
 }) {
   return (
     <View style={styles.permRow}>
-      <Text style={styles.permIcon}>{icon}</Text>
+      <IconBadge name={icon} size={18} />
       <View style={styles.permInfo}>
         <Text style={styles.permLabel}>{label}</Text>
         <Text style={styles.permDesc}>{desc}</Text>
@@ -206,16 +209,6 @@ function PermRow({
         disabled={status === 'loading'}
       />
     </View>
-  )
-}
-
-function MenuRow({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={styles.menuRow} onPress={onPress} activeOpacity={0.7}>
-      <Text style={styles.menuIcon}>{icon}</Text>
-      <Text style={styles.menuLabel}>{label}</Text>
-      <Text style={styles.menuChevron}>›</Text>
-    </TouchableOpacity>
   )
 }
 
@@ -239,16 +232,10 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: Colors.light.border },
 
   permRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  permIcon:  { fontSize: 22, width: 28 },
   permInfo:  { flex: 1, gap: 2 },
   permLabel: { fontSize: 14, fontWeight: '600', color: Colors.light.textPrimary },
   permDesc:  { fontSize: 12, color: Colors.light.textSecondary, lineHeight: 17 },
   permStatus:{ fontSize: 11, fontWeight: '500', marginTop: 2 },
-
-  menuRow:     { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  menuIcon:    { fontSize: 18, width: 28 },
-  menuLabel:   { flex: 1, fontSize: 14, color: Colors.light.textPrimary },
-  menuChevron: { fontSize: 20, color: Colors.light.textMuted },
 
   aboutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14 },
   aboutLabel:  { fontSize: 14, color: Colors.light.textSecondary },

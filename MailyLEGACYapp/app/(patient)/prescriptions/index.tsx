@@ -20,6 +20,9 @@ import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Card }          from '@components/ui/Card'
 import { Badge }         from '@components/ui/Badge'
 import { Skeleton }      from '@components/ui/Skeleton'
+import { EmptyState }    from '@components/ui/EmptyState'
+import { IconBadge }     from '@components/ui/IconBadge'
+import { AppIcon }       from '@components/ui/AppIcon'
 import { Colors }        from '@constants/colors'
 import { get, post }     from '@lib/api/client'
 import { EP }            from '@lib/api/endpoints'
@@ -69,8 +72,8 @@ const STATUS_VARIANT: Record<PrescriptionStatus, 'success' | 'error' | 'neutral'
 }
 
 const SOURCE_LABEL: Record<PrescriptionSource, string> = {
-  MANUAL:    '✏️ Manual',
-  MAILYSOFT: '⚡ MailySoft',
+  MANUAL:    'Manual',
+  MAILYSOFT: 'MailySoft',
 }
 
 export default function PrescriptionsScreen() {
@@ -97,7 +100,10 @@ export default function PrescriptionsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>📋 Recetas médicas</Text>
+        <View style={styles.headerTitleRow}>
+          <IconBadge name="clipboard" size={20} />
+          <Text style={styles.headerTitle}>Recetas médicas</Text>
+        </View>
         {active.length > 0 && (
           <View style={styles.activeBadge}>
             <Text style={styles.activeBadgeText}>{active.length} activa{active.length > 1 ? 's' : ''}</Text>
@@ -119,13 +125,11 @@ export default function PrescriptionsScreen() {
         )}
 
         {!isLoading && prescriptions.length === 0 && (
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyEmoji}>📋</Text>
-            <Text style={styles.emptyTitle}>Sin recetas registradas</Text>
-            <Text style={styles.emptySubtitle}>
-              Tus recetas médicas aparecerán aquí cuando tu médico las registre o las recibas vía MailySoft.
-            </Text>
-          </View>
+          <EmptyState
+            icon="clipboard"
+            title="Sin recetas registradas"
+            subtitle="Tus recetas médicas aparecerán aquí cuando tu médico las registre o las recibas vía MailySoft."
+          />
         )}
 
         {/* Activas primero */}
@@ -186,8 +190,11 @@ function RxAIModal({ visible, onClose, rxId, rxTitle }: {
       <View style={aiS.sheet}>
         <View style={aiS.handle} />
         <View style={aiS.header}>
-          <Text style={aiS.title} numberOfLines={1}>🤖 IA — {rxTitle || 'Receta'}</Text>
-          <TouchableOpacity onPress={onClose}><Text style={aiS.close}>✕</Text></TouchableOpacity>
+          <View style={aiS.titleRow}>
+            <IconBadge name="robot" size={16} />
+            <Text style={aiS.title} numberOfLines={1}>IA — {rxTitle || 'Receta'}</Text>
+          </View>
+          <TouchableOpacity onPress={onClose}><Text style={aiS.close}>Cerrar</Text></TouchableOpacity>
         </View>
         <ScrollView style={aiS.body} showsVerticalScrollIndicator={false}>
           {loading && (
@@ -250,7 +257,10 @@ function PrescriptionCard({ prescription: p }: { prescription: Prescription }) {
 
         {/* Doctor y diagnóstico */}
         {p.doctor_name && (
-          <Text style={styles.doctorName}>👨‍⚕️ {p.doctor_name}</Text>
+          <View style={styles.doctorRow}>
+            <IconBadge name="doctor" size={16} />
+            <Text style={styles.doctorName}>{p.doctor_name}</Text>
+          </View>
         )}
         {p.diagnosis && (
           <Text style={styles.diagnosis} numberOfLines={expanded ? undefined : 1}>
@@ -298,7 +308,10 @@ function PrescriptionCard({ prescription: p }: { prescription: Prescription }) {
             onPress={(e) => { e.stopPropagation(); setAiOpen(true) }}
             activeOpacity={0.8}
           >
-            <Text style={styles.aiBtnText}>🤖 Analizar con IA</Text>
+            <View style={styles.aiBtnInner}>
+              <AppIcon name="robot" size={14} color={Colors.brand.primary} />
+              <Text style={styles.aiBtnText}>Analizar con IA</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </Card>
@@ -316,6 +329,7 @@ const styles = StyleSheet.create({
     paddingTop:        16,
     paddingBottom:     12,
   },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.light.textPrimary },
   activeBadge: {
     backgroundColor: Colors.semantic.successBg,
@@ -349,6 +363,7 @@ const styles = StyleSheet.create({
   sourceLabel:    { fontSize: 12, fontWeight: '600', color: Colors.brand.primary },
   issuedDate:     { fontSize: 12, color: Colors.light.textMuted },
 
+  doctorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   doctorName: { fontSize: 14, fontWeight: '700', color: Colors.light.textPrimary },
   diagnosis:  { fontSize: 13, color: Colors.light.textSecondary, lineHeight: 18 },
 
@@ -369,12 +384,8 @@ const styles = StyleSheet.create({
     borderRadius:    12, paddingHorizontal: 10, paddingVertical: 5,
     borderWidth: 1, borderColor: Colors.brand.primary + '40',
   },
+  aiBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   aiBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brand.primary },
-
-  emptyWrap:     { alignItems: 'center', marginTop: 80, gap: 12, paddingHorizontal: 20 },
-  emptyEmoji:    { fontSize: 52 },
-  emptyTitle:    { fontSize: 18, fontWeight: '700', color: Colors.light.textPrimary },
-  emptySubtitle: { fontSize: 14, color: Colors.light.textMuted, textAlign: 'center', lineHeight: 21 },
 })
 
 const aiS = StyleSheet.create({
@@ -393,6 +404,7 @@ const aiS = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: Colors.light.border,
   },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   title:       { fontSize: 15, fontWeight: '700', color: Colors.light.textPrimary, flex: 1 },
   close:       { fontSize: 20, color: Colors.light.textMuted, paddingLeft: 12 },
   body:        { paddingHorizontal: 20, paddingTop: 16 },

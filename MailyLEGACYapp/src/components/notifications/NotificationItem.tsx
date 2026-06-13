@@ -1,11 +1,13 @@
 /**
  * NotificationItem.tsx
- * Fila de notificación con indicador de no leída y timestamp.
+ * Fila de notificación con cápsula 3D e iconos vectoriales.
  */
 
 import React from 'react'
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { Colors } from '@constants/colors'
+import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
+import { Capsule3D } from '@components/ui/Capsule3D'
 import type { Notification } from '@hooks/useNotifications'
 
 interface NotificationItemProps {
@@ -13,14 +15,14 @@ interface NotificationItemProps {
   onPress?:     () => void
 }
 
-const TYPE_ICON: Record<string, string> = {
-  medication:  '💊',
-  appointment: '📅',
-  vital:       '❤️',
-  lab:         '🧪',
-  referral:    '📋',
-  payment:     '💳',
-  system:      '🔔',
+const TYPE_ICON: Record<string, AppIconName> = {
+  medication:  'pill',
+  appointment: 'calendar',
+  vital:       'heart',
+  lab:         'lab',
+  referral:    'clipboard',
+  payment:     'card',
+  system:      'bell',
 }
 
 function timeAgo(dateStr: string): string {
@@ -35,18 +37,24 @@ function timeAgo(dateStr: string): string {
 }
 
 export function NotificationItem({ notification, onPress }: NotificationItemProps) {
-  const icon = TYPE_ICON[notification.type] ?? '🔔'
+  const iconName = TYPE_ICON[notification.type] ?? 'bell'
+  const faceColor = notification.is_read ? '#FFFFFF' : '#F0FFFE'
 
   return (
-    <TouchableOpacity
+    <Capsule3D
+      pressable={!!onPress}
       onPress={onPress}
-      activeOpacity={0.7}
-      style={[styles.container, !notification.is_read && styles.unread]}
+      faceColor={faceColor}
+      shadowColor="#E2E8F0"
+      depth="sm"
+      borderRadius={14}
+      style={styles.wrap}
+      faceStyle={styles.container}
     >
       {!notification.is_read && <View style={styles.dot} />}
 
       <View style={styles.iconBox}>
-        <Text style={styles.icon}>{icon}</Text>
+        <AppIcon name={iconName} size={20} color={Colors.brand.primary} />
       </View>
 
       <View style={styles.content}>
@@ -58,61 +66,44 @@ export function NotificationItem({ notification, onPress }: NotificationItemProp
         </Text>
         <Text style={styles.time}>{timeAgo(notification.created_at)}</Text>
       </View>
-    </TouchableOpacity>
+    </Capsule3D>
   )
 }
 
 const styles = StyleSheet.create({
+  wrap:      { marginBottom: 10 },
   container: {
     flexDirection:     'row',
     alignItems:        'flex-start',
     paddingVertical:   14,
     paddingHorizontal: 16,
-    backgroundColor:   Colors.light.card,
-    borderRadius:      12,
-    marginBottom:      8,
-    shadowColor:       '#000',
-    shadowOffset:      { width: 0, height: 1 },
-    shadowOpacity:     0.04,
-    shadowRadius:      4,
-    elevation:         2,
-  },
-  unread: {
-    backgroundColor: '#F0FFFE',
   },
   dot: {
-    position:     'absolute',
-    top:          16,
-    left:         6,
-    width:        8,
-    height:       8,
-    borderRadius: 4,
+    position:        'absolute',
+    top:             16,
+    left:            8,
+    width:           8,
+    height:          8,
+    borderRadius:    4,
     backgroundColor: Colors.brand.primary,
+    zIndex:          1,
   },
   iconBox: {
     width:           40,
     height:          40,
-    borderRadius:    20,
-    backgroundColor: Colors.light.surface,
+    borderRadius:    12,
+    backgroundColor: Colors.brand.primary + '15',
     alignItems:      'center',
     justifyContent:  'center',
     marginRight:     12,
   },
-  icon: {
-    fontSize: 20,
-  },
-  content: {
-    flex: 1,
-    gap:  3,
-  },
+  content: { flex: 1, gap: 3 },
   title: {
     fontSize:   14,
     color:      Colors.light.textPrimary,
     fontWeight: '500',
   },
-  titleBold: {
-    fontWeight: '700',
-  },
+  titleBold: { fontWeight: '700' },
   body: {
     fontSize:   13,
     color:      Colors.light.textSecondary,

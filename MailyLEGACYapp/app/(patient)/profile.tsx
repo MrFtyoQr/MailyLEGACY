@@ -20,6 +20,12 @@ import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Avatar } from '@components/ui/Avatar'
 import { Card } from '@components/ui/Card'
 import { Badge } from '@components/ui/Badge'
+import { InfoCard } from '@components/ui/InfoCard'
+import { InfoRow } from '@components/ui/InfoRow'
+import { MenuRow } from '@components/ui/MenuRow'
+import { IconBadge } from '@components/ui/IconBadge'
+import { PointsCoin } from '@components/ui/PointsCoin'
+import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
 import { useAuthStore } from '@store/auth.store'
 import { get } from '@lib/api/client'
@@ -39,8 +45,8 @@ const PLAN_COLORS: Record<string, string> = {
   PLATINUM: '#9B59B6',
 }
 
-const PLAN_ICONS: Record<string, string> = {
-  FREE: '🆓', SILVER: '🥈', GOLD: '🥇', PLATINUM: '💎',
+const PLAN_ICONS: Record<string, AppIconName> = {
+  FREE: 'card', SILVER: 'medal', GOLD: 'trophy', PLATINUM: 'star',
 }
 
 export default function PatientProfileScreen() {
@@ -99,7 +105,7 @@ export default function PatientProfileScreen() {
   const tier      = subscription?.plan?.tier ?? 'FREE'
   const planName  = subscription?.plan?.name ?? 'Plan Gratuito'
   const planColor = PLAN_COLORS[tier] ?? PLAN_COLORS.FREE
-  const planIcon  = PLAN_ICONS[tier]  ?? '🆓'
+  const planIcon  = PLAN_ICONS[tier]  ?? PLAN_ICONS.FREE
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Mi Perfil'
 
@@ -133,7 +139,7 @@ export default function PatientProfileScreen() {
             <Avatar uri={user?.photoUrl} name={fullName} size={88} bgColor={Colors.role.patient} />
             {photoLoading
               ? <View style={styles.avatarOverlay}><ActivityIndicator color="#fff" /></View>
-              : <View style={styles.avatarEditBadge}><Text style={styles.avatarEditIcon}>📷</Text></View>
+              : <View style={styles.avatarEditBadge}><AppIcon name="camera" size={11} color="#fff" /></View>
             }
           </View>
         </TouchableOpacity>
@@ -149,27 +155,29 @@ export default function PatientProfileScreen() {
         contentContainerStyle={styles.content}
       >
         {/* Plan de suscripción */}
-        <View style={[styles.planCard, { borderLeftColor: planColor }]}>
-          <Text style={styles.planIcon}>{planIcon}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.planLabel}>Plan activo</Text>
-            <Text style={[styles.planName, { color: planColor }]}>{planName}</Text>
+        <InfoCard style={styles.planCard}>
+          <View style={styles.planCardInner}>
+            <IconBadge name={planIcon} size={20} accent={planColor} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.planLabel}>Plan activo</Text>
+              <Text style={[styles.planName, { color: planColor }]}>{planName}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.upgradeBtn, { backgroundColor: tier === 'FREE' ? PLAN_COLORS.GOLD : PLAN_COLORS[tier] }]}
+              activeOpacity={0.8}
+              onPress={() => router.push('/(patient)/plans')}
+            >
+              <Text style={styles.upgradeBtnText}>{tier === 'FREE' ? 'Mejorar' : 'Ver plan'}</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.upgradeBtn, { backgroundColor: tier === 'FREE' ? PLAN_COLORS.GOLD : PLAN_COLORS[tier] }]}
-            activeOpacity={0.8}
-            onPress={() => router.push('/(patient)/plans')}
-          >
-            <Text style={styles.upgradeBtnText}>{tier === 'FREE' ? 'Mejorar' : 'Ver plan'}</Text>
-          </TouchableOpacity>
-        </View>
+        </InfoCard>
 
         {/* Info personal */}
         <Text style={styles.sectionTitle}>Información</Text>
         <Card>
-          <InfoRow icon="👤" label="Nombre" value={fullName} />
-          {user?.email && <InfoRow icon="✉️" label="Email" value={user.email} divider />}
-          <InfoRow icon="🏷️" label="Rol" value="Paciente" divider />
+          <InfoRow icon="user" label="Nombre" value={fullName} />
+          {user?.email && <InfoRow icon="mail" label="Email" value={user.email} divider />}
+          <InfoRow icon="tag" label="Rol" value="Paciente" divider />
           <InfoRow icon={planIcon} label="Plan" value={planName} divider />
         </Card>
 
@@ -177,27 +185,27 @@ export default function PatientProfileScreen() {
         <Text style={styles.sectionTitle}>Configuración</Text>
         <Card style={{ padding: 0 }}>
           <MenuRow
-            icon="💳"
+            icon="card"
             label="Planes y suscripción"
             onPress={() => router.push('/(patient)/plans')}
           />
+          <View style={styles.menuDivider} />
           <MenuRow
-            icon="🔔"
+            icon="bell"
             label="Notificaciones"
             onPress={() => router.push('/(patient)/notifications')}
-            divider
           />
+          <View style={styles.menuDivider} />
           <MenuRow
-            icon="⭐"
+            leftIcon={<PointsCoin size={22} />}
             label="Mis puntos y logros"
             onPress={() => router.push('/(patient)/gamification')}
-            divider
           />
+          <View style={styles.menuDivider} />
           <MenuRow
-            icon="🗂️"
+            icon="folder"
             label="Mis documentos"
             onPress={() => router.push('/(patient)/documents')}
-            divider
           />
         </Card>
 
@@ -207,7 +215,7 @@ export default function PatientProfileScreen() {
           onPress={handleSignOut}
           activeOpacity={0.75}
         >
-          <Text style={styles.signOutText}>🚪 Cerrar sesión</Text>
+          <Text style={styles.signOutText}>Cerrar sesión</Text>
         </TouchableOpacity>
 
         <Text style={styles.version}>MailyT-Cuida v1.0</Text>
@@ -217,51 +225,6 @@ export default function PatientProfileScreen() {
     </ScreenWrapper>
   )
 }
-
-function InfoRow({
-  icon, label, value, divider,
-}: { icon: string; label: string; value: string; divider?: boolean }) {
-  return (
-    <View>
-      {divider && <View style={ir.divider} />}
-      <View style={ir.row}>
-        <Text style={ir.icon}>{icon}</Text>
-        <Text style={ir.label}>{label}</Text>
-        <Text style={ir.value} numberOfLines={1}>{value}</Text>
-      </View>
-    </View>
-  )
-}
-
-const ir = StyleSheet.create({
-  row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
-  divider: { height: 1, backgroundColor: Colors.light.border },
-  icon:    { fontSize: 18, width: 26 },
-  label:   { fontSize: 14, color: Colors.light.textSecondary, flex: 1 },
-  value:   { fontSize: 14, color: Colors.light.textPrimary, fontWeight: '500', flex: 2, textAlign: 'right' },
-})
-
-function MenuRow({
-  icon, label, onPress, divider,
-}: { icon: string; label: string; onPress: () => void; divider?: boolean }) {
-  return (
-    <View>
-      {divider && <View style={{ height: 1, backgroundColor: Colors.light.border, marginLeft: 52 }} />}
-      <TouchableOpacity style={mr.row} onPress={onPress} activeOpacity={0.7}>
-        <Text style={mr.icon}>{icon}</Text>
-        <Text style={mr.label}>{label}</Text>
-        <Text style={mr.chevron}>›</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
-
-const mr = StyleSheet.create({
-  row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 10 },
-  icon:    { fontSize: 18, width: 26 },
-  label:   { fontSize: 15, color: Colors.light.textPrimary, flex: 1 },
-  chevron: { fontSize: 20, color: Colors.light.textMuted },
-})
 
 const styles = StyleSheet.create({
   avatarWrap: { position: 'relative' },
@@ -276,7 +239,6 @@ const styles = StyleSheet.create({
     width: 24, height: 24, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: '#fff',
   },
-  avatarEditIcon: { fontSize: 11 },
   profileHeader: {
     alignItems:        'center',
     paddingTop:        24,
@@ -325,19 +287,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  menuDivider: {
+    height: 1,
+    backgroundColor: Colors.light.border,
+    marginLeft: 52,
+  },
+
   // Plan card
   planCard: {
+    marginBottom: 0,
+  },
+  planCardInner: {
     flexDirection:  'row',
     alignItems:     'center',
     gap:            12,
-    backgroundColor: '#fff',
-    borderRadius:   14,
-    padding:        16,
-    borderWidth:    1,
-    borderColor:    Colors.light.border,
-    borderLeftWidth: 4,
   },
-  planIcon:  { fontSize: 26 },
   planLabel: { fontSize: 12, color: Colors.light.textMuted, marginBottom: 2 },
   planName:  { fontSize: 16, fontWeight: '700' },
   upgradeBtn: {

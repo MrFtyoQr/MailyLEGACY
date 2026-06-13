@@ -20,6 +20,9 @@ import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Card }          from '@components/ui/Card'
 import { Badge }         from '@components/ui/Badge'
 import { Skeleton }      from '@components/ui/Skeleton'
+import { EmptyState }    from '@components/ui/EmptyState'
+import { IconBadge }     from '@components/ui/IconBadge'
+import { AppIcon }       from '@components/ui/AppIcon'
 import { Colors }        from '@constants/colors'
 import { get, post }     from '@lib/api/client'
 import { EP }            from '@lib/api/endpoints'
@@ -103,8 +106,11 @@ function AIModal({
       <View style={aiStyles.sheet}>
         <View style={aiStyles.handle} />
         <View style={aiStyles.header}>
-          <Text style={aiStyles.title}>🤖 Análisis IA — {panelName || 'Laboratorio'}</Text>
-          <TouchableOpacity onPress={onClose}><Text style={aiStyles.close}>✕</Text></TouchableOpacity>
+          <View style={aiStyles.titleRow}>
+            <IconBadge name="robot" size={16} />
+            <Text style={aiStyles.title}>Análisis IA — {panelName || 'Laboratorio'}</Text>
+          </View>
+          <TouchableOpacity onPress={onClose}><Text style={aiStyles.close}>Cerrar</Text></TouchableOpacity>
         </View>
         <ScrollView style={aiStyles.body} showsVerticalScrollIndicator={false}>
           {loading && (
@@ -183,7 +189,10 @@ export default function LabsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🔬 Laboratorio</Text>
+        <View style={styles.headerTitleRow}>
+          <IconBadge name="lab" size={20} />
+          <Text style={styles.headerTitle}>Laboratorio</Text>
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {(abnormalQ.data?.length ?? 0) > 0 && (
             <View style={styles.alertBadge}>
@@ -199,7 +208,10 @@ export default function LabsScreen() {
               })}
               activeOpacity={0.8}
             >
-              <Text style={styles.aiBtnText}>🤖 IA</Text>
+              <View style={styles.aiBtnInner}>
+                <AppIcon name="robot" size={14} color="#fff" />
+                <Text style={styles.aiBtnText}>IA</Text>
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -265,7 +277,7 @@ export default function LabsScreen() {
             ))
           ) : (
             <EmptyState
-              emoji="🔬"
+              icon="lab"
               title="Sin resultados disponibles"
               subtitle="Tus resultados de laboratorio aparecerán aquí"
             />
@@ -278,7 +290,7 @@ export default function LabsScreen() {
             <>
               <View style={styles.alertBanner}>
                 <Text style={styles.alertBannerText}>
-                  ⚠️  {abnormalQ.data.length} resultado{abnormalQ.data.length > 1 ? 's' : ''} fuera del rango normal. Consulta con tu médico.
+                  {abnormalQ.data.length} resultado{abnormalQ.data.length > 1 ? 's' : ''} fuera del rango normal. Consulta con tu médico.
                 </Text>
               </View>
               {abnormalQ.data.map((item) => (
@@ -301,7 +313,7 @@ export default function LabsScreen() {
             </>
           ) : (
             <EmptyState
-              emoji="✅"
+              icon="check"
               title="Todo en orden"
               subtitle="No tienes resultados fuera de rango"
             />
@@ -344,7 +356,7 @@ export default function LabsScreen() {
             ))
           ) : (
             <EmptyState
-              emoji="🔬"
+              icon="lab"
               title="Sin resultados disponibles"
               subtitle="Tus resultados de laboratorio aparecerán aquí"
             />
@@ -357,23 +369,6 @@ export default function LabsScreen() {
   )
 }
 
-function EmptyState({ emoji, title, subtitle }: { emoji: string; title: string; subtitle: string }) {
-  return (
-    <View style={es.wrap}>
-      <Text style={es.emoji}>{emoji}</Text>
-      <Text style={es.title}>{title}</Text>
-      <Text style={es.subtitle}>{subtitle}</Text>
-    </View>
-  )
-}
-
-const es = StyleSheet.create({
-  wrap:     { alignItems: 'center', marginTop: 60, gap: 10 },
-  emoji:    { fontSize: 48 },
-  title:    { fontSize: 17, fontWeight: '700', color: Colors.light.textPrimary },
-  subtitle: { fontSize: 14, color: Colors.light.textMuted, textAlign: 'center', lineHeight: 20 },
-})
-
 const styles = StyleSheet.create({
   header: {
     flexDirection:     'row',
@@ -383,6 +378,7 @@ const styles = StyleSheet.create({
     paddingTop:        16,
     paddingBottom:     8,
   },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.light.textPrimary },
   alertBadge: {
     backgroundColor: Colors.semantic.errorBg,
@@ -454,6 +450,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical:   5,
   },
+  aiBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   aiBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 })
 
@@ -473,6 +470,7 @@ const aiStyles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: Colors.light.border,
   },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   title:    { fontSize: 15, fontWeight: '700', color: Colors.light.textPrimary, flex: 1 },
   close:    { fontSize: 20, color: Colors.light.textMuted, paddingLeft: 12 },
   body:     { paddingHorizontal: 20, paddingTop: 16 },

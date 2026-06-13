@@ -25,15 +25,18 @@ import { ScreenWrapper }  from '@components/layout/ScreenWrapper'
 import { FormField }      from '@components/forms/FormField'
 import { ProtectedForm }  from '@components/forms/ProtectedForm'
 import { Button }         from '@components/ui/Button'
+import { IconBadge }      from '@components/ui/IconBadge'
+import { InfoCard }       from '@components/ui/InfoCard'
+import type { AppIconName } from '@components/ui/AppIcon'
 import { Colors }         from '@constants/colors'
 import { post }           from '@lib/api/client'
 import { EP }             from '@lib/api/endpoints'
 
 type RoleParam = 'DOCTOR' | 'SPECIALIST'
 
-const ROLE_LABELS: Record<RoleParam, { label: string; emoji: string; color: string }> = {
-  DOCTOR:     { label: 'Médico',       emoji: '👨‍⚕️', color: Colors.role.doctor     },
-  SPECIALIST: { label: 'Especialista', emoji: '🔬', color: Colors.role.specialist },
+const ROLE_LABELS: Record<RoleParam, { label: string; icon: AppIconName; color: string }> = {
+  DOCTOR:     { label: 'Médico',       icon: 'doctor',     color: Colors.role.doctor     },
+  SPECIALIST: { label: 'Especialista', icon: 'lab',        color: Colors.role.specialist },
 }
 
 export default function ContactRequestScreen() {
@@ -95,7 +98,7 @@ export default function ContactRequestScreen() {
     return (
       <ScreenWrapper>
         <View style={styles.successContainer}>
-          <Text style={styles.successEmoji}>✅</Text>
+          <IconBadge name="check" size={36} shape="circle" style={{ marginBottom: 8 }} />
           <Text style={styles.successTitle}>¡Solicitud enviada!</Text>
           <Text style={styles.successBody}>
             El equipo de MailyT-Cuida revisará tu solicitud como{' '}
@@ -105,11 +108,11 @@ export default function ContactRequestScreen() {
             y se pondrá en contacto contigo en los próximos días hábiles al email{' '}
             <Text style={{ fontWeight: '600' }}>{email}</Text>.
           </Text>
-          <View style={styles.successHint}>
+          <InfoCard style={styles.successHint}>
             <Text style={styles.successHintText}>
-              💡 Si eres paciente, puedes registrarte ahora mismo.
+              Si eres paciente, puedes registrarte ahora mismo.
             </Text>
-          </View>
+          </InfoCard>
           <Button
             label="Regresar al inicio"
             onPress={() => router.replace('/(auth)/sign-in')}
@@ -140,7 +143,7 @@ export default function ContactRequestScreen() {
 
           {/* Header */}
           <View style={[styles.rolePill, { backgroundColor: roleInfo.color + '18' }]}>
-            <Text style={styles.rolePillEmoji}>{roleInfo.emoji}</Text>
+            <IconBadge name={roleInfo.icon} size={16} accent={roleInfo.color} />
             <Text style={[styles.rolePillLabel, { color: roleInfo.color }]}>
               {roleInfo.label}
             </Text>
@@ -269,7 +272,6 @@ const styles = StyleSheet.create({
     gap:               6,
     marginBottom:      16,
   },
-  rolePillEmoji: { fontSize: 18 },
   rolePillLabel: {
     fontSize:   14,
     fontWeight: '700',
@@ -313,7 +315,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   successEmoji: {
-    fontSize: 64,
+    display: 'none',
   },
   successTitle: {
     fontSize:   26,
@@ -328,10 +330,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   successHint: {
-    backgroundColor: Colors.light.surface,
-    borderRadius:    12,
-    padding:         14,
-    width:           '100%',
+    width: '100%',
   },
   successHintText: {
     fontSize:   13,

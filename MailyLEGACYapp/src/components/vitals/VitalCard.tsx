@@ -7,6 +7,8 @@ import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import { Card } from '@components/ui/Card'
 import { Badge } from '@components/ui/Badge'
+import { IconBadge } from '@components/ui/IconBadge'
+import type { AppIconName } from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
 import type { VitalEntry } from '@hooks/useVitals'
 
@@ -50,21 +52,21 @@ export function VitalCard({ entry }: VitalCardProps) {
 
       <View style={styles.grid}>
         {entry.glucose_mgdl != null && (
-          <VitalItem icon="🩸" label="Glucosa" value={`${entry.glucose_mgdl}`} unit="mg/dL" />
+          <VitalItem icon="syringe" label="Glucosa" value={`${entry.glucose_mgdl}`} unit="mg/dL" />
         )}
         {entry.heart_rate != null && (
-          <VitalItem icon="❤️" label="Frec. cardíaca" value={`${entry.heart_rate}`} unit="lpm" />
+          <VitalItem icon="heart" label="Frec. cardíaca" value={`${entry.heart_rate}`} unit="lpm" />
         )}
         {entry.systolic_bp != null && entry.diastolic_bp != null && (
           <VitalItem
-            icon="💉"
+            icon="heart"
             label="Presión"
             value={`${entry.systolic_bp}/${entry.diastolic_bp}`}
             unit="mmHg"
           />
         )}
         {entry.weight_kg != null && (
-          <VitalItem icon="⚖️" label="Peso" value={`${entry.weight_kg}`} unit="kg" />
+          <VitalItem icon="scale" label="Peso" value={`${entry.weight_kg}`} unit="kg" />
         )}
       </View>
 
@@ -77,10 +79,10 @@ export function VitalCard({ entry }: VitalCardProps) {
 
 function VitalItem({
   icon, label, value, unit,
-}: { icon: string; label: string; value: string; unit: string }) {
+}: { icon: AppIconName; label: string; value: string; unit: string }) {
   return (
     <View style={styles.item}>
-      <Text style={styles.itemIcon}>{icon}</Text>
+      <IconBadge name={icon} size={14} style={styles.itemIcon} />
       <Text style={styles.itemLabel}>{label}</Text>
       <Text style={styles.itemValue}>
         {value} <Text style={styles.itemUnit}>{unit}</Text>
@@ -113,8 +115,7 @@ const styles = StyleSheet.create({
     gap:           8,
   },
   itemIcon: {
-    fontSize: 16,
-    width:    24,
+    flexShrink: 0,
   },
   itemLabel: {
     flex:      1,

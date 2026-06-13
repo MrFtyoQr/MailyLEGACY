@@ -11,11 +11,13 @@ import {
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
+import { IconBadge }     from '@components/ui/IconBadge'
 import { Colors } from '@constants/colors'
 import {
   useVitals, useVitalsLatest,
   VITAL_META, type VitalType, type VitalReading,
 } from '@hooks/useVitals'
+import { getStatusBadge, getStatusColor, getVitalStatus } from '@lib/vitals/statusColors'
 
 const { width } = Dimensions.get('window')
 const CHART_W    = width - 48
@@ -23,21 +25,17 @@ const CHART_H    = 160
 const BAR_RADIUS = 4
 
 // ── Helpers de color ──────────────────────────────────────────────────────────
-function getColor(value: number, meta: typeof VITAL_META[VitalType]): string {
-  if (value < meta.normal.min || value > meta.normal.max) return Colors.semantic.error
-  const span   = meta.normal.max - meta.normal.min
-  const margin = span * 0.1
-  if (value < meta.normal.min + margin || value > meta.normal.max - margin)
-    return Colors.semantic.warning
-  return Colors.semantic.success
+function getColor(value: number, type: VitalType, secondary?: number | null): string {
+  return getStatusColor(getVitalStatus(type, value, secondary))
 }
 
 // ── Gráfica de barras con Views ───────────────────────────────────────────────
 function BarChart({
-  readings, meta,
+  readings, meta, vitalType,
 }: {
   readings: { value: number; date: string }[]
   meta: typeof VITAL_META[VitalType]
+  vitalType: VitalType
 }) {
   if (readings.length === 0) {
     return (
@@ -104,7 +102,7 @@ function BarChart({
             {readings.map((r, i) => {
               const heightPct = (r.value - yMin) / range
               const barH      = Math.max(heightPct * CHART_H, 4)
-              const color     = getColor(r.value, meta)
+              const color     = getColor(r.value, vitalType)
               return (
                 <View key={i} style={[chartStyles.barWrap, { width: BAR_W, marginHorizontal: BAR_GAP / 2 }]}>
                   {/* Valor encima de la barra si hay pocas lecturas */}
@@ -159,10 +157,16 @@ export default function VitalDetailScreen() {
     }))
   }, [history])
 
-  const statusColor = useMemo(() => {
-    if (!latestForType || !meta) return Colors.light.textMuted
-    return getColor(Number(latestForType.value), meta)
-  }, [latestForType, meta])
+  const statusBadge = useMemo(() => {
+    if (!latestForType) return getStatusBadge('muted')
+    return getStatusBadge(getVitalStatus(
+      vitalType,
+      Number(latestForType.value),
+      latestForType.secondary_value,
+    ))
+  }, [latestForType, vitalType])
+
+  const statusColor = statusBadge.color
 
   const currentValueStr = latestForType
     ? vitalType === 'BLOOD_PRESSURE' && latestForType.secondary_value != null
@@ -205,7 +209,10 @@ export default function VitalDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
           <Text style={styles.back}>‹ Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>{meta.icon} {meta.label}</Text>
+        <View style={styles.titleRow}>
+          <IconBadge name={meta.icon} size={20} color={statusBadge.color} bgColor={statusBadge.bg} />
+          <Text style={styles.title}>{meta.label}</Text>
+        </View>
         <View style={{ width: 60 }} />
       </View>
 
@@ -214,7 +221,7 @@ export default function VitalDetailScreen() {
         contentContainerStyle={styles.content}
       >
         {/* Valor actual */}
-        <View style={[styles.currentCard, { borderLeftColor: statusColor, borderLeftWidth: 4 }]}>
+        <View style={styles.currentCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.currentLabel}>Último registro</Text>
             {latestForType && (
@@ -270,7 +277,7 @@ export default function VitalDetailScreen() {
           {isLoading ? (
             <ActivityIndicator style={{ marginVertical: 40 }} color={Colors.brand.primary} />
           ) : (
-            <BarChart readings={chartData} meta={meta} />
+            <BarChart readings={chartData} meta={meta} vitalType={vitalType} />
           )}
         </View>
 
@@ -284,7 +291,7 @@ export default function VitalDetailScreen() {
           <View style={styles.historyList}>
             {history.slice(0, 50).map((r: VitalReading) => {
               const v      = Number(r.value)
-              const col    = getColor(v, meta)
+              const col    = getColor(v, vitalType, r.secondary_value)
               const valStr = vitalType === 'BLOOD_PRESSURE' && r.secondary_value != null
                 ? `${r.value}/${r.secondary_value}`
                 : `${r.value}`
@@ -372,7 +379,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10,
   },
   back:  { fontSize: 17, color: Colors.brand.primary, fontWeight: '600', minWidth: 60 },
-  title: { fontSize: 16, fontWeight: '700', color: Colors.light.textPrimary, flex: 1, textAlign: 'center' },
+  titleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  title: { fontSize: 16, fontWeight: '700', color: Colors.light.textPrimary },
 
   content: { paddingHorizontal: 20, paddingBottom: 24, gap: 14 },
 

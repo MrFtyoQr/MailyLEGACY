@@ -19,6 +19,7 @@ import { Card } from '@components/ui/Card'
 import { Badge } from '@components/ui/Badge'
 import { Avatar } from '@components/ui/Avatar'
 import { Skeleton } from '@components/ui/Skeleton'
+import { IconBadge } from '@components/ui/IconBadge'
 import { Colors } from '@constants/colors'
 import { get } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
@@ -60,7 +61,7 @@ export default function SpecialistHome() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hola, {firstName} {lastName} 👋</Text>
+          <Text style={styles.greeting}>Hola, {firstName} {lastName}</Text>
           <Text style={styles.subGreeting}>Panel de especialista</Text>
         </View>
         <Avatar
@@ -81,7 +82,7 @@ export default function SpecialistHome() {
         ) : (
           <Card style={styles.statCard}>
             <View style={styles.statRow}>
-              <Text style={styles.statEmoji}>📋</Text>
+              <IconBadge name="clipboard" size={28} />
               <View>
                 <Text style={styles.statValue}>{pending.length}</Text>
                 <Text style={styles.statLabel}>Referidos pendientes</Text>
@@ -91,7 +92,7 @@ export default function SpecialistHome() {
                 onPress={() => router.push('/(specialist)/referrals/index')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.statBtnText}>Ver todos →</Text>
+                <Text style={styles.statBtnText}>Ver todos</Text>
               </TouchableOpacity>
             </View>
           </Card>
@@ -139,7 +140,9 @@ export default function SpecialistHome() {
                       </View>
                       <View style={styles.referralRight}>
                         <Badge label={label} variant={variant} size="sm" />
-                        <Text style={styles.referralStatus}>{r.status === 'pending' ? '⏳' : r.status === 'in_progress' ? '🔄' : '✅'}</Text>
+                        <Text style={styles.referralStatus}>
+                          {r.status === 'pending' ? 'Pendiente' : r.status === 'in_progress' ? 'En progreso' : 'Completado'}
+                        </Text>
                       </View>
                     </View>
                   </Card>
@@ -180,7 +183,6 @@ const styles = StyleSheet.create({
     alignItems:    'center',
     gap:           12,
   },
-  statEmoji: { fontSize: 36 },
   statValue: {
     fontSize:   28,
     fontWeight: '700',
@@ -219,7 +221,7 @@ const styles = StyleSheet.create({
   referralName:   { fontSize: 14, fontWeight: '600', color: Colors.light.textPrimary },
   referralDiag:   { fontSize: 12, color: Colors.light.textSecondary, marginTop: 2 },
   referralRight:  { alignItems: 'flex-end', gap: 4 },
-  referralStatus: { fontSize: 18 },
+  referralStatus: { fontSize: 11, color: Colors.light.textMuted, fontWeight: '600' },
   emptyCard: {
     marginHorizontal: 20,
     alignItems:       'center',

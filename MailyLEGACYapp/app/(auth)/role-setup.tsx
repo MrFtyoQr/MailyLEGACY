@@ -32,6 +32,9 @@ import { ScreenWrapper }   from '@components/layout/ScreenWrapper'
 import { FormField }       from '@components/forms/FormField'
 import { ProtectedForm }   from '@components/forms/ProtectedForm'
 import { Button }          from '@components/ui/Button'
+import { IconBadge }       from '@components/ui/IconBadge'
+import { InfoCard }        from '@components/ui/InfoCard'
+import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { useFormGuard }    from '@hooks/useFormGuard'
 import { createRateLimiter } from '@lib/security/rateLimiter'
 import { patch }           from '@lib/api/client'
@@ -50,7 +53,7 @@ type RoleId = 'PATIENT' | 'DOCTOR' | 'SPECIALIST'
 
 interface RoleCard {
   id:    RoleId
-  emoji: string
+  icon:  AppIconName
   label: string
   desc:  string
   color: string
@@ -59,21 +62,21 @@ interface RoleCard {
 const ROLES: RoleCard[] = [
   {
     id:    'PATIENT',
-    emoji: '🙋',
+    icon:  'user',
     label: 'Paciente',
     desc:  'Gestiona tu salud y la de tu familia',
     color: Colors.role.patient,
   },
   {
     id:    'DOCTOR',
-    emoji: '👨‍⚕️',
+    icon:  'doctor',
     label: 'Médico',
     desc:  'Consulta y seguimiento de pacientes',
     color: Colors.role.doctor,
   },
   {
     id:    'SPECIALIST',
-    emoji: '🔬',
+    icon:  'lab',
     label: 'Especialista',
     desc:  'Laboratorista, terapeuta u otro especialista',
     color: Colors.role.specialist,
@@ -108,7 +111,7 @@ function RoleCardItem({
         }}
         activeOpacity={0.85}
       >
-        <Text style={styles.roleEmoji}>{card.emoji}</Text>
+        <IconBadge name={card.icon} size={24} accent={card.color} />
         <View style={styles.roleText}>
           <Text style={[styles.roleLabel, selected && { color: card.color }]}>
             {card.label}
@@ -168,7 +171,7 @@ function BirthDatePicker({
         <Text style={[dp.fieldText, !value && dp.placeholder]}>
           {displayStr}
         </Text>
-        <Text style={dp.calIcon}>📅</Text>
+        <AppIcon name="calendar" size={18} color={Colors.light.textMuted} />
       </TouchableOpacity>
 
       {error ? (
@@ -249,7 +252,6 @@ const dp = StyleSheet.create({
   },
   fieldText:   { fontSize: 15, color: Colors.light.textPrimary, flex: 1 },
   placeholder: { color: Colors.light.textMuted },
-  calIcon:     { fontSize: 18 },
   hint:        { marginTop: 4, fontSize: 12, color: Colors.light.textSecondary },
   errorText:   { marginTop: 4, fontSize: 12, color: Colors.semantic.error },
 
@@ -389,17 +391,20 @@ export default function RoleSetupScreen() {
 
           {/* Nota para médicos/especialistas */}
           {(selectedRole === 'DOCTOR' || selectedRole === 'SPECIALIST') && (
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
-                💡 Los médicos y especialistas pasan por un proceso de verificación antes de unirse al equipo. Te contactaremos en breve.
-              </Text>
-            </View>
+            <InfoCard style={styles.infoBox}>
+              <View style={styles.infoBoxInner}>
+                <IconBadge name="bulb" size={18} />
+                <Text style={styles.infoText}>
+                  Los médicos y especialistas pasan por un proceso de verificación antes de unirse al equipo. Te contactaremos en breve.
+                </Text>
+              </View>
+            </InfoCard>
           )}
 
           <Button
             label={
               selectedRole === 'DOCTOR' || selectedRole === 'SPECIALIST'
-                ? 'Enviar solicitud →'
+                ? 'Enviar solicitud'
                 : 'Continuar'
             }
             onPress={handleContinue}
@@ -488,7 +493,6 @@ const styles = StyleSheet.create({
     borderColor:     Colors.light.border,
     gap:             12,
   },
-  roleEmoji: { fontSize: 32 },
   roleText:  { flex: 1, gap: 2 },
   roleLabel: {
     fontSize:   16,
@@ -523,12 +527,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   infoBox: {
-    backgroundColor: Colors.light.surface,
-    borderRadius:    12,
-    padding:         14,
-    marginBottom:    16,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.brand.primary,
+    marginBottom: 16,
+  },
+  infoBoxInner: {
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    gap:           10,
   },
   infoText: {
     fontSize:   13,

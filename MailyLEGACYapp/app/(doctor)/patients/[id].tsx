@@ -18,6 +18,8 @@ import { Card } from '@components/ui/Card'
 import { Avatar } from '@components/ui/Avatar'
 import { Badge } from '@components/ui/Badge'
 import { EmptyState } from '@components/ui/EmptyState'
+import { IconBadge } from '@components/ui/IconBadge'
+import type { AppIconName } from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
 import { usePatient, usePatientVitals, usePatientMedications } from '@hooks/usePatients'
 
@@ -78,7 +80,7 @@ export default function PatientDetailScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
-                {tab === 'vitals' ? '❤️ Vitales' : '💊 Medicamentos'}
+                {tab === 'vitals' ? 'Vitales' : 'Medicamentos'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -93,21 +95,21 @@ export default function PatientDetailScreen() {
               <Text style={styles.tabSectionTitle}>Último registro de vitales</Text>
               <View style={styles.vitalsGrid}>
                 {(latestVitals as { heart_rate?: number | null; glucose_mgdl?: number | null; systolic_bp?: number | null; diastolic_bp?: number | null; weight_kg?: number | null; severity?: string | null }).heart_rate != null && (
-                  <VitalChip icon="❤️" label="FC" value={`${(latestVitals as any).heart_rate}`} unit="lpm" />
+                  <VitalChip icon="heart" label="FC" value={`${(latestVitals as any).heart_rate}`} unit="lpm" />
                 )}
                 {(latestVitals as any).glucose_mgdl != null && (
-                  <VitalChip icon="🩸" label="Glucosa" value={`${(latestVitals as any).glucose_mgdl}`} unit="mg/dL" />
+                  <VitalChip icon="syringe" label="Glucosa" value={`${(latestVitals as any).glucose_mgdl}`} unit="mg/dL" />
                 )}
                 {(latestVitals as any).systolic_bp != null && (
                   <VitalChip
-                    icon="💉"
+                    icon="heart"
                     label="PA"
                     value={`${(latestVitals as any).systolic_bp}/${(latestVitals as any).diastolic_bp}`}
                     unit="mmHg"
                   />
                 )}
                 {(latestVitals as any).weight_kg != null && (
-                  <VitalChip icon="⚖️" label="Peso" value={`${(latestVitals as any).weight_kg}`} unit="kg" />
+                  <VitalChip icon="scale" label="Peso" value={`${(latestVitals as any).weight_kg}`} unit="kg" />
                 )}
               </View>
               {(latestVitals as any).severity && (
@@ -121,7 +123,7 @@ export default function PatientDetailScreen() {
               )}
             </Card>
           ) : (
-            <EmptyState icon="📊" title="Sin vitales" subtitle="Este paciente no tiene registros de signos vitales." />
+            <EmptyState icon="chart" title="Sin vitales" subtitle="Este paciente no tiene registros de signos vitales." />
           )
         ) : (
           loadingMeds ? (
@@ -141,7 +143,7 @@ export default function PatientDetailScreen() {
               ))}
             </View>
           ) : (
-            <EmptyState icon="💊" title="Sin medicamentos" subtitle="Este paciente no tiene medicamentos asignados." />
+            <EmptyState icon="pill" title="Sin medicamentos" subtitle="Este paciente no tiene medicamentos asignados." />
           )
         )}
 
@@ -151,10 +153,10 @@ export default function PatientDetailScreen() {
   )
 }
 
-function VitalChip({ icon, label, value, unit }: { icon: string; label: string; value: string; unit: string }) {
+function VitalChip({ icon, label, value, unit }: { icon: AppIconName; label: string; value: string; unit: string }) {
   return (
     <View style={vc.chip}>
-      <Text style={vc.icon}>{icon}</Text>
+      <IconBadge name={icon} size={16} />
       <Text style={vc.label}>{label}</Text>
       <Text style={vc.value}>{value}</Text>
       <Text style={vc.unit}>{unit}</Text>
@@ -163,8 +165,7 @@ function VitalChip({ icon, label, value, unit }: { icon: string; label: string; 
 }
 
 const vc = StyleSheet.create({
-  chip:  { alignItems: 'center', flex: 1, gap: 2 },
-  icon:  { fontSize: 20 },
+  chip:  { alignItems: 'center', flex: 1, gap: 4 },
   label: { fontSize: 11, color: Colors.light.textMuted },
   value: { fontSize: 16, fontWeight: '700', color: Colors.light.textPrimary },
   unit:  { fontSize: 10, color: Colors.light.textMuted },
