@@ -10,6 +10,7 @@
  */
 
 import * as SecureStore from 'expo-secure-store'
+import { parseApiResponse } from '@lib/api/parseResponse'
 
 const ACCESS_KEY  = 'mc_access_token'
 const REFRESH_KEY = 'mc_refresh_token'
@@ -66,7 +67,8 @@ export async function tryRefreshTokens(apiUrl: string): Promise<string | null> {
       return null
     }
 
-    const data = await res.json() as { access: string; refresh?: string }
+    // Parseo seguro: si el proxy devuelve HTML, lanza ApiError (capturado abajo)
+    const data = await parseApiResponse<{ access: string; refresh?: string }>(res)
     const newAccess = data.access
     const newRefresh = data.refresh ?? refresh   // Backend rota el refresh
 

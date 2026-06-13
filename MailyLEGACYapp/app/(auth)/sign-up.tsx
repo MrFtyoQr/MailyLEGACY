@@ -37,6 +37,7 @@ import {
 } from '@schemas/auth.schema'
 import { Colors }          from '@constants/colors'
 import { API_URL }         from '@constants/config'
+import { parseApiResponse } from '@lib/api/parseResponse'
 import { setTokens }       from '@lib/auth/session'
 import { useAuthStore }    from '@store/auth.store'
 import type { UserRole }   from '@constants/config'
@@ -95,11 +96,8 @@ export default function SignUpScreen() {
           }),
         })
 
-        const json = await res.json() as RegisterResponse & { error?: string }
-
-        if (!res.ok) {
-          throw new Error(json.error ?? 'No se pudo crear la cuenta.')
-        }
+        // Parseo seguro: valida res.ok y Content-Type, nunca revienta con HTML
+        const json = await parseApiResponse<RegisterResponse>(res)
 
         // Guardar tokens en SecureStore
         await setTokens(json.access, json.refresh)

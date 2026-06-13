@@ -17,8 +17,34 @@
 
 import { useState, useCallback } from 'react'
 import { ZodSchema, ZodError } from 'zod'
+import * as Sentry from '@sentry/react-native'
 import { sanitizeObject } from '@lib/security/sanitize'
 import type { RateLimiter } from '@lib/security/rateLimiter'
+
+const FALLBACK_ERROR_MSG = 'Ocurrió un error. Inténtalo de nuevo.'
+const NETWORK_ERROR_MSG =
+  'No pudimos conectar con el servidor. Verifica tu conexión o inténtalo más tarde.'
+
+/** Patrones de mensajes técnicos que nunca deben verse en pantalla */
+const TECHNICAL_PATTERNS = [
+  /json parse/i,
+  /unexpected token/i,
+  /unexpected character/i,
+  /syntaxerror/i,
+  /network request failed/i,
+  /failed to fetch/i,
+]
+
+/** Convierte cualquier error en un mensaje apto para el usuario y reporta a Sentry. */
+function toUserMessage(err: unknown): string {
+  if (!(err instanceof Error)) return FALLBACK_ERROR_MSG
+
+  if (TECHNICAL_PATTERNS.some((re) => re.test(err.message))) {
+    try { Sentry.captureException(err) } catch { /* no romper el flujo */ }
+    return NETWORK_ERROR_MSG
+  }
+  return err.message || FALLBACK_ERROR_MSG
+}
 
 interface UseFormGuardOptions<TInput, TOutput> {
   /** Zod schema para validar y transformar el input */
@@ -90,9 +116,8 @@ export function useFormGuard<TInput extends Record<string, unknown>, TOutput>(
       try {
         await onSubmit(result.data)
       } catch (err: unknown) {
-        const msg =
-          err instanceof Error ? err.message : 'Ocurrió un error. Inténtalo de nuevo.'
-        setFormError(msg)
+        // Nunca mostrar mensajes técnicos crudos (BUG #1)
+        setFormError(toUserMessage(err))
       } finally {
         setIsSubmitting(false)
       }
