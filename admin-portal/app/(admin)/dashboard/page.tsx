@@ -163,7 +163,7 @@ function PatientDetailModal({ patient, onClose }: { patient: Patient; onClose: (
         <div className="p-6">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Cambiar plan manualmente</p>
           <div className="flex gap-2 mb-2">
-            <select value={newTier} onChange={e => setNewTier(e.target.value)}
+            <select value={newTier} onChange={e => setNewTier(e.target.value as typeof newTier)}
               className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-400">
               {['FREE','SILVER','GOLD','PLATINUM'].map(t => (
                 <option key={t} value={t}>{TIER_ICON[t]} {t}</option>
