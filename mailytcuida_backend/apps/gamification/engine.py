@@ -143,7 +143,7 @@ def _check_badges(player: PlayerProfile):
                 player.total_points += badge.points_reward
                 PointTransaction.objects.create(
                     player      = player,
-                    source      = PointSource.MILESTONE,
+                    source      = PointSource.MANUAL_ADJUSTMENT,
                     base_points = badge.points_reward,
                     multiplier  = 1,
                     points      = badge.points_reward,

@@ -15,6 +15,7 @@ INTERNAL_IPS = ['127.0.0.1']
 # Only active when DEBUG=True AND DEV_AUTH_BYPASS=True in .env.dev
 REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = [
     'apps.accounts.middleware.dev_auth.DevBypassAuthentication',
+    'rest_framework_simplejwt.authentication.JWTAuthentication',
     'apps.accounts.middleware.clerk_auth.ClerkJWTAuthentication',
 ]
 
