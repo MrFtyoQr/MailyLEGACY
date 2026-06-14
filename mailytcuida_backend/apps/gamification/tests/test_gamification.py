@@ -1,8 +1,8 @@
 import pytest
-from unittest.mock import patch
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
 from apps.accounts.models import User, PatientProfile
 from apps.gamification.models import (
     PlayerProfile, PointTransaction, Badge, PlayerBadge,
@@ -12,16 +12,24 @@ from apps.gamification.engine import award_points
 
 
 def _patient(email='p@test.com', clerk_id='pat_001'):
-    user    = User.objects.create_user(email=email, clerk_id=clerk_id, role='PATIENT')
+    user    = User.objects.create_user(email=email, clerk_id=clerk_id, role='PATIENT', password='testpass123')
     profile = PatientProfile.objects.create(user=user, first_name='Sofía', last_name='Luna')
     return user, profile
 
 
+def _jwt_client(user):
+    client = APIClient()
+    refresh = RefreshToken.for_user(user)
+    client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+    return client
+
+
 def _badge(code='TEST_BADGE', category=BadgeCategory.ADHERENCE, threshold=1, reward=10):
-    return Badge.objects.create(
-        code=code, name=code, category=category,
-        threshold=threshold, points_reward=reward, is_active=True,
+    badge, _ = Badge.objects.get_or_create(
+        code=code,
+        defaults=dict(name=code, category=category, threshold=threshold, points_reward=reward, is_active=True),
     )
+    return badge
 
 
 @pytest.mark.django_db
@@ -196,53 +204,38 @@ class TestBadges(TestCase):
 class TestGamificationAPI(TestCase):
 
     def setUp(self):
-        self.client = APIClient()
         self.user, self.patient = _patient()
+        self.client = _jwt_client(self.user)
 
-    @patch('apps.accounts.middleware.clerk_auth._verify_clerk_token')
-    def test_my_profile_empty(self, mock_verify):
-        mock_verify.return_value = {'sub': 'pat_001'}
-        self.client.credentials(HTTP_AUTHORIZATION='Bearer fake')
+    def test_my_profile_empty(self):
         response = self.client.get('/api/v1/gamification/me/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['total_points'], 0)
         self.assertEqual(response.data['level'], 1)
 
-    @patch('apps.accounts.middleware.clerk_auth._verify_clerk_token')
-    def test_my_profile_after_points(self, mock_verify):
+    def test_my_profile_after_points(self):
         award_points(self.patient, PointSource.APPOINTMENT_KEPT)
-        mock_verify.return_value = {'sub': 'pat_001'}
-        self.client.credentials(HTTP_AUTHORIZATION='Bearer fake')
         response = self.client.get('/api/v1/gamification/me/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreater(response.data['total_points'], 0)
 
-    @patch('apps.accounts.middleware.clerk_auth._verify_clerk_token')
-    def test_badge_list(self, mock_verify):
+    def test_badge_list(self):
         _badge('TEST_1', BadgeCategory.ADHERENCE, threshold=1)
-        mock_verify.return_value = {'sub': 'pat_001'}
-        self.client.credentials(HTTP_AUTHORIZATION='Bearer fake')
         response = self.client.get('/api/v1/gamification/badges/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data.get('results', response.data)
         self.assertGreaterEqual(len(results), 1)
 
-    @patch('apps.accounts.middleware.clerk_auth._verify_clerk_token')
-    def test_leaderboard(self, mock_verify):
+    def test_leaderboard(self):
         award_points(self.patient, PointSource.MEDICATION_TAKEN)
-        mock_verify.return_value = {'sub': 'pat_001'}
-        self.client.credentials(HTTP_AUTHORIZATION='Bearer fake')
         response = self.client.get('/api/v1/gamification/leaderboard/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data.get('results', response.data)
         self.assertGreaterEqual(len(results), 1)
 
-    @patch('apps.accounts.middleware.clerk_auth._verify_clerk_token')
-    def test_transactions_history(self, mock_verify):
+    def test_transactions_history(self):
         award_points(self.patient, PointSource.VITAL_LOGGED)
         award_points(self.patient, PointSource.LAB_UPLOADED)
-        mock_verify.return_value = {'sub': 'pat_001'}
-        self.client.credentials(HTTP_AUTHORIZATION='Bearer fake')
         response = self.client.get('/api/v1/gamification/me/transactions/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data.get('results', response.data)
