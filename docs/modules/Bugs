@@ -1,1 +1,138 @@
 Trataremos de subir la primer version dockerizada en sevalla desde la cuenta de Quint4n4 pero el proyecto fue creado en MrFtyoQr lo cual complica el proceso
+
+================================================================================
+BUG #1 — "JSON Parse error: Unexpected character: <" al crear cuenta
+================================================================================
+
+ESTADO:        Documentado (pendiente de fix de blindaje)
+SEVERIDAD:     Alta — bloquea el registro de nuevos usuarios
+PANTALLA:      Crear cuenta  (registro con email + contraseña)
+FECHA:         2026-06-11
+SÍNTOMA VISIBLE:
+  Banner rojo en la pantalla de registro con el texto:
+  "JSON Parse error: Unexpected character: <"
+
+--------------------------------------------------------------------------------
+1. DÓNDE SUCEDE
+--------------------------------------------------------------------------------
+Archivo:  MailyLEGACYapp/app/(auth)/sign-up.tsx
+Líneas:   88-101  (callback onSubmit del formulario de registro)
+
+    const res = await fetch(`${API_URL}/auth/register/`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password, role: 'PATIENT' }),
+    })
+
+    const json = await res.json()   // <-- AQUÍ se lanza la excepción
+
+    if (!res.ok) {
+      throw new Error(json.error ?? 'No se pudo crear la cuenta.')
+    }
+
+El error se origina en `res.json()` (línea 98). La excepción que lanza
+React Native ("JSON Parse error: Unexpected character: <") sube hasta el
+hook `useFormGuard` y se muestra tal cual al usuario:
+
+Archivo:  MailyLEGACYapp/src/hooks/useFormGuard.ts  (líneas 92-95)
+
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Ocurrió un error...'
+      setFormError(msg)   // <-- muestra el mensaje técnico crudo en pantalla
+    }
+
+El mismo patrón inseguro existe en:
+  - MailyLEGACYapp/app/(auth)/sign-in.tsx        (línea 65)
+  - MailyLEGACYapp/src/lib/auth/session.ts        (línea 69, refresh)
+  - MailyLEGACYapp/src/store/auth.store.ts        (línea 54, logout)
+
+--------------------------------------------------------------------------------
+2. POR QUÉ SUCEDE
+--------------------------------------------------------------------------------
+El mensaje "Unexpected character: <" significa que el cuerpo de la respuesta
+NO es JSON: empieza con "<", es decir, es HTML (típicamente "<!DOCTYPE html>"
+o "<html>"). La app intenta parsear ese HTML como JSON y revienta.
+
+Causa raíz: la petición a /api/v1/auth/register/ NO está recibiendo una
+respuesta JSON de Django. En su lugar recibe una página HTML, lo que ocurre
+cuando:
+
+  a) La URL del API en el build es incorrecta o apunta a un despliegue caído
+     -> el proxy de Sevalla devuelve una página HTML de error 404/502/503.
+  b) El backend está caído o en mantenimiento
+     -> el balanceador responde con HTML.
+  c) Error 500 de Django servido como página HTML (proxy mal configurado).
+  d) La variable EXPO_PUBLIC_API_URL no se inyectó bien en el build
+     -> la app cae al fallback hardcodeado de config.ts.
+
+Fuente de verdad de la URL:
+  Archivo:  MailyLEGACYapp/src/constants/config.ts  (líneas 6-9)
+
+    export const API_BASE_URL =
+      (extra.apiUrl as string | undefined) ??
+      process.env.EXPO_PUBLIC_API_URL ??
+      'https://mailyt-cuidalegacy-wxnx5.sevalla.app'   // fallback
+
+  Hasta el 2026-06-11 había DOS dominios mezclados en el repo (wxnx5 e
+  iihlu). Ya se unificaron todos a:
+      https://mailyt-cuidalegacy-wxnx5.sevalla.app
+
+DEFECTO DE DISEÑO (por qué puede volver a pasar):
+  Aunque la URL hoy sea correcta, el bug reaparecerá ante cualquier caída
+  del servidor, 502, WAF o mantenimiento, porque el cliente:
+    1. Llama res.json() ANTES de validar res.ok y el Content-Type.
+    2. Usa `fetch` crudo en auth, fuera del apiClient (axios) que SÍ tiene
+       manejo de errores en MailyLEGACYapp/src/lib/api/client.ts + errors.ts.
+    3. Muestra el mensaje técnico de la excepción directamente al usuario.
+
+--------------------------------------------------------------------------------
+3. CÓMO ARREGLARLO
+--------------------------------------------------------------------------------
+Fix en 3 capas (de causa raíz a blindaje):
+
+CAPA 1 — Verificar/asegurar la URL (causa raíz inmediata)
+  - Confirmar que el build usa EXPO_PUBLIC_API_URL =
+      https://mailyt-cuidalegacy-wxnx5.sevalla.app
+  - En Sevalla, ALLOWED_HOSTS debe incluir mailyt-cuidalegacy-wxnx5.sevalla.app
+  - Probar el endpoint y confirmar que responde JSON (201 o 400), nunca HTML:
+      POST https://mailyt-cuidalegacy-wxnx5.sevalla.app/api/v1/auth/register/
+  - (Opcional) Quitar el fallback hardcodeado en producción y fallar al
+    arranque si falta apiUrl, para no enmascarar builds mal configurados.
+
+CAPA 2 — Parseo seguro de la respuesta (evita el crash)
+  Crear un helper central y usarlo en TODOS los fetch de auth en lugar de
+  res.json() directo. Comportamiento deseado:
+
+    async function parseApiResponse<T>(res: Response): Promise<T> {
+      const text = await res.text()
+      const ct   = res.headers.get('content-type') ?? ''
+      const looksLikeHtml = text.trimStart().startsWith('<')
+
+      if (!ct.includes('application/json') || looksLikeHtml) {
+        throw new ApiError(
+          res.status,
+          httpErrorMessage(res.status) ?? 'El servidor respondió de forma inesperada.',
+          text.slice(0, 200),  // para logs / Sentry
+        )
+      }
+      try { return JSON.parse(text) as T }
+      catch { throw new ApiError(res.status, 'Respuesta inválida del servidor.') }
+    }
+
+  Migrar sign-up.tsx, sign-in.tsx, session.ts y auth.store.ts a este helper
+  (o directamente a apiClient.post, que ya lo maneja).
+
+CAPA 3 — Mensaje amigable en UI (última línea de defensa)
+  En useFormGuard (líneas 92-95), nunca mostrar mensajes técnicos:
+    - Si err.message contiene "JSON Parse" / "Unexpected token" / "SyntaxError",
+      mostrar: "No pudimos conectar con el servidor. Verifica tu conexión o
+      inténtalo más tarde."
+    - Enviar el error real a Sentry (status, URL, primeros 200 chars del body).
+
+RESUMEN:
+  Qué pasa     -> la app hace res.json() sobre una respuesta HTML.
+  Dónde        -> sign-up.tsx línea 98 (res.json), mostrado por useFormGuard.
+  Por qué      -> el backend/proxy devolvió HTML (URL/despliegue) y el cliente
+                  no valida Content-Type ni res.ok antes de parsear.
+  Cómo arreglar-> URL correcta + parseo seguro (Content-Type/HTML) + mensaje
+                  amigable + envío a Sentry.

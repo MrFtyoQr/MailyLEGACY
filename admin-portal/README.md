@@ -35,7 +35,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
-NEXT_PUBLIC_API_URL=https://mailytcuida-iihlu.sevalla.app/api/v1
+NEXT_PUBLIC_API_URL=https://mailyt-cuidalegacy-wxnx5.sevalla.app/api/v1
 ```
 
 ## Pantallas — Fase 1

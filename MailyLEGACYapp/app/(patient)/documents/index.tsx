@@ -23,6 +23,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native'
 import { router } from 'expo-router'
 import * as DocumentPicker from 'expo-document-picker'
@@ -434,6 +435,16 @@ function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void
   const [expanded, setExpanded] = useState(false)
   const catColor = CATEGORY_COLORS[doc.category] ?? '#94A3B8'
 
+  function openFile() {
+    if (!doc.file_url) {
+      Alert.alert('Sin archivo', 'Este documento no tiene un archivo adjunto.')
+      return
+    }
+    Linking.openURL(doc.file_url).catch(() =>
+      Alert.alert('Error', 'No se pudo abrir el archivo. Intenta desde un navegador.')
+    )
+  }
+
   return (
     <TouchableOpacity
       style={[styles.card, { borderLeftColor: catColor }]}
@@ -468,13 +479,29 @@ function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void
 
       {/* Meta row */}
       <View style={styles.cardMetas}>
-        <Text style={styles.cardMetaItem}>
-          {CATEGORY_LABELS[doc.category]}
-        </Text>
+        <Text style={styles.cardMetaItem}>{CATEGORY_LABELS[doc.category]}</Text>
         {doc.file_size ? (
           <Text style={styles.cardMetaItem}>· {formatBytes(doc.file_size)}</Text>
         ) : null}
         <Text style={styles.cardMetaItem}>· {formatDate(doc.created_at)}</Text>
+      </View>
+
+      {/* Botones de acción (siempre visibles) */}
+      <View style={styles.cardActions}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={(e) => { e.stopPropagation(); openFile() }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionBtnText}>📂 Abrir</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={(e) => { e.stopPropagation(); openFile() }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionBtnText}>⬇️ Descargar</Text>
+        </TouchableOpacity>
       </View>
 
       {/* OCR text (if expanded and available) */}
@@ -613,6 +640,27 @@ const styles = StyleSheet.create({
   cardMetaItem: {
     fontSize: 12,
     color:    Colors.light.textSecondary,
+  },
+
+  // Action buttons
+  cardActions: {
+    flexDirection:  'row',
+    gap:            8,
+    marginLeft:     32,
+    marginTop:      4,
+  },
+  actionBtn: {
+    paddingVertical:   6,
+    paddingHorizontal: 12,
+    borderRadius:      8,
+    backgroundColor:   Colors.light.surface,
+    borderWidth:       1,
+    borderColor:       Colors.light.border,
+  },
+  actionBtnText: {
+    fontSize:   12,
+    fontWeight: '600',
+    color:      Colors.brand.primary,
   },
 
   // OCR

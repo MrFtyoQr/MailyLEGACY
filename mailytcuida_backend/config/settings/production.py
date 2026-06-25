@@ -6,10 +6,10 @@ _env = environ.Env()
 DEBUG = False
 
 # ── Hosts ─────────────────────────────────────────────────────────────────────
-# Must be set in Sevalla env vars: ALLOWED_HOSTS=mailyt-cuidalegacy-iihlu.sevalla.app
+# Must be set in Sevalla env vars: ALLOWED_HOSTS=mailyt-cuidalegacy-wxnx5.sevalla.app
 # Fallback covers the Sevalla domain so health probes never get 400.
 ALLOWED_HOSTS = _env.list('ALLOWED_HOSTS', default=[
-    'mailyt-cuidalegacy-iihlu.sevalla.app',
+    'mailyt-cuidalegacy-wxnx5.sevalla.app',
     '.sevalla.app',
     'localhost',
     '127.0.0.1',

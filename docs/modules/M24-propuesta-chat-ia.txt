@@ -1,0 +1,158 @@
+================================================================================
+MÓDULO PROPUESTO: M24 — Chat Conversacional con IA (Asistente de Salud)
+PROYECTO: MailyT-Cuida (CAMSA)
+================================================================================
+
+CREADO: 2026-06-04
+ESTADO: PROPUESTA — NO IMPLEMENTADO EN BACKEND
+INTERFAZ APP: IMPLEMENTADA (pantalla ai-chat.tsx con mock)
+
+--------------------------------------------------------------------------------
+PROBLEMA QUE RESUELVE
+--------------------------------------------------------------------------------
+El paciente necesita orientación de salud rápida entre consultas médicas.
+Un chat conversacional con IA reduce visitas innecesarias de urgencias,
+mejora la adherencia y aumenta el engagement con la plataforma.
+
+--------------------------------------------------------------------------------
+ARQUITECTURA PROPUESTA
+--------------------------------------------------------------------------------
+
+                    ┌──────────────┐
+                    │  App Móvil   │
+                    │  ai-chat.tsx │
+                    └──────┬───────┘
+                           │ POST /api/v1/ai/chat/
+                           │ { message, conversation_id? }
+                    ┌──────▼───────┐
+                    │  Django View │
+                    │  AIChatView  │
+                    └──────┬───────┘
+                           │
+              ┌────────────┼────────────┐
+              │                         │
+    ┌─────────▼──────┐       ┌──────────▼──────┐
+    │  ai_service.py │       │  AIChatMessage   │
+    │  (ya existe)   │       │  (modelo nuevo)  │
+    └─────────┬──────┘       └──────────────────┘
+              │
+    ┌─────────▼──────┐
+    │ OpenAI / Claude│
+    │ (por tier)     │
+    └────────────────┘
+
+--------------------------------------------------------------------------------
+MODELOS NUEVOS NECESARIOS (Django)
+--------------------------------------------------------------------------------
+
+class AIConversation(models.Model):
+    patient       = models.ForeignKey(PatientProfile, on_delete=models.CASCADE)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    last_message  = models.DateTimeField(auto_now=True)
+    message_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['-last_message']
+
+class AIChatMessage(models.Model):
+    ROLE_CHOICES = [('user', 'Usuario'), ('assistant', 'Asistente')]
+
+    conversation  = models.ForeignKey(AIConversation, on_delete=models.CASCADE,
+                                      related_name='messages')
+    role          = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    content       = models.TextField()
+    is_voice      = models.BooleanField(default=False)   # enviado por voz
+    provider      = models.CharField(max_length=20, blank=True)  # OPENAI | ANTHROPIC
+    tokens_used   = models.PositiveIntegerField(default=0)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+--------------------------------------------------------------------------------
+ENDPOINTS PROPUESTOS
+--------------------------------------------------------------------------------
+
+POST /api/v1/ai/chat/
+  Auth:    Bearer JWT
+  Body:    { "message": string, "conversation_id": uuid | null }
+  Returns: {
+    "conversation_id": uuid,
+    "response": string,
+    "provider": "OPENAI" | "ANTHROPIC",
+    "disclaimer": "Este mensaje es orientativo y no constituye diagnóstico médico."
+  }
+  Rate limit: 20/hora para FREE, 100/hora para PLATINUM
+
+GET /api/v1/ai/chat/history/
+  Returns: lista de conversaciones con último mensaje
+
+GET /api/v1/ai/chat/{conversation_id}/messages/
+  Returns: historial de mensajes de la conversación
+
+--------------------------------------------------------------------------------
+SISTEMA DE PRIVACIDAD Y ANONIMIZACIÓN
+--------------------------------------------------------------------------------
+
+Antes de enviar a OpenAI/Anthropic, el contexto del paciente se anonimiza:
+
+DATOS QUE SÍ SE ENVÍAN (numéricos, sin identificadores):
+  - Últimos 3 valores de signos vitales (valor + fecha relativa)
+  - Lista de tipos de medicamentos (sin nombres de marca)
+  - Edad en rangos (ej. "adulto 30-40")
+  - Resumen de adherencia (%)
+
+DATOS QUE NUNCA SE ENVÍAN:
+  - Nombre, apellido, email, CURP, RFC
+  - Diagnósticos en texto libre
+  - Notas del médico
+  - ID de paciente
+  - Dirección, teléfono
+
+IMPLEMENTACIÓN:
+  def build_safe_context(patient) -> dict:
+      # Retorna solo datos numéricos y categóricos
+      # Sin PII — compatible con LGPDPPSO y HIPAA como buena práctica
+      ...
+
+--------------------------------------------------------------------------------
+SYSTEM PROMPT PROPUESTO PARA CHAT
+--------------------------------------------------------------------------------
+
+"Eres un asistente de salud orientativo de MailyT Cuida.
+REGLAS ESTRICTAS:
+1. NUNCA diagnostiques enfermedades.
+2. SIEMPRE recomienda consultar al médico para decisiones clínicas.
+3. Responde en español, lenguaje sencillo y empático.
+4. Cita fuentes oficiales cuando menciones rangos (OMS, AHA, ADA, SSA México).
+5. Si el usuario describe síntomas de emergencia (dolor pecho, dificultad respirar,
+   pérdida de consciencia), responde ÚNICAMENTE: indicarle llamar al 911.
+6. No menciones datos personales del usuario en tu respuesta.
+7. Máximo 150 palabras por respuesta."
+
+--------------------------------------------------------------------------------
+INTEGRACIÓN CON PANTALLA EXISTENTE
+--------------------------------------------------------------------------------
+
+La pantalla app/(patient)/ai-chat.tsx ya está implementada con:
+  ✅ UI completa de chat con burbujas
+  ✅ Botón de voz (🎙️) con animación de pulso
+  ✅ Sugerencias rápidas
+  ✅ Indicador "Analizando…"
+  ✅ Aviso médico legal
+
+Solo requiere:
+  [ ] Instalar expo-av para grabación real
+  [ ] Instalar expo-speech para reproducir respuestas (TTS)
+  [ ] Crear endpoint en backend
+  [ ] Reemplazar getMockResponse() con llamada real al API
+
+--------------------------------------------------------------------------------
+ESTIMACIÓN
+--------------------------------------------------------------------------------
+Backend (modelos + endpoint + anonimización): 2-3 días
+Expo-av + Speech-to-Text: 1-2 días
+Integración completa + pruebas: 1 día
+TOTAL: ~5 días de desarrollo
+
+================================================================================
