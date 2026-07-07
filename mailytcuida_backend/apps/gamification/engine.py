@@ -23,6 +23,7 @@ import logging
 from datetime import date
 
 from django.db import transaction as db_transaction
+from django.db import IntegrityError
 
 from .models import (
     PlayerProfile, PointTransaction, PlayerBadge, Badge,
@@ -78,6 +79,16 @@ def award_points(
             )
             return txn
 
+    except IntegrityError:
+        # Evento duplicado: ya existe una transacción para este
+        # (player, source, ref_id). Se omite silenciosamente — el deduplicado
+        # es comportamiento esperado, no un error. La restricción
+        # unique_points_per_event garantiza la integridad a nivel de BD.
+        logger.debug(
+            'award_points: evento duplicado omitido patient=%s source=%s ref_id=%s',
+            patient.id, source, ref_id,
+        )
+        return None
     except Exception as exc:
         logger.error('award_points failed for patient=%s: %s', patient.id, exc, exc_info=True)
         return None

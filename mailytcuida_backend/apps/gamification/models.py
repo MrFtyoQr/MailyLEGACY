@@ -18,6 +18,7 @@ Point sources:
 """
 import uuid
 from django.db import models
+from django.db.models import Q, UniqueConstraint
 
 
 class PointSource(models.TextChoices):
@@ -144,6 +145,17 @@ class PointTransaction(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            # Impide puntos duplicados por un mismo evento: un (player, source,
+            # ref_id) solo puede otorgarse una vez. La condición excluye los
+            # bonos generados por el sistema (STREAK_BONUS, MANUAL_ADJUSTMENT),
+            # que no tienen ref_id y pueden repetirse legítimamente.
+            UniqueConstraint(
+                fields=['player', 'source', 'ref_id'],
+                condition=~Q(ref_id=''),
+                name='unique_points_per_event',
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         if self.pk and PointTransaction.objects.filter(pk=self.pk).exists():
