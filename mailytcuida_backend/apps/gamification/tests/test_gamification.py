@@ -146,6 +146,31 @@ class TestStreaks(TestCase):
         self.assertEqual(player.current_streak, 1)   # reset
         self.assertEqual(player.longest_streak, 14)  # preserved
 
+    def test_streak_bonus_uses_patient_plan_multiplier(self):
+        """El bono de racha debe usar el multiplicador del plan real, no FREE fijo."""
+        from datetime import date, timedelta
+        from apps.payments.models import Plan, Subscription
+        plan, _ = Plan.objects.get_or_create(
+            tier='SILVER',
+            defaults={'name': 'Silver', 'price_mxn': 99, 'max_doctors': 2},
+        )
+        Subscription.objects.create(user=self.user, plan=plan, status='ACTIVE')
+
+        player, _ = PlayerProfile.objects.get_or_create(patient=self.patient)
+        player.current_streak = 6
+        player.longest_streak = 6
+        player.last_activity_date = date.today() - timedelta(days=1)
+        player.save()
+
+        award_points(self.patient, PointSource.MEDICATION_TAKEN)
+
+        bonus = PointTransaction.objects.get(
+            player=player, source=PointSource.STREAK_BONUS,
+        )
+        expected = PLAN_MULTIPLIERS['SILVER']  # 2×
+        self.assertEqual(bonus.multiplier, expected)
+        self.assertEqual(bonus.points, bonus.base_points * expected)
+
 
 @pytest.mark.django_db
 class TestBadges(TestCase):
