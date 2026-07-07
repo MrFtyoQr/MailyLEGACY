@@ -116,7 +116,7 @@ def _update_streak(player: PlayerProfile, source: str):
     milestones = {7, 14, 30, 60, 90}
     if player.current_streak in milestones:
         bp         = BASE_POINTS[PointSource.STREAK_BONUS]
-        multiplier = PLAN_MULTIPLIERS.get('FREE', 1)  # already inside atomic; re-fetch if needed
+        multiplier = _get_multiplier(player.patient)
         PointTransaction.objects.create(
             player      = player,
             source      = PointSource.STREAK_BONUS,
