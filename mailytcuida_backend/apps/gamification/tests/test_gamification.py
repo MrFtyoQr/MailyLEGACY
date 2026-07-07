@@ -173,6 +173,59 @@ class TestStreaks(TestCase):
 
 
 @pytest.mark.django_db
+class TestDuplicatePrevention(TestCase):
+    """Restricción unique_points_per_event: sin puntos duplicados por evento."""
+
+    def setUp(self):
+        self.user, self.patient = _patient()
+
+    def test_duplicate_event_awarded_once(self):
+        # Mismo (player, source, ref_id) dos veces → una sola transacción.
+        first = award_points(self.patient, PointSource.MEDICATION_TAKEN, ref_id='evt-123')
+        second = award_points(self.patient, PointSource.MEDICATION_TAKEN, ref_id='evt-123')
+
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)  # duplicado omitido silenciosamente
+
+        player = PlayerProfile.objects.get(patient=self.patient)
+        self.assertEqual(
+            PointTransaction.objects.filter(
+                player=player, source=PointSource.MEDICATION_TAKEN, ref_id='evt-123'
+            ).count(),
+            1,
+        )
+        self.assertEqual(player.total_points, 10)  # no se duplicó (no 20)
+
+    def test_distinct_events_both_awarded(self):
+        # ref_id distintos → ambas transacciones se crean.
+        award_points(self.patient, PointSource.MEDICATION_TAKEN, ref_id='evt-1')
+        award_points(self.patient, PointSource.MEDICATION_TAKEN, ref_id='evt-2')
+        player = PlayerProfile.objects.get(patient=self.patient)
+        self.assertEqual(
+            PointTransaction.objects.filter(player=player).count(), 2
+        )
+
+    def test_system_bonus_allows_repeated_empty_ref_id(self):
+        # Los bonos del sistema (ref_id='') deben poder repetirse: la
+        # restricción parcial los excluye vía condition=~Q(ref_id='').
+        player, _ = PlayerProfile.objects.get_or_create(patient=self.patient)
+        PointTransaction.objects.create(
+            player=player, source=PointSource.STREAK_BONUS,
+            base_points=25, multiplier=1, points=25,
+        )
+        PointTransaction.objects.create(
+            player=player, source=PointSource.STREAK_BONUS,
+            base_points=25, multiplier=1, points=25,
+        )
+        self.assertEqual(
+            PointTransaction.objects.filter(
+                player=player, source=PointSource.STREAK_BONUS, ref_id=''
+            ).count(),
+            2,
+        )
+
+
+@pytest.mark.django_db
 class TestBadges(TestCase):
 
     def setUp(self):
