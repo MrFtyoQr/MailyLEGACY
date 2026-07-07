@@ -16,6 +16,7 @@ Point sources:
   REFERRAL_COMPLETED  — referido a especialista completado
   PROFILE_COMPLETED   — perfil completado al 100%
 """
+import secrets
 import uuid
 from django.db import models
 from django.db.models import Q, UniqueConstraint
@@ -212,3 +213,46 @@ class RewardProduct(models.Model):
     def __str__(self):
         stock_str = '∞' if self.stock == 0 else str(self.stock)
         return f'{self.name} — {self.points_cost} pts (stock: {stock_str})'
+
+
+def generate_redemption_code() -> str:
+    """Código de canje legible: 'RDM-' + 8 hex en mayúsculas (ej. RDM-7F3A9C2B)."""
+    return f'RDM-{secrets.token_hex(4).upper()}'
+
+
+class RedemptionRecord(models.Model):
+    """
+    Registro de un canje de RewardProduct por puntos.
+    El débito de puntos, el decremento de stock y la generación con reintento
+    se implementan en el endpoint atómico POST /redeem/ (Actividad 6).
+    """
+    class Status(models.TextChoices):
+        PENDING   = 'PENDING',   'Pendiente'
+        FULFILLED = 'FULFILLED', 'Entregado'
+        CANCELLED = 'CANCELLED', 'Cancelado'
+
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    player       = models.ForeignKey(
+        PlayerProfile, on_delete=models.CASCADE, related_name='redemptions'
+    )
+    reward       = models.ForeignKey(
+        RewardProduct, on_delete=models.PROTECT, related_name='redemptions'
+    )
+    # Snapshot del costo al momento del canje (RewardProduct.points_cost puede cambiar).
+    points_spent = models.PositiveIntegerField(help_text='Puntos debitados en el canje.')
+    status       = models.CharField(
+        max_length=9, choices=Status.choices, default=Status.PENDING
+    )
+    code         = models.CharField(
+        max_length=12, unique=True, default=generate_redemption_code,
+        help_text='Código único de canje (ej. RDM-7F3A9C2B).'
+    )
+    note         = models.CharField(max_length=255, blank=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.player.patient} — {self.reward.name} ({self.code}, {self.status})'

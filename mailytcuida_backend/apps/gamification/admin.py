@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Badge, PlayerProfile, PointTransaction, PlayerBadge, RewardProduct
+from .models import (
+    Badge, PlayerProfile, PointTransaction, PlayerBadge, RewardProduct,
+    RedemptionRecord,
+)
 
 
 @admin.register(Badge)
@@ -60,3 +63,18 @@ class RewardProductAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at'),
         }),
     )
+
+
+@admin.register(RedemptionRecord)
+class RedemptionRecordAdmin(admin.ModelAdmin):
+    list_display  = ('code', 'player', 'reward', 'points_spent', 'status', 'created_at')
+    list_filter   = ('status',)
+    search_fields = ('code', 'player__patient__first_name', 'player__patient__last_name',
+                     'reward__name')
+    # Los canjes se crean vía el endpoint POST /redeem/; aquí solo se gestiona
+    # el ciclo de vida (status/note). El resto es de solo lectura.
+    readonly_fields = ('id', 'player', 'reward', 'points_spent', 'code',
+                       'created_at', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False
