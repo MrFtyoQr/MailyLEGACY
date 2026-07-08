@@ -21,7 +21,7 @@ class PlayerBadgeInline(admin.TabularInline):
 
 @admin.register(PlayerProfile)
 class PlayerProfileAdmin(admin.ModelAdmin):
-    list_display  = ('patient', 'total_points', 'level',
+    list_display  = ('patient', 'total_points', 'balance', 'level',
                      'current_streak', 'longest_streak', 'last_activity_date')
     list_filter   = ('level',)
     search_fields = ('patient__first_name', 'patient__last_name')
@@ -73,8 +73,8 @@ class RedemptionRecordAdmin(admin.ModelAdmin):
                      'reward__name')
     # Los canjes se crean vía el endpoint POST /redeem/; aquí solo se gestiona
     # el ciclo de vida (status/note). El resto es de solo lectura.
-    readonly_fields = ('id', 'player', 'reward', 'points_spent', 'code',
-                       'created_at', 'updated_at')
+    readonly_fields = ('id', 'player', 'reward', 'point_transaction', 'points_spent',
+                       'code', 'created_at', 'updated_at')
 
     def has_add_permission(self, request):
         return False

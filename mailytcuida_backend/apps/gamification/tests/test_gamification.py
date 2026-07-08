@@ -9,7 +9,7 @@ from apps.gamification.models import (
     BadgeCategory, PointSource, PLAN_MULTIPLIERS,
     RewardProduct, RedemptionRecord,
 )
-from apps.gamification.engine import award_points
+from apps.gamification.engine import award_points, redeem_reward
 
 
 def _patient(email='p@test.com', clerk_id='pat_001'):
@@ -377,3 +377,143 @@ class TestRedemptionModel(TestCase):
         )
         with self.assertRaises(ProtectedError):
             self.reward.delete()
+
+
+@pytest.mark.django_db
+class TestRedemptionFlow(TestCase):
+    """
+    Actividad 6: canje atómico vía POST /redeem/ y engine.redeem_reward().
+    Modelo A: el canje debita el saldo gastable (balance); total_points
+    (lifetime) y el nivel quedan intactos.
+    """
+
+    def setUp(self):
+        self.user, self.patient = _patient()
+        self.client = _jwt_client(self.user)
+        self.reward = RewardProduct.objects.create(
+            name='Cupón 10% farmacia', points_cost=100, stock=5, is_active=True,
+        )
+
+    def _give_balance(self, amount):
+        player, _ = PlayerProfile.objects.get_or_create(patient=self.patient)
+        player.balance      = amount
+        player.total_points = amount
+        player.save(update_fields=['balance', 'total_points'])
+        return player
+
+    def _redeem(self, reward_id=None):
+        return self.client.post(
+            '/api/v1/gamification/redeem/',
+            {'reward_id': str(reward_id or self.reward.id)},
+            format='json',
+        )
+
+    def test_award_increments_both_counters(self):
+        # Un award alimenta lifetime (total_points) y saldo gastable (balance).
+        award_points(self.patient, PointSource.APPOINTMENT_KEPT)  # 20 pts (FREE)
+        player = PlayerProfile.objects.get(patient=self.patient)
+        self.assertEqual(player.total_points, 20)
+        self.assertEqual(player.balance, 20)
+
+    def test_redeem_success(self):
+        self._give_balance(300)
+        resp = self._redeem()
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['balance'], 200)  # 300 − 100
+
+        rec = RedemptionRecord.objects.get(id=resp.data['redemption']['id'])
+        self.assertEqual(rec.points_spent, 100)
+        self.assertTrue(rec.code.startswith('RDM-'))
+        self.assertEqual(rec.status, RedemptionRecord.Status.PENDING)
+
+        # Asiento de débito en el ledger, enlazado por la FK de trazabilidad.
+        txn = PointTransaction.objects.get(
+            source=PointSource.REDEMPTION, player__patient=self.patient,
+        )
+        self.assertEqual(txn.points, -100)
+        self.assertEqual(rec.point_transaction_id, txn.id)
+
+        # total_points (lifetime) intacto → el nivel nunca baja por canjear.
+        player = PlayerProfile.objects.get(patient=self.patient)
+        self.assertEqual(player.total_points, 300)
+        self.assertEqual(player.balance, 200)
+
+    def test_redeem_insufficient_balance(self):
+        self._give_balance(50)
+        resp = self._redeem()
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.data['code'], 'insufficient_balance')
+        # Sin registro ni débito.
+        self.assertFalse(
+            RedemptionRecord.objects.filter(player__patient=self.patient).exists()
+        )
+        self.assertEqual(
+            PlayerProfile.objects.get(patient=self.patient).balance, 50
+        )
+
+    def test_redeem_inactive_reward(self):
+        self._give_balance(300)
+        self.reward.is_active = False
+        self.reward.save(update_fields=['is_active'])
+        resp = self._redeem()
+        self.assertEqual(resp.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(resp.data['code'], 'reward_unavailable')
+        self.assertEqual(
+            PlayerProfile.objects.get(patient=self.patient).balance, 300
+        )
+
+    def test_redeem_reward_not_found(self):
+        import uuid
+        self._give_balance(300)
+        resp = self._redeem(reward_id=uuid.uuid4())
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(resp.data['code'], 'reward_not_found')
+
+    def test_finite_stock_depletes_and_deactivates(self):
+        # Hallazgo A: un producto finito que se agota se desactiva en vez de
+        # quedar en stock=0 (que significaría "ilimitado").
+        self._give_balance(1000)
+        self.reward.stock = 1
+        self.reward.save(update_fields=['stock'])
+
+        resp = self._redeem()
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        self.reward.refresh_from_db()
+        self.assertEqual(self.reward.stock, 0)
+        self.assertFalse(self.reward.is_active)
+
+        # El segundo canje se rechaza (recompensa ya no disponible).
+        resp2 = self._redeem()
+        self.assertEqual(resp2.status_code, status.HTTP_409_CONFLICT)
+
+    def test_unlimited_stock_allows_multiple(self):
+        self._give_balance(1000)
+        self.reward.stock = 0  # ilimitado
+        self.reward.save(update_fields=['stock'])
+
+        for _ in range(3):
+            self.assertEqual(self._redeem().status_code, status.HTTP_201_CREATED)
+
+        self.reward.refresh_from_db()
+        self.assertEqual(self.reward.stock, 0)   # sigue ilimitado
+        self.assertTrue(self.reward.is_active)
+        self.assertEqual(
+            RedemptionRecord.objects.filter(player__patient=self.patient).count(), 3
+        )
+
+    def test_ledger_reconciliation(self):
+        # Gana puntos reales y luego canjea; verifica los invariantes del Modelo A.
+        for i in range(10):
+            award_points(self.patient, PointSource.APPOINTMENT_KEPT, ref_id=f'appt-{i}')  # 200
+        redeem_reward(self.patient, self.reward.id)  # −100
+
+        player = PlayerProfile.objects.get(patient=self.patient)
+        txns   = list(PointTransaction.objects.filter(player=player))
+
+        # balance == suma de TODOS los asientos (awards positivos + canjes negativos).
+        self.assertEqual(player.balance, sum(t.points for t in txns))
+        # total_points (lifetime) == suma de los asientos positivos.
+        self.assertEqual(
+            player.total_points, sum(t.points for t in txns if t.points > 0)
+        )

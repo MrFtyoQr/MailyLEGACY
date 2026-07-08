@@ -31,6 +31,7 @@ class PointSource(models.TextChoices):
     REFERRAL_COMPLETED = 'REFERRAL_COMPLETED', 'Referido completado'
     PROFILE_COMPLETED  = 'PROFILE_COMPLETED',  'Perfil completado'
     MANUAL_ADJUSTMENT  = 'MANUAL_ADJUSTMENT',  'Ajuste manual (admin)'
+    REDEMPTION         = 'REDEMPTION',         'Canje de recompensa'
 
 
 # Base points per action (before multiplier)
@@ -43,6 +44,7 @@ BASE_POINTS: dict[str, int] = {
     PointSource.REFERRAL_COMPLETED: 50,
     PointSource.PROFILE_COMPLETED:  30,
     PointSource.MANUAL_ADJUSTMENT:   0,  # set explicitly
+    PointSource.REDEMPTION:          0,  # débito real = -points_cost, explícito en el canje
 }
 
 PLAN_MULTIPLIERS: dict[str, int] = {
@@ -98,7 +100,15 @@ class PlayerProfile(models.Model):
         on_delete=models.CASCADE,
         related_name='player_profile',
     )
+    # Experiencia acumulada de por vida: rige el nivel (compute_level) y el
+    # leaderboard. Monótono — solo lo incrementan los awards; el canje NO lo
+    # toca, de modo que el nivel nunca baja.
     total_points    = models.PositiveIntegerField(default=0)
+    # Saldo gastable = puntos ganados − puntos canjeados. Es lo que se debita
+    # en POST /redeem/. Se mantiene entre niveles (no se reinicia).
+    balance         = models.PositiveIntegerField(
+        default=0, help_text='Puntos disponibles para canjear (ganados − canjeados).'
+    )
     # Current consecutive days with at least one MEDICATION_TAKEN
     current_streak  = models.PositiveIntegerField(default=0)
     longest_streak  = models.PositiveIntegerField(default=0)
@@ -223,8 +233,9 @@ def generate_redemption_code() -> str:
 class RedemptionRecord(models.Model):
     """
     Registro de un canje de RewardProduct por puntos.
-    El débito de puntos, el decremento de stock y la generación con reintento
-    se implementan en el endpoint atómico POST /redeem/ (Actividad 6).
+    El débito de puntos (sobre PlayerProfile.balance), el decremento de stock y
+    el enlace al asiento del ledger se realizan atómicamente en
+    engine.redeem_reward(), invocado por el endpoint POST /redeem/ (Actividad 6).
     """
     class Status(models.TextChoices):
         PENDING   = 'PENDING',   'Pendiente'
@@ -237,6 +248,12 @@ class RedemptionRecord(models.Model):
     )
     reward       = models.ForeignKey(
         RewardProduct, on_delete=models.PROTECT, related_name='redemptions'
+    )
+    # Enlace de trazabilidad al asiento del débito en el ledger. Nullable:
+    # el canje se conserva aunque el asiento se elimine (SET_NULL).
+    point_transaction = models.ForeignKey(
+        'PointTransaction', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='redemption'
     )
     # Snapshot del costo al momento del canje (RewardProduct.points_cost puede cambiar).
     points_spent = models.PositiveIntegerField(help_text='Puntos debitados en el canje.')

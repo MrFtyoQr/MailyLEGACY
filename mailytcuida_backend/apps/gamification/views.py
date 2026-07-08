@@ -10,16 +10,18 @@ Gamification API.
   GET  /api/v1/gamification/patient/<id>/    — view a patient's gamification profile
 """
 from django.shortcuts import get_object_or_404
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from apps.accounts.models import PatientProfile, DoctorPatient
+from . import engine
 from .models import PlayerProfile, PointTransaction, Badge, RewardProduct
 from .serializers import (
     PlayerProfileSerializer, PointTransactionSerializer,
     BadgeSerializer, LeaderboardEntrySerializer, RewardProductSerializer,
+    RedemptionSerializer,
 )
 
 
@@ -78,6 +80,56 @@ class RewardProductListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class   = RewardProductSerializer
     queryset           = RewardProduct.objects.filter(is_active=True)
+
+
+class RedeemView(APIView):
+    """
+    POST /gamification/redeem/  — canjea un RewardProduct por puntos.
+
+    Body: {"reward_id": "<uuid>"}
+    201 → {"redemption": {...}, "balance": <saldo restante>}
+    Errores:
+      400 saldo insuficiente          {"code": "insufficient_balance"}
+      404 recompensa inexistente      {"code": "reward_not_found"}
+      409 recompensa no disponible    {"code": "reward_unavailable"}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        reward_id = request.data.get('reward_id')
+        if not reward_id:
+            return Response(
+                {'code': 'reward_id_required', 'detail': 'Falta reward_id.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        patient = _get_patient(request)
+        try:
+            redemption = engine.redeem_reward(patient, reward_id)
+        except RewardProduct.DoesNotExist:
+            return Response(
+                {'code': 'reward_not_found', 'detail': 'La recompensa no existe.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except engine.RewardUnavailable as exc:
+            return Response(
+                {'code': 'reward_unavailable', 'detail': str(exc)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except engine.InsufficientBalance as exc:
+            return Response(
+                {'code': 'insufficient_balance', 'detail': str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        redemption.player.refresh_from_db(fields=['balance'])
+        return Response(
+            {
+                'redemption': RedemptionSerializer(redemption).data,
+                'balance': redemption.player.balance,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class DoctorPatientGameView(APIView):
