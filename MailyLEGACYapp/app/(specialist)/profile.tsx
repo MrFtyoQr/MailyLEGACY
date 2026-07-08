@@ -8,16 +8,14 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
-  StyleSheet,
   Alert,
 } from 'react-native'
-import { router } from 'expo-router'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
-import { Avatar } from '@components/ui/Avatar'
 import { Card } from '@components/ui/Card'
-import { Badge } from '@components/ui/Badge'
 import { InfoRow } from '@components/ui/InfoRow'
+import { ProfileAvatarHeader } from '@components/profile/ProfileAvatarHeader'
+import { ProfileSignOutButton } from '@components/profile/ProfileSignOutButton'
+import { profileStyles } from '@components/profile/profileStyles'
 import { Colors } from '@constants/colors'
 import { useAuthStore } from '@store/auth.store'
 
@@ -50,91 +48,31 @@ export default function SpecialistProfileScreen() {
 
   return (
     <ScreenWrapper noPadding edges={['top', 'left', 'right']}>
-      {/* Header con avatar */}
-      <View style={styles.profileHeader}>
-        <Avatar
-          uri={user?.photoUrl}
-          name={fullName}
-          size={88}
-          bgColor={Colors.role.specialist}
-        />
-        <Text style={styles.name}>{fullName}</Text>
-        {user?.email && <Text style={styles.email}>{user.email}</Text>}
-        <Badge label="Especialista" variant="success" size="sm" />
-      </View>
+      <ProfileAvatarHeader
+        fullName={fullName}
+        email={user?.email}
+        photoUrl={user?.photoUrl}
+        roleLabel="Especialista"
+        roleBadge="success"
+        avatarColor={Colors.role.specialist}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={profileStyles.content}
       >
-        <Text style={styles.sectionTitle}>Información</Text>
+        <Text style={profileStyles.sectionTitle}>Información</Text>
         <Card>
           <InfoRow icon="user" label="Nombre" value={fullName} />
           {user?.email && <InfoRow icon="mail" label="Email" value={user.email} divider />}
           <InfoRow icon="tag" label="Rol" value="Especialista" divider />
         </Card>
 
-        <TouchableOpacity
-          style={styles.signOutBtn}
-          onPress={handleSignOut}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.signOutText}>Cerrar sesión</Text>
-        </TouchableOpacity>
+        <ProfileSignOutButton onPress={handleSignOut} />
 
-        <Text style={styles.version}>MailyT-Cuida v1.0</Text>
+        <Text style={profileStyles.version}>MailyT-Cuida v1.0</Text>
         <View style={{ height: 80 }} />
       </ScrollView>
     </ScreenWrapper>
   )
 }
-
-const styles = StyleSheet.create({
-  profileHeader: {
-    alignItems:        'center',
-    paddingTop:        24,
-    paddingBottom:     20,
-    gap:               8,
-    backgroundColor:   Colors.light.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  name: {
-    fontSize:   22,
-    fontWeight: '700',
-    color:      Colors.light.textPrimary,
-    marginTop:  4,
-  },
-  email: {
-    fontSize: 14,
-    color:    Colors.light.textSecondary,
-  },
-  content: {
-    gap:           16,
-    padding:       20,
-    paddingBottom: 24,
-  },
-  sectionTitle: {
-    fontSize:      14,
-    fontWeight:    '700',
-    color:         Colors.light.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  signOutBtn: {
-    backgroundColor: Colors.semantic.errorBg,
-    borderRadius:    12,
-    paddingVertical: 14,
-    alignItems:      'center',
-  },
-  signOutText: {
-    fontSize:   15,
-    fontWeight: '600',
-    color:      Colors.semantic.error,
-  },
-  version: {
-    fontSize:  12,
-    color:     Colors.light.textMuted,
-    textAlign: 'center',
-  },
-})

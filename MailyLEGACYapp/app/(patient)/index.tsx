@@ -20,6 +20,7 @@ import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { Card }          from '@components/ui/Card'
 import { InfoCard }      from '@components/ui/InfoCard'
 import { IconBadge }     from '@components/ui/IconBadge'
+import { StreakFlame, StreakIconSlot } from '@components/ui/StreakIcons'
 import { Button }        from '@components/ui/Button'
 import { Capsule3D }     from '@components/ui/Capsule3D'
 import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
@@ -34,6 +35,7 @@ import { useAuthStore }   from '@store/auth.store'
 import { useWsStore }     from '@store/ws.store'
 import { useVitalsLatest, VITAL_META, type VitalType } from '@hooks/useVitals'
 import { getStatusBadge, getVitalStatus } from '@lib/vitals/statusColors'
+import { formatVitalValue } from '@lib/vitals/formatValue'
 
 const { width } = Dimensions.get('window')
 
@@ -279,11 +281,15 @@ export default function PatientHome() {
               accent="purple"
             />
             <StatCard
-              icon="fire"
               value={streakDays > 0 ? `${streakDays}d` : '—'}
               label="Racha"
               sub="consecutivos"
               accent="orange"
+              customIcon={
+                <StreakIconSlot>
+                  <StreakFlame size={30} />
+                </StreakIconSlot>
+              }
             />
             <StatCard
               icon="chart"
@@ -309,9 +315,7 @@ export default function PatientHome() {
             <View style={styles.vitalsRow}>
               {vitalsLatest.slice(0, 4).map(v => {
                 const meta = VITAL_META[v.vital_type]
-                const display = v.vital_type === 'BLOOD_PRESSURE' && v.secondary_value != null
-                  ? `${v.value}/${v.secondary_value}`
-                  : `${v.value}`
+                const display = formatVitalValue(v.vital_type, v.value, v.secondary_value)
                 return (
                   <VitalChip
                     key={v.vital_type}
@@ -448,8 +452,16 @@ const sh = StyleSheet.create({
 })
 
 function StatCard({
-  icon, value, label, sub, accent, dynamicColor,
-}: { icon: AppIconName; value: string; label: string; sub: string; accent: keyof typeof PASTEL | 'dynamic'; dynamicColor?: string }) {
+  icon, customIcon, value, label, sub, accent, dynamicColor,
+}: {
+  icon?: AppIconName
+  customIcon?: React.ReactNode
+  value: string
+  label: string
+  sub: string
+  accent: keyof typeof PASTEL | 'dynamic'
+  dynamicColor?: string
+}) {
   const pastel = accent === 'dynamic'
     ? adherencePastel(dynamicColor ?? '#64748B')
     : PASTEL[accent as keyof typeof PASTEL]
@@ -462,8 +474,11 @@ function StatCard({
         depth="sm"
         borderRadius={16}
         faceStyle={sc.face}
+        style={sc.capsule}
       >
-        <IconBadge name={icon} size={20} color={pastel.icon} bgColor={pastel.bg} />
+        <View style={sc.iconSlot}>
+          {customIcon ?? <IconBadge name={icon!} size={20} color={pastel.icon} bgColor={pastel.bg} />}
+        </View>
         <Text style={sc.value}>{value}</Text>
         <Text style={sc.label}>{label}</Text>
         <Text style={sc.sub}>{sub}</Text>
@@ -473,8 +488,15 @@ function StatCard({
 }
 
 const sc = StyleSheet.create({
-  wrap:  { flex: 1, marginHorizontal: 4 },
-  face:  { alignItems: 'center', paddingVertical: 14, paddingHorizontal: 6, gap: 4 },
+  wrap:    { flex: 1, marginHorizontal: 4, alignSelf: 'stretch' },
+  capsule: { flex: 1 },
+  face:    { alignItems: 'center', paddingVertical: 14, paddingHorizontal: 6, gap: 4, flex: 1, justifyContent: 'flex-start' },
+  iconSlot: {
+    width:          40,
+    height:         40,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
   value: { fontSize: 20, fontWeight: '800', color: Colors.light.textPrimary },
   label: { fontSize: 11, fontWeight: '700', color: Colors.light.textPrimary },
   sub:   { fontSize: 10, color: Colors.light.textMuted },
@@ -594,7 +616,7 @@ const styles = StyleSheet.create({
   chatBtnTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
   chatBtnSub:   { fontSize: 12, color: 'rgba(255,255,255,0.78)', marginTop: 2 },
 
-  statsRow:    { flexDirection: 'row', marginHorizontal: 16, marginTop: 16 },
+  statsRow:    { flexDirection: 'row', marginHorizontal: 16, marginTop: 16, alignItems: 'stretch' },
 
   vitalsCard:  { marginHorizontal: 20 },
   vitalsRow:   { flexDirection: 'row', justifyContent: 'space-around' },

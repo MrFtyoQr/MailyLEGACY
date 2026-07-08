@@ -11,6 +11,10 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
+import { Button } from '@components/ui/Button'
+import { Badge } from '@components/ui/Badge'
+import { InfoCard } from '@components/ui/InfoCard'
+import { IconBadge } from '@components/ui/IconBadge'
 import { Colors }        from '@constants/colors'
 import {
   useFamilyLinks, useAcceptLink, useRevokeLink,
@@ -44,42 +48,46 @@ function LinkCard({
   const rel = RELATIONSHIP_LABEL[link.relationship] ?? link.relationship
 
   return (
-    <View style={styles.card}>
-      <View style={styles.cardAvatar}>
-        <Text style={{ fontSize: 24 }}>👤</Text>
-      </View>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>{link.caregiver_name}</Text>
-        <Text style={styles.cardRel}>{rel}</Text>
-        {link.status === 'ACTIVE' && link.accepted_at && (
-          <Text style={styles.cardDate}>Vinculado {fmtDate(link.accepted_at)}</Text>
-        )}
-        {link.status === 'PENDING' && (
-          <Text style={[styles.cardDate, { color: Colors.semantic.warning }]}>
-            Solicitud pendiente — {fmtDate(link.created_at)}
-          </Text>
-        )}
-      </View>
-      <View style={styles.cardActions}>
-        {link.status === 'PENDING' && onAccept && (
-          <TouchableOpacity style={styles.btnAccept} onPress={onAccept} activeOpacity={0.7}>
-            <Text style={styles.btnAcceptText}>Aceptar</Text>
-          </TouchableOpacity>
-        )}
-        {(link.status === 'ACTIVE' || link.status === 'PENDING') && onRevoke && (
-          <TouchableOpacity style={styles.btnRevoke} onPress={onRevoke} activeOpacity={0.7}>
-            <Text style={styles.btnRevokeText}>
-              {link.status === 'PENDING' ? 'Rechazar' : 'Revocar'}
+    <InfoCard padding={14}>
+      <View style={styles.cardRow}>
+        <IconBadge name="user" size={20} shape="circle" />
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName}>{link.caregiver_name}</Text>
+          <Text style={styles.cardRel}>{rel}</Text>
+          {link.status === 'ACTIVE' && link.accepted_at && (
+            <Text style={styles.cardDate}>Vinculado {fmtDate(link.accepted_at)}</Text>
+          )}
+          {link.status === 'PENDING' && (
+            <Text style={[styles.cardDate, { color: Colors.semantic.warning }]}>
+              Solicitud pendiente — {fmtDate(link.created_at)}
             </Text>
-          </TouchableOpacity>
-        )}
+          )}
+        </View>
+        <View style={styles.cardActions}>
+          {link.status === 'PENDING' && onAccept && (
+            <Button
+              label="Aceptar"
+              size="sm"
+              variant="primary"
+              onPress={onAccept}
+            />
+          )}
+          {(link.status === 'ACTIVE' || link.status === 'PENDING') && onRevoke && (
+            <Button
+              label={link.status === 'PENDING' ? 'Rechazar' : 'Revocar'}
+              size="sm"
+              variant="danger"
+              onPress={onRevoke}
+            />
+          )}
+        </View>
       </View>
-    </View>
+    </InfoCard>
   )
 }
 
 export default function FamilyCareScreen() {
-  const { data, isLoading, refetch } = useFamilyLinks()
+  const { data, isLoading } = useFamilyLinks()
   const accept = useAcceptLink()
   const revoke = useRevokeLink()
 
@@ -137,9 +145,7 @@ export default function FamilyCareScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Solicitudes pendientes</Text>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pending.length}</Text>
-                </View>
+                <Badge label={String(pending.length)} variant="warning" size="sm" />
               </View>
               {pending.map((link) => (
                 <LinkCard
@@ -156,13 +162,15 @@ export default function FamilyCareScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Vínculos activos</Text>
             {active.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={{ fontSize: 36, marginBottom: 8 }}>👨‍👩‍👧</Text>
-                <Text style={styles.emptyTitle}>Sin cuidadores vinculados</Text>
-                <Text style={styles.emptyText}>
-                  Cuando un familiar te envíe una solicitud aparecerá aquí.
-                </Text>
-              </View>
+              <InfoCard padding={32}>
+                <View style={styles.emptyInner}>
+                  <IconBadge name="family" size={28} />
+                  <Text style={styles.emptyTitle}>Sin cuidadores vinculados</Text>
+                  <Text style={styles.emptyText}>
+                    Cuando un familiar te envíe una solicitud aparecerá aquí.
+                  </Text>
+                </View>
+              </InfoCard>
             ) : (
               active.map((link) => (
                 <LinkCard
@@ -210,7 +218,7 @@ const styles = StyleSheet.create({
   },
   scroll: {
     padding: 16,
-    gap:     16,
+    gap:     12,
   },
   section: {
     gap: 10,
@@ -225,36 +233,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color:      Colors.light.textPrimary,
   },
-  badge: {
-    backgroundColor: Colors.semantic.warning,
-    borderRadius:    10,
-    paddingHorizontal: 7,
-    paddingVertical:   2,
-  },
-  badgeText: {
-    fontSize:   12,
-    fontWeight: '700',
-    color:      '#FFFFFF',
-  },
 
   // Card
-  card: {
-    flexDirection:    'row',
-    alignItems:       'center',
-    backgroundColor:  Colors.light.surface,
-    borderRadius:     16,
-    padding:          14,
-    borderWidth:      1,
-    borderColor:      Colors.light.border,
-    gap:              12,
-  },
-  cardAvatar: {
-    width:           44,
-    height:          44,
-    borderRadius:    22,
-    backgroundColor: Colors.light.border,
-    alignItems:      'center',
-    justifyContent:  'center',
+  cardRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           12,
   },
   cardInfo: {
     flex: 1,
@@ -275,49 +259,24 @@ const styles = StyleSheet.create({
   },
   cardActions: {
     gap: 6,
-  },
-  btnAccept: {
-    backgroundColor: Colors.brand.primary,
-    borderRadius:    10,
-    paddingHorizontal: 12,
-    paddingVertical:   7,
-  },
-  btnAcceptText: {
-    fontSize:   13,
-    fontWeight: '700',
-    color:      '#FFFFFF',
-  },
-  btnRevoke: {
-    borderWidth:  1,
-    borderColor:  Colors.semantic.error,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical:   7,
-  },
-  btnRevokeText: {
-    fontSize:   13,
-    fontWeight: '600',
-    color:      Colors.semantic.error,
+    alignItems: 'flex-end',
   },
 
   // Empty
-  emptyBox: {
-    backgroundColor: Colors.light.surface,
-    borderRadius:    16,
-    padding:         32,
-    alignItems:      'center',
-    borderWidth:     1,
-    borderColor:     Colors.light.border,
+  emptyInner: {
+    alignItems: 'center',
+    gap:        10,
   },
   emptyTitle: {
     fontSize:   15,
     fontWeight: '700',
     color:      Colors.light.textPrimary,
-    marginBottom: 4,
+    textAlign:  'center',
   },
   emptyText: {
     fontSize:  13,
     color:     Colors.light.textSecondary,
     textAlign: 'center',
+    lineHeight: 18,
   },
 })

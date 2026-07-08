@@ -15,11 +15,15 @@ import {
   StyleSheet,
   Alert,
   Linking,
-  ActivityIndicator,
 } from 'react-native'
 import { router } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
+import { Button } from '@components/ui/Button'
+import { Card } from '@components/ui/Card'
+import { Badge } from '@components/ui/Badge'
+import { IconBadge } from '@components/ui/IconBadge'
+import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
 import {
   usePlans,
@@ -34,16 +38,18 @@ import {
 // ─── Constantes visuales por tier ─────────────────────────────────────────────
 
 const TIER_META: Record<PlanTier, {
-  icon: string
-  gradient: readonly [string, string]
+  icon:  AppIconName
+  accent: string
+  faceColor: string
+  shadowColor: string
   label: string
   priceIndividual: number
   priceFamily: number
 }> = {
-  FREE:     { icon: '🆓', gradient: ['#8E8E93', '#6B6B72'], label: 'Gratis',    priceIndividual: 0,    priceFamily: 0    },
-  SILVER:   { icon: '🥈', gradient: ['#5E9FE0', '#3B7DC4'], label: 'Silver',    priceIndividual: 5.99, priceFamily: 9.99 },
-  GOLD:     { icon: '🥇', gradient: ['#F5A623', '#E8922A'], label: 'Gold',      priceIndividual: 12.99,priceFamily: 19.99},
-  PLATINUM: { icon: '💎', gradient: ['#9B59B6', '#7D3C98'], label: 'Platinum',  priceIndividual: 24.99,priceFamily: 34.99},
+  FREE:     { icon: 'card',   accent: '#8E8E93', faceColor: '#F4F4F5', shadowColor: '#E4E4E7', label: 'Gratis',   priceIndividual: 0,     priceFamily: 0     },
+  SILVER:   { icon: 'medal',  accent: '#5E9FE0', faceColor: '#EFF6FF', shadowColor: '#DBEAFE', label: 'Silver',   priceIndividual: 5.99,  priceFamily: 9.99  },
+  GOLD:     { icon: 'trophy', accent: '#F5A623', faceColor: '#FFFBEB', shadowColor: '#FDE68A', label: 'Gold',     priceIndividual: 12.99, priceFamily: 19.99 },
+  PLATINUM: { icon: 'star',   accent: '#9B59B6', faceColor: '#FAF5FF', shadowColor: '#E9D5FF', label: 'Platinum', priceIndividual: 24.99, priceFamily: 34.99 },
 }
 
 const TIERS: PlanTier[] = ['FREE', 'SILVER', 'GOLD', 'PLATINUM']
@@ -136,40 +142,64 @@ export default function PlansScreen() {
             onPress={() => setMode('individual')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.modeBtnText, mode === 'individual' && styles.modeBtnTextActive]}>
-              👤 Individual
-            </Text>
+            <View style={styles.modeBtnInner}>
+              <AppIcon
+                name="user"
+                size={14}
+                color={mode === 'individual' ? Colors.dark.bg : 'rgba(255,255,255,0.7)'}
+              />
+              <Text style={[styles.modeBtnText, mode === 'individual' && styles.modeBtnTextActive]}>
+                Individual
+              </Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.modeBtn, mode === 'family' && styles.modeBtnActive]}
             onPress={() => setMode('family')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.modeBtnText, mode === 'family' && styles.modeBtnTextActive]}>
-              👨‍👩‍👧 Familiar
-            </Text>
+            <View style={styles.modeBtnInner}>
+              <AppIcon
+                name="family"
+                size={14}
+                color={mode === 'family' ? Colors.dark.bg : 'rgba(255,255,255,0.7)'}
+              />
+              <Text style={[styles.modeBtnText, mode === 'family' && styles.modeBtnTextActive]}>
+                Familiar
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
         {mode === 'family' && (
-          <Text style={styles.familyNote}>
-            ✓ Incluye hasta 6 miembros en el plan Platinum
-          </Text>
+          <View style={styles.familyNote}>
+            <AppIcon name="check" size={12} color={Colors.brand.nature} />
+            <Text style={styles.familyNoteText}>
+              Incluye hasta 6 miembros en el plan Platinum
+            </Text>
+          </View>
         )}
       </LinearGradient>
 
       {/* ── Plan actual badge ──────────────────────────────────────── */}
       {subscription?.plan && (
         <View style={styles.currentPlanBanner}>
-          <Text style={styles.currentPlanText}>
-            {TIER_META[currentTier].icon} Plan actual:{' '}
-            <Text style={{ fontWeight: '700' }}>{subscription.plan.name}</Text>
-          </Text>
-          {subscription.currentPeriodEnd && (
-            <Text style={styles.currentPlanSub}>
-              Vigente hasta {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-MX')}
+          <IconBadge
+            name={TIER_META[currentTier].icon}
+            size={14}
+            accent={TIER_META[currentTier].accent}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.currentPlanText}>
+              Plan actual:{' '}
+              <Text style={{ fontWeight: '700' }}>{subscription.plan.name}</Text>
             </Text>
-          )}
+            {subscription.currentPeriodEnd && (
+              <Text style={styles.currentPlanSub}>
+                Vigente hasta {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-MX')}
+              </Text>
+            )}
+          </View>
         </View>
       )}
 
@@ -178,117 +208,24 @@ export default function PlansScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {TIERS.map((tier) => {
-          const meta      = TIER_META[tier]
-          const price     = getPrice(tier)
-          const isCurrent = tier === currentTier
-          const isSelected = selected === tier
-          const isExpanded = expanded === tier
-          const features  = FEATURE_MATRIX[tier]
-          const popular   = tier === 'GOLD'
-
-          return (
-            <TouchableOpacity
-              key={tier}
-              activeOpacity={0.9}
-              onPress={() => {
-                setSelected(tier)
-                setExpanded(isExpanded ? null : tier)
-              }}
-              style={[
-                styles.planCard,
-                isCurrent   && styles.planCardCurrent,
-                isSelected  && !isCurrent && styles.planCardSelected,
-                popular     && !isCurrent && styles.planCardPopular,
-              ]}
-            >
-              {/* Popular badge */}
-              {popular && (
-                <View style={styles.popularBadge}>
-                  <Text style={styles.popularText}>⭐ Más popular</Text>
-                </View>
-              )}
-
-              {/* Plan header */}
-              <View style={styles.planHeader}>
-                <LinearGradient
-                  colors={meta.gradient}
-                  style={styles.planIconBg}
-                >
-                  <Text style={styles.planIcon}>{meta.icon}</Text>
-                </LinearGradient>
-
-                <View style={styles.planInfo}>
-                  <Text style={styles.planName}>{meta.label}</Text>
-                  {isCurrent && (
-                    <View style={styles.activeChip}>
-                      <Text style={styles.activeChipText}>Activo</Text>
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.planPricing}>
-                  {price === 0 ? (
-                    <Text style={[styles.planPrice, { color: meta.gradient[0] }]}>Gratis</Text>
-                  ) : (
-                    <>
-                      <Text style={[styles.planPrice, { color: meta.gradient[0] }]}>
-                        ${price.toFixed(2)}
-                      </Text>
-                      <Text style={styles.planPriceSub}>/mes</Text>
-                    </>
-                  )}
-                </View>
-
-                <Text style={[styles.expandChevron, isExpanded && { transform: [{ rotate: '90deg' }] }]}>
-                  ›
-                </Text>
-              </View>
-
-              {/* Features expandibles */}
-              {isExpanded && (
-                <View style={styles.featureList}>
-                  <View style={styles.featureDivider} />
-                  {features.map((f, i) => (
-                    <View key={i} style={styles.featureRow}>
-                      <Text style={[
-                        styles.featureCheck,
-                        f.included ? { color: Colors.semantic.success } : { color: Colors.light.textMuted },
-                      ]}>
-                        {f.included ? '✓' : '✕'}
-                      </Text>
-                      <Text style={[
-                        styles.featureLabel,
-                        !f.included && styles.featureLabelDisabled,
-                        f.highlight && f.included && styles.featureLabelHighlight,
-                      ]}>
-                        {f.label}
-                      </Text>
-                    </View>
-                  ))}
-
-                  {/* CTA */}
-                  {!isCurrent && (
-                    <TouchableOpacity
-                      style={[styles.ctaBtn, { backgroundColor: meta.gradient[0] }]}
-                      onPress={() => handleSubscribe(tier)}
-                      activeOpacity={0.85}
-                      disabled={checkoutLoading}
-                    >
-                      {checkoutLoading && selected === tier ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                      ) : (
-                        <Text style={styles.ctaBtnText}>
-                          {tier === 'FREE' ? 'Continuar gratis' : `Contratar ${meta.label}`}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
-          )
-        })}
+        {TIERS.map((tier) => (
+          <PlanCard
+            key={tier}
+            tier={tier}
+            meta={TIER_META[tier]}
+            price={getPrice(tier)}
+            isCurrent={tier === currentTier}
+            isSelected={selected === tier}
+            isExpanded={expanded === tier}
+            popular={tier === 'GOLD'}
+            checkoutLoading={checkoutLoading && selected === tier}
+            onToggle={() => {
+              setSelected(tier)
+              setExpanded(expanded === tier ? null : tier)
+            }}
+            onSubscribe={() => handleSubscribe(tier)}
+          />
+        ))}
 
         {/* Nota legal */}
         <Text style={styles.legalNote}>
@@ -299,6 +236,114 @@ export default function PlansScreen() {
         <View style={{ height: 80 }} />
       </ScrollView>
     </ScreenWrapper>
+  )
+}
+
+// ─── Tarjeta de plan ──────────────────────────────────────────────────────────
+
+function PlanCard({
+  tier,
+  meta,
+  price,
+  isCurrent,
+  isSelected,
+  isExpanded,
+  popular,
+  checkoutLoading,
+  onToggle,
+  onSubscribe,
+}: {
+  tier:            PlanTier
+  meta:            typeof TIER_META[PlanTier]
+  price:           number
+  isCurrent:       boolean
+  isSelected:      boolean
+  isExpanded:      boolean
+  popular:         boolean
+  checkoutLoading: boolean
+  onToggle:        () => void
+  onSubscribe:     () => void
+}) {
+  const features = FEATURE_MATRIX[tier]
+  const faceColor = isCurrent ? '#F0FDF4' : meta.faceColor
+  const shadowColor = isCurrent ? '#BBF7D0' : meta.shadowColor
+
+  return (
+    <Card
+      variant={isSelected && !isCurrent ? 'outlined' : 'default'}
+      padding={0}
+      faceColor={faceColor}
+      shadowColor={shadowColor}
+    >
+      {popular && (
+        <View style={styles.popularBadge}>
+          <AppIcon name="star" size={12} color="#E8922A" />
+          <Text style={styles.popularText}>Más popular</Text>
+        </View>
+      )}
+
+      <TouchableOpacity onPress={onToggle} activeOpacity={0.85}>
+        <View style={styles.planHeader}>
+          <IconBadge name={meta.icon} size={20} accent={meta.accent} />
+          <View style={styles.planInfo}>
+            <Text style={styles.planName}>{meta.label}</Text>
+            {isCurrent && <Badge label="Activo" variant="success" size="sm" />}
+          </View>
+          <View style={styles.planPricing}>
+            {price === 0 ? (
+              <Text style={[styles.planPrice, { color: meta.accent }]}>Gratis</Text>
+            ) : (
+              <>
+                <Text style={[styles.planPrice, { color: meta.accent }]}>
+                  ${price.toFixed(2)}
+                </Text>
+                <Text style={styles.planPriceSub}>/mes</Text>
+              </>
+            )}
+          </View>
+          <AppIcon
+            name="chevron-right"
+            size={18}
+            color={Colors.light.textMuted}
+            style={isExpanded ? { transform: [{ rotate: '90deg' }] } : undefined}
+          />
+        </View>
+      </TouchableOpacity>
+
+      {isExpanded && (
+        <View style={styles.featureList}>
+          <View style={styles.featureDivider} />
+          {features.map((f, i) => (
+            <View key={i} style={styles.featureRow}>
+              <AppIcon
+                name={f.included ? 'check' : 'close'}
+                size={16}
+                color={f.included ? Colors.semantic.success : Colors.light.textMuted}
+              />
+              <Text style={[
+                styles.featureLabel,
+                !f.included && styles.featureLabelDisabled,
+                f.highlight && f.included && styles.featureLabelHighlight,
+              ]}>
+                {f.label}
+              </Text>
+            </View>
+          ))}
+
+          {!isCurrent && (
+            <View style={styles.ctaWrap}>
+              <Button
+                label={tier === 'FREE' ? 'Continuar gratis' : `Contratar ${meta.label}`}
+                variant={tier === 'FREE' ? 'secondary' : 'primary'}
+                fullWidth
+                loading={checkoutLoading}
+                onPress={onSubscribe}
+              />
+            </View>
+          )}
+        </View>
+      )}
+    </Card>
   )
 }
 
@@ -345,6 +390,11 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     borderRadius:    10,
   },
+  modeBtnInner: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           6,
+  },
   modeBtnActive: {
     backgroundColor: '#fff',
   },
@@ -357,16 +407,24 @@ const styles = StyleSheet.create({
     color: Colors.dark.bg,
   },
   familyNote: {
-    fontSize:  12,
-    color:     Colors.brand.nature,
-    marginTop: 8,
-    textAlign: 'center',
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           6,
+    marginTop:     8,
+    justifyContent: 'center',
+  },
+  familyNoteText: {
+    fontSize: 12,
+    color:    Colors.brand.nature,
   },
 
   // Current plan banner
   currentPlanBanner: {
-    backgroundColor: Colors.semantic.infoBg,
-    paddingVertical: 10,
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               10,
+    backgroundColor:   Colors.semantic.infoBg,
+    paddingVertical:   10,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.border,
@@ -387,30 +445,14 @@ const styles = StyleSheet.create({
     gap:        12,
   },
 
-  // Plan card
-  planCard: {
-    backgroundColor: '#fff',
-    borderRadius:    16,
-    borderWidth:     1.5,
-    borderColor:     Colors.light.border,
-    overflow:        'hidden',
-  },
-  planCardCurrent: {
-    borderColor:     Colors.semantic.success,
-    backgroundColor: '#F0FDF4',
-  },
-  planCardSelected: {
-    borderColor: Colors.brand.primary,
-  },
-  planCardPopular: {
-    borderColor: '#F5A623',
-  },
-
   // Popular badge
   popularBadge: {
-    backgroundColor: '#FEF3C7',
-    paddingVertical: 5,
-    alignItems:      'center',
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'center',
+    gap:               6,
+    backgroundColor:   '#FEF3C7',
+    paddingVertical:   6,
     borderBottomWidth: 1,
     borderBottomColor: '#F5A623',
   },
@@ -427,31 +469,11 @@ const styles = StyleSheet.create({
     gap:            12,
     padding:        16,
   },
-  planIconBg: {
-    width:         46,
-    height:        46,
-    borderRadius:  12,
-    justifyContent: 'center',
-    alignItems:    'center',
-  },
-  planIcon:   { fontSize: 22 },
-  planInfo:   { flex: 1, gap: 3 },
+  planInfo:   { flex: 1, gap: 4 },
   planName: {
     fontSize:   16,
     fontWeight: '700',
     color:      Colors.light.textPrimary,
-  },
-  activeChip: {
-    alignSelf:       'flex-start',
-    backgroundColor: Colors.semantic.successBg,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius:    6,
-  },
-  activeChipText: {
-    fontSize:   10,
-    fontWeight: '700',
-    color:      Colors.semantic.success,
   },
   planPricing:  { alignItems: 'flex-end' },
   planPrice: {
@@ -463,11 +485,6 @@ const styles = StyleSheet.create({
     color:    Colors.light.textMuted,
     marginTop: -2,
   },
-  expandChevron: {
-    fontSize:  22,
-    color:     Colors.light.textMuted,
-    marginLeft: 4,
-  },
 
   // Features
   featureDivider: {
@@ -478,7 +495,6 @@ const styles = StyleSheet.create({
   },
   featureList:  { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
   featureRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  featureCheck: { fontSize: 13, fontWeight: '700', width: 16, marginTop: 1 },
   featureLabel: {
     fontSize:  13,
     color:     Colors.light.textPrimary,
@@ -493,18 +509,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color:      Colors.light.textPrimary,
   },
-
-  // CTA
-  ctaBtn: {
-    marginTop:       16,
-    borderRadius:    12,
-    paddingVertical: 13,
-    alignItems:      'center',
-  },
-  ctaBtnText: {
-    fontSize:   15,
-    fontWeight: '700',
-    color:      '#fff',
+  ctaWrap: {
+    marginTop: 8,
   },
 
   // Legal

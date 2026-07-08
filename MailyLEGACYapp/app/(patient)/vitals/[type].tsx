@@ -18,6 +18,7 @@ import {
   VITAL_META, type VitalType, type VitalReading,
 } from '@hooks/useVitals'
 import { getStatusBadge, getStatusColor, getVitalStatus } from '@lib/vitals/statusColors'
+import { formatVitalValue } from '@lib/vitals/formatValue'
 
 const { width } = Dimensions.get('window')
 const CHART_W    = width - 48
@@ -107,7 +108,7 @@ function BarChart({
                 <View key={i} style={[chartStyles.barWrap, { width: BAR_W, marginHorizontal: BAR_GAP / 2 }]}>
                   {/* Valor encima de la barra si hay pocas lecturas */}
                   {readings.length <= 5 && (
-                    <Text style={[chartStyles.barLabel, { color }]}>{r.value}</Text>
+                    <Text style={[chartStyles.barLabel, { color }]}>{formatVitalValue(vitalType, r.value)}</Text>
                   )}
                   <View style={{ height: barH, width: BAR_W, backgroundColor: color, borderRadius: BAR_RADIUS }} />
                 </View>
@@ -169,9 +170,7 @@ export default function VitalDetailScreen() {
   const statusColor = statusBadge.color
 
   const currentValueStr = latestForType
-    ? vitalType === 'BLOOD_PRESSURE' && latestForType.secondary_value != null
-      ? `${latestForType.value}/${latestForType.secondary_value}`
-      : `${latestForType.value}`
+    ? formatVitalValue(vitalType, Number(latestForType.value), latestForType.secondary_value)
     : '—'
 
   if (!meta) {
@@ -292,9 +291,7 @@ export default function VitalDetailScreen() {
             {history.slice(0, 50).map((r: VitalReading) => {
               const v      = Number(r.value)
               const col    = getColor(v, vitalType, r.secondary_value)
-              const valStr = vitalType === 'BLOOD_PRESSURE' && r.secondary_value != null
-                ? `${r.value}/${r.secondary_value}`
-                : `${r.value}`
+              const valStr = formatVitalValue(vitalType, v, r.secondary_value)
 
               return (
                 <View key={r.id} style={styles.historyRow}>

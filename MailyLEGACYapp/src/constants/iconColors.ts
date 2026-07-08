@@ -66,6 +66,7 @@ const BASE: Partial<Record<AppIconName, IconColorSet>> = {
   trash:          { color: '#EF4444', bg: '#FEE2E2', card: '#FEF2F2', shadow: '#FECACA' },
   note:           { color: '#64748B', bg: '#F1F5F9', card: '#F8FAFC', shadow: '#E2E8F0' },
   sparkles:       { color: '#A855F7', bg: '#F3E8FF', card: '#FAF5FF', shadow: '#E9D5FF' },
+  download:       { color: '#3B82F6', bg: '#DBEAFE', card: '#EFF6FF', shadow: '#BFDBFE' },
   folder:         { color: '#F59E0B', bg: '#FEF3C7', card: '#FFFBEB', shadow: '#FDE68A' },
   inbox:          { color: '#64748B', bg: '#F1F5F9', card: '#F8FAFC', shadow: '#E2E8F0' },
   dumbbell:       { color: '#F97316', bg: '#FFEDD5', card: '#FFF7ED', shadow: '#FED7AA' },
@@ -87,6 +88,8 @@ const BASE: Partial<Record<AppIconName, IconColorSet>> = {
   cog:            { color: '#64748B', bg: '#F1F5F9', card: '#F8FAFC', shadow: '#E2E8F0' },
   location:       { color: '#EF4444', bg: '#FEE2E2', card: '#FEF2F2', shadow: '#FECACA' },
   bug:            { color: '#8B5CF6', bg: '#EDE9FE', card: '#F5F3FF', shadow: '#DDD6FE' },
+  close:          { color: '#94A3B8', bg: '#F1F5F9', card: '#F8FAFC', shadow: '#E2E8F0' },
+  share:          { color: '#00C5E3', bg: '#CFFAFE', card: '#ECFEFF', shadow: '#A5F3FC' },
 }
 
 const FALLBACK: IconColorSet = {

@@ -16,12 +16,12 @@ export type AppIconName =
   | 'trend' | 'user' | 'bell' | 'family' | 'card' | 'trophy' | 'settings'
   | 'chat' | 'wave' | 'home' | 'microscope' | 'clipboard' | 'run'
   | 'stethoscope' | 'mail' | 'lock' | 'eye' | 'eye-off' | 'chevron-right'
-  | 'plus' | 'folder' | 'gift' | 'camera' | 'lock-closed' | 'medal'
+  | 'plus' | 'folder' | 'gift' | 'camera' | 'lock-closed' | 'medal' | 'download'
   | 'inbox' | 'doctor' | 'hospital' | 'users' | 'apple' | 'dumbbell'
   | 'activity' | 'thermometer' | 'footsteps' | 'ruler' | 'syringe'
   | 'document' | 'shield' | 'trash' | 'note' | 'sparkles'
   | 'scale' | 'bulb' | 'tag' | 'time' | 'refresh' | 'check' | 'star' | 'image' | 'cog'
-  | 'location' | 'bug' | 'search'
+  | 'location' | 'bug' | 'search' | 'close' | 'share'
 
 type IconSet = 'ion' | 'mci' | 'fa5'
 
@@ -58,13 +58,14 @@ const ICON_MAP: Record<AppIconName, { set: IconSet; name: string }> = {
   clipboard:      { set: 'ion',  name: 'clipboard' },
   run:            { set: 'ion',  name: 'fitness' },
   stethoscope:    { set: 'fa5',  name: 'stethoscope' },
-  mail:           { set: 'ion',  name: 'mail-outline' },
+  mail:           { set: 'ion',  name: 'mail' },
   lock:           { set: 'ion',  name: 'lock-closed-outline' },
   eye:            { set: 'ion',  name: 'eye-outline' },
   'eye-off':      { set: 'ion',  name: 'eye-off-outline' },
   'chevron-right':{ set: 'ion',  name: 'chevron-forward' },
   plus:           { set: 'ion',  name: 'add' },
-  folder:         { set: 'ion',  name: 'folder-open' },
+  folder:         { set: 'ion',  name: 'folder' },
+  download:       { set: 'ion',  name: 'download' },
   gift:           { set: 'ion',  name: 'gift' },
   camera:         { set: 'ion',  name: 'camera' },
   'lock-closed':  { set: 'ion',  name: 'lock-closed' },
@@ -97,6 +98,8 @@ const ICON_MAP: Record<AppIconName, { set: IconSet; name: string }> = {
   location:       { set: 'ion',  name: 'location-outline' },
   bug:            { set: 'ion',  name: 'bug-outline' },
   search:         { set: 'ion',  name: 'search' },
+  close:          { set: 'ion',  name: 'close-circle' },
+  share:          { set: 'ion',  name: 'share-social' },
 }
 
 /** Mapeo emoji → nombre de icono (compatibilidad con datos existentes) */

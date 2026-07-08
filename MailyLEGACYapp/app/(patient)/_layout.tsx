@@ -4,12 +4,15 @@
 import React from 'react'
 import { Tabs } from 'expo-router'
 import { TabIcon, useTabBarStyle } from '@components/layout/TabIcon'
+import { LevelUpWatcher } from '@components/gamification/LevelUpWatcher'
 
 export default function PatientLayout() {
   const tabBarStyle = useTabBarStyle()
 
   return (
-    <Tabs
+    <>
+      <LevelUpWatcher />
+      <Tabs
       screenOptions={{
         headerShown:     false,
         tabBarShowLabel: false,
@@ -34,8 +37,10 @@ export default function PatientLayout() {
       <Tabs.Screen name="family-care/index"    options={{ href: null }} />
       <Tabs.Screen name="documents/index"      options={{ href: null }} />
       <Tabs.Screen name="plans"                options={{ href: null }} />
+      <Tabs.Screen name="dev/level-badges"     options={{ href: null }} />
       <Tabs.Screen name="ai-chat"              options={{ href: null }} />
       <Tabs.Screen name="settings"             options={{ href: null }} />
     </Tabs>
+    </>
   )
 }

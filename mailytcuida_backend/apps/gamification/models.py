@@ -115,8 +115,8 @@ class PlayerProfile(models.Model):
         return f'{self.patient} — {self.total_points}pts (streak {self.current_streak}d)'
 
     def compute_level(self) -> int:
-        """Level thresholds: 1=0, 2=200, 3=500, 4=1000, 5=2000, 6=4000, …"""
-        thresholds = [0, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000]
+        """Level thresholds: 1=0 … 10=50000 pts."""
+        thresholds = [0, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 50000]
         level = 1
         for i, t in enumerate(thresholds):
             if self.total_points >= t:

@@ -21,6 +21,18 @@ export function shadeColor(hex: string, amount = 0.15): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }
 
+/** Aclara un color hex mezclándolo hacia blanco */
+export function lightenColor(hex: string, amount = 0.18): string {
+  const c = hex.replace('#', '')
+  if (c.length !== 6) return hex
+  const mix = (channel: string) =>
+    Math.min(255, Math.round(parseInt(channel, 16) + (255 - parseInt(channel, 16)) * amount))
+  const r = mix(c.slice(0, 2))
+  const g = mix(c.slice(2, 4))
+  const b = mix(c.slice(4, 6))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
 export const DuoColors = {
   input: {
     face:   '#F2F2F2',

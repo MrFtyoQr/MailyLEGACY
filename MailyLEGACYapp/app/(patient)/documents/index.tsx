@@ -20,7 +20,6 @@ import {
   Alert,
   Modal,
   ScrollView,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   Linking,
@@ -33,9 +32,13 @@ import axios from 'axios'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
 import { EmptyState } from '@components/ui/EmptyState'
 import { Badge } from '@components/ui/Badge'
+import { Button } from '@components/ui/Button'
+import { Card } from '@components/ui/Card'
+import { Input } from '@components/ui/Input'
 import { IconBadge } from '@components/ui/IconBadge'
 import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
+import { DuoColors } from '@constants/duoTheme'
 import { get, post, del } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
 
@@ -136,6 +139,35 @@ function formatBytes(bytes: number | null): string {
 function formatDate(iso: string): string {
   const d = new Date(iso.replace(/\.\d{1,6}(?=[+-Z]|$)/, ''))
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function FilterChip({
+  label,
+  active,
+  onPress,
+  activeColor,
+}: {
+  label:       string
+  active:      boolean
+  onPress:     () => void
+  activeColor?: string
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.chip,
+        active && (activeColor
+          ? { backgroundColor: activeColor, borderColor: activeColor }
+          : styles.chipActive),
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  )
 }
 
 // ── Main screen ──────────────────────────────────────────────────────────────
@@ -268,47 +300,38 @@ export default function DocumentsScreen() {
           <Text style={styles.back}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Mis documentos</Text>
-        <TouchableOpacity
-          style={styles.uploadBtn}
+        <Button
+          label="Subir"
+          size="sm"
+          variant="primary"
+          loading={uploading}
           onPress={pickFile}
-          activeOpacity={0.8}
-          disabled={uploading}
-        >
-          {uploading
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={styles.uploadBtnText}>+ Subir</Text>
-          }
-        </TouchableOpacity>
+          leftIcon={<AppIcon name="plus" size={14} color={DuoColors.button.primaryText} />}
+        />
       </View>
 
       {/* Category filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-      >
-        <TouchableOpacity
-          style={[styles.chip, filterCat === null && styles.chipActive]}
-          onPress={() => setFilterCat(null)}
-          activeOpacity={0.7}
+      <View style={styles.chipsWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}
         >
-          <Text style={[styles.chipText, filterCat === null && styles.chipTextActive]}>
-            Todos
-          </Text>
-        </TouchableOpacity>
-        {ALL_CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat}
-            style={[styles.chip, filterCat === cat && styles.chipActive]}
-            onPress={() => setFilterCat(cat === filterCat ? null : cat)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.chipText, filterCat === cat && styles.chipTextActive]}>
-              {CATEGORY_LABELS[cat]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+          <FilterChip
+            label="Todos"
+            active={filterCat === null}
+            onPress={() => setFilterCat(null)}
+          />
+          {ALL_CATEGORIES.map((cat) => (
+            <FilterChip
+              key={cat}
+              label={CATEGORY_LABELS[cat]}
+              active={filterCat === cat}
+              onPress={() => setFilterCat(cat === filterCat ? null : cat)}
+            />
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Document list */}
       {isLoading ? (
@@ -371,12 +394,10 @@ export default function DocumentsScreen() {
             )}
 
             <Text style={styles.fieldLabel}>Título *</Text>
-            <TextInput
-              style={styles.textInput}
+            <Input
               value={uploadTitle}
               onChangeText={setUploadTitle}
               placeholder="Ej. Análisis de sangre junio 2026"
-              placeholderTextColor={Colors.light.textMuted}
               returnKeyType="done"
             />
 
@@ -387,40 +408,33 @@ export default function DocumentsScreen() {
               contentContainerStyle={styles.catChips}
             >
               {ALL_CATEGORIES.map((cat) => (
-                <TouchableOpacity
+                <FilterChip
                   key={cat}
-                  style={[
-                    styles.catChip,
-                    uploadCategory === cat && { backgroundColor: CATEGORY_COLORS[cat] },
-                  ]}
+                  label={CATEGORY_LABELS[cat]}
+                  active={uploadCategory === cat}
+                  activeColor={CATEGORY_COLORS[cat]}
                   onPress={() => setUploadCategory(cat)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.catChipText,
-                    uploadCategory === cat && styles.catChipTextActive,
-                  ]}>
-                    {CATEGORY_LABELS[cat]}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </ScrollView>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setShowUploadModal(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.cancelBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmBtn}
-                onPress={confirmUpload}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.confirmBtnText}>Subir documento</Text>
-              </TouchableOpacity>
+              <View style={styles.modalBtnWrap}>
+                <Button
+                  label="Cancelar"
+                  variant="secondary"
+                  fullWidth
+                  onPress={() => setShowUploadModal(false)}
+                />
+              </View>
+              <View style={[styles.modalBtnWrap, { flex: 1.6 }]}>
+                <Button
+                  label="Subir documento"
+                  variant="primary"
+                  fullWidth
+                  onPress={confirmUpload}
+                />
+              </View>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -433,7 +447,6 @@ export default function DocumentsScreen() {
 
 function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void }) {
   const [expanded, setExpanded] = useState(false)
-  const catColor = CATEGORY_COLORS[doc.category] ?? '#94A3B8'
 
   function openFile() {
     if (!doc.file_url) {
@@ -446,65 +459,68 @@ function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void
   }
 
   return (
-    <TouchableOpacity
-      style={[styles.card, { borderLeftColor: catColor }]}
-      onPress={() => setExpanded((v) => !v)}
-      activeOpacity={0.85}
-    >
-      {/* Top row */}
-      <View style={styles.cardTop}>
-        <IconBadge name={CATEGORY_ICONS[doc.category]} size={18} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle} numberOfLines={expanded ? undefined : 1}>
-            {doc.title}
-          </Text>
-          {doc.file_name ? (
-            <Text style={styles.cardMeta} numberOfLines={1}>{doc.file_name}</Text>
+    <Card padding={14} faceColor="#FFFFFF" shadowColor="#E8ECF0">
+      <TouchableOpacity
+        onPress={() => setExpanded((v) => !v)}
+        activeOpacity={0.85}
+      >
+        <View style={styles.cardTop}>
+          <IconBadge name={CATEGORY_ICONS[doc.category]} size={18} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle} numberOfLines={expanded ? undefined : 1}>
+              {doc.title}
+            </Text>
+            {doc.file_name ? (
+              <Text style={styles.cardMeta} numberOfLines={1}>{doc.file_name}</Text>
+            ) : null}
+          </View>
+          <View style={styles.cardRight}>
+            <Badge
+              label={STATUS_LABELS[doc.status]}
+              variant={STATUS_VARIANT[doc.status]}
+              size="sm"
+            />
+            <TouchableOpacity
+              onPress={(e) => { e.stopPropagation(); onDelete() }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <AppIcon name="trash" size={18} color={Colors.semantic.error} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.cardMetas}>
+          <Text style={styles.cardMetaItem}>{CATEGORY_LABELS[doc.category]}</Text>
+          {doc.file_size ? (
+            <Text style={styles.cardMetaItem}>· {formatBytes(doc.file_size)}</Text>
           ) : null}
+          <Text style={styles.cardMetaItem}>· {formatDate(doc.created_at)}</Text>
         </View>
-        <View style={styles.cardRight}>
-          <Badge
-            label={STATUS_LABELS[doc.status]}
-            variant={STATUS_VARIANT[doc.status]}
-            size="sm"
-          />
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); onDelete() }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <AppIcon name="trash" size={18} color={Colors.semantic.error} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      </TouchableOpacity>
 
-      {/* Meta row */}
-      <View style={styles.cardMetas}>
-        <Text style={styles.cardMetaItem}>{CATEGORY_LABELS[doc.category]}</Text>
-        {doc.file_size ? (
-          <Text style={styles.cardMetaItem}>· {formatBytes(doc.file_size)}</Text>
-        ) : null}
-        <Text style={styles.cardMetaItem}>· {formatDate(doc.created_at)}</Text>
-      </View>
-
-      {/* Botones de acción (siempre visibles) */}
       <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={(e) => { e.stopPropagation(); openFile() }}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.actionBtnText}>📂 Abrir</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={(e) => { e.stopPropagation(); openFile() }}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.actionBtnText}>⬇️ Descargar</Text>
-        </TouchableOpacity>
+        <View style={styles.actionBtnWrap}>
+          <Button
+            label="Abrir"
+            size="sm"
+            variant="secondary"
+            fullWidth
+            leftIcon={<AppIcon name="folder" size={14} color={Colors.brand.primary} />}
+            onPress={openFile}
+          />
+        </View>
+        <View style={styles.actionBtnWrap}>
+          <Button
+            label="Descargar"
+            size="sm"
+            variant="secondary"
+            fullWidth
+            leftIcon={<AppIcon name="download" size={14} color={Colors.brand.primary} />}
+            onPress={openFile}
+          />
+        </View>
       </View>
 
-      {/* OCR text (if expanded and available) */}
       {expanded && doc.ocr_text ? (
         <View style={styles.ocrBox}>
           <Text style={styles.ocrLabel}>Texto extraído (OCR)</Text>
@@ -519,7 +535,7 @@ function DocCard({ doc, onDelete }: { doc: MedicalDocument; onDelete: () => void
       {expanded && doc.status === 'PROCESSING' ? (
         <Text style={styles.noOcr}>Procesando OCR…</Text>
       ) : null}
-    </TouchableOpacity>
+    </Card>
   )
 }
 
@@ -547,31 +563,27 @@ const styles = StyleSheet.create({
     fontSize:   20,
     fontWeight: '700',
     color:      Colors.light.textPrimary,
-  },
-  uploadBtn: {
-    backgroundColor: Colors.brand.primary,
-    borderRadius:    20,
-    paddingVertical:   7,
-    paddingHorizontal: 16,
-    minWidth:          70,
-    alignItems:        'center',
-  },
-  uploadBtnText: {
-    color:      '#fff',
-    fontSize:   14,
-    fontWeight: '700',
+    flex:       1,
+    textAlign:  'center',
   },
 
   // Chips
+  chipsWrap: {
+    flexGrow: 0,
+    maxHeight: 44,
+  },
   chips: {
-    gap:               8,
+    flexDirection:     'row',
+    alignItems:      'center',
+    gap:             8,
     paddingHorizontal: 16,
-    paddingVertical:   12,
+    paddingVertical:   8,
   },
   chip: {
-    paddingVertical:   6,
-    paddingHorizontal: 14,
-    borderRadius:      20,
+    alignSelf:         'center',
+    paddingVertical:   4,
+    paddingHorizontal: 12,
+    borderRadius:      16,
     backgroundColor:   Colors.light.surface,
     borderWidth:       1,
     borderColor:       Colors.light.border,
@@ -581,7 +593,7 @@ const styles = StyleSheet.create({
     borderColor:     Colors.brand.primary,
   },
   chipText: {
-    fontSize:   13,
+    fontSize:   12,
     color:      Colors.light.textSecondary,
     fontWeight: '500',
   },
@@ -593,6 +605,7 @@ const styles = StyleSheet.create({
   // List
   list: {
     paddingHorizontal: 16,
+    paddingTop:        4,
     paddingBottom:     40,
     gap:               12,
   },
@@ -602,16 +615,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Card
-  card: {
-    backgroundColor: '#fff',
-    borderRadius:    14,
-    padding:         14,
-    borderWidth:     1,
-    borderColor:     Colors.light.border,
-    borderLeftWidth: 4,
-    gap:             6,
-  },
+  // Card content (inside Card 3D)
   cardTop: {
     flexDirection: 'row',
     alignItems:    'flex-start',
@@ -644,23 +648,12 @@ const styles = StyleSheet.create({
 
   // Action buttons
   cardActions: {
-    flexDirection:  'row',
-    gap:            8,
-    marginLeft:     32,
-    marginTop:      4,
+    flexDirection: 'row',
+    gap:           8,
+    marginTop:     10,
   },
-  actionBtn: {
-    paddingVertical:   6,
-    paddingHorizontal: 12,
-    borderRadius:      8,
-    backgroundColor:   Colors.light.surface,
-    borderWidth:       1,
-    borderColor:       Colors.light.border,
-  },
-  actionBtnText: {
-    fontSize:   12,
-    fontWeight: '600',
-    color:      Colors.brand.primary,
+  actionBtnWrap: {
+    flex: 1,
   },
 
   // OCR
@@ -742,66 +735,20 @@ const styles = StyleSheet.create({
     fontSize:   13,
     fontWeight: '600',
     color:      Colors.light.textSecondary,
-    marginBottom: -4,
-  },
-  textInput: {
-    borderWidth:   1,
-    borderColor:   Colors.light.border,
-    borderRadius:  10,
-    paddingVertical:   12,
-    paddingHorizontal: 14,
-    fontSize:      15,
-    color:         Colors.light.textPrimary,
-    backgroundColor: '#fff',
   },
   catChips: {
-    gap: 8,
-  },
-  catChip: {
-    paddingVertical:   7,
-    paddingHorizontal: 14,
-    borderRadius:      20,
-    backgroundColor:   Colors.light.surface,
-    borderWidth:       1,
-    borderColor:       Colors.light.border,
-  },
-  catChipText: {
-    fontSize:   13,
-    color:      Colors.light.textSecondary,
-    fontWeight: '500',
-  },
-  catChipTextActive: {
-    color:      '#fff',
-    fontWeight: '700',
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           8,
+    paddingVertical: 2,
   },
   modalActions: {
     flexDirection: 'row',
     gap:           10,
     marginTop:     4,
+    alignItems:    'flex-end',
   },
-  cancelBtn: {
-    flex:            1,
-    paddingVertical: 14,
-    borderRadius:    12,
-    borderWidth:     1,
-    borderColor:     Colors.light.border,
-    alignItems:      'center',
-  },
-  cancelBtnText: {
-    fontSize:   15,
-    color:      Colors.light.textSecondary,
-    fontWeight: '600',
-  },
-  confirmBtn: {
-    flex:            2,
-    paddingVertical: 14,
-    borderRadius:    12,
-    backgroundColor: Colors.brand.primary,
-    alignItems:      'center',
-  },
-  confirmBtnText: {
-    fontSize:   15,
-    color:      '#fff',
-    fontWeight: '700',
+  modalBtnWrap: {
+    flex: 1,
   },
 })

@@ -13,31 +13,17 @@ import { router } from 'expo-router'
 import { ScreenWrapper }  from '@components/layout/ScreenWrapper'
 import { IconBadge }      from '@components/ui/IconBadge'
 import { PointsCoin }     from '@components/ui/PointsCoin'
+import { StreakFlame, StreakTrophy } from '@components/ui/StreakIcons'
 import { InfoCard }       from '@components/ui/InfoCard'
 import { EmptyState }     from '@components/ui/EmptyState'
+import { LevelBadgeDisplay } from '@components/gamification/LevelBadgeDisplay'
 import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors }         from '@constants/colors'
+import { MAX_LEVEL, getLevelProgress } from '@constants/levelBadges'
 import {
   usePlayerProfile, useTransactions, useAvailableBadges, useRewardProducts,
   type EarnedBadge, type PointTransaction, type RewardProduct, type Badge,
 } from '@hooks/useGamification'
-
-// ── Niveles y umbrales ────────────────────────────────────────────────────────
-const LEVEL_THRESHOLDS = [0, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000]
-const MAX_LEVEL = 10
-
-function getLevelProgress(totalPoints: number, level: number) {
-  const currentThreshold = LEVEL_THRESHOLDS[level - 1] ?? 0
-  const nextThreshold    = LEVEL_THRESHOLDS[level] ?? LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]
-  if (level >= MAX_LEVEL) return { pct: 1, current: totalPoints, needed: 0 }
-  const range = nextThreshold - currentThreshold
-  const done  = totalPoints  - currentThreshold
-  return {
-    pct:     Math.min(Math.max(done / range, 0), 1),
-    current: done,
-    needed:  nextThreshold - totalPoints,
-  }
-}
 
 // ── Labels de fuente de puntos ────────────────────────────────────────────────
 const SOURCE_LABEL: Record<string, string> = {
@@ -212,10 +198,12 @@ export default function GamificationScreen() {
                   <Text style={styles.heroPoints}>{profile.total_points.toLocaleString('es-MX')}</Text>
                 </View>
               </View>
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelBadgeNum}>{profile.level}</Text>
-                <Text style={styles.levelBadgeLabel}>NIVEL</Text>
-              </View>
+              <LevelBadgeDisplay
+                level={profile.level}
+                imageSize={80}
+                light
+                showName={false}
+              />
             </View>
 
             {/* Barra de progreso de nivel */}
@@ -244,14 +232,14 @@ export default function GamificationScreen() {
             <View style={styles.heroStatsRow}>
               <View style={styles.heroStat}>
                 <View style={styles.heroStatRow}>
-                  <AppIcon name="fire" size={16} color="#FFFFFF" />
+                  <StreakFlame size={20} />
                   <Text style={styles.heroStatVal}>{profile.current_streak}d</Text>
                 </View>
                 <Text style={styles.heroLabel}>racha actual</Text>
               </View>
               <View style={styles.heroStat}>
                 <View style={styles.heroStatRow}>
-                  <AppIcon name="trophy" size={16} color="#FFFFFF" />
+                  <StreakTrophy size={20} />
                   <Text style={styles.heroStatVal}>{profile.longest_streak}d</Text>
                 </View>
                 <Text style={styles.heroLabel}>racha récord</Text>
@@ -346,6 +334,16 @@ export default function GamificationScreen() {
           )}
         </View>
 
+        {__DEV__ && (
+          <TouchableOpacity
+            onPress={() => router.push('/(patient)/dev/level-badges')}
+            style={styles.devLabBtn}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.devLabText}>Laboratorio de insignias (dev)</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={{ height: 60 }} />
       </ScrollView>
     </ScreenWrapper>
@@ -397,27 +395,6 @@ const styles = StyleSheet.create({
     fontSize:   28,
     fontWeight: '800',
     color:      '#FFFFFF',
-  },
-  levelBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius:    16,
-    paddingHorizontal: 16,
-    paddingVertical:   10,
-    alignItems:      'center',
-    minWidth:        64,
-  },
-  levelBadgeNum: {
-    fontSize:   26,
-    fontWeight: '900',
-    color:      '#FFFFFF',
-    lineHeight: 30,
-  },
-  levelBadgeLabel: {
-    fontSize:   9,
-    fontWeight: '700',
-    color:      'rgba(255,255,255,0.8)',
-    letterSpacing: 1.2,
-    marginTop:  2,
   },
 
   // Level progress
@@ -619,5 +596,22 @@ const styles = StyleSheet.create({
     fontSize:   14,
     fontWeight: '700',
     color:      Colors.brand.primary,
+  },
+
+  devLabBtn: {
+    marginTop:       4,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius:    14,
+    borderWidth:     1,
+    borderColor:     Colors.light.border,
+    borderStyle:     'dashed',
+    backgroundColor: Colors.light.surface,
+    alignItems:      'center',
+  },
+  devLabText: {
+    fontSize:   14,
+    fontWeight: '600',
+    color:      Colors.light.textSecondary,
   },
 })

@@ -9,6 +9,9 @@ import { IconBadge } from './IconBadge'
 import { AppIcon } from './AppIcon'
 import type { AppIconName } from './AppIcon'
 
+/** Misma huella que IconBadge con size=18 */
+const ICON_SLOT = 38
+
 interface MenuRowProps {
   icon?:     AppIconName
   leftIcon?: React.ReactNode
@@ -20,7 +23,9 @@ interface MenuRowProps {
 export function MenuRow({ icon, leftIcon, label, onPress, right }: MenuRowProps) {
   const inner = (
     <>
-      {leftIcon ?? (icon ? <IconBadge name={icon} size={18} /> : null)}
+      <View style={styles.iconSlot}>
+        {leftIcon ?? (icon ? <IconBadge name={icon} size={18} /> : null)}
+      </View>
       <Text style={styles.label}>{label}</Text>
       {right ?? <AppIcon name="chevron-right" size={18} color={Colors.light.textMuted} />}
     </>
@@ -43,6 +48,13 @@ const styles = StyleSheet.create({
     alignItems:    'center',
     padding:       14,
     gap:           12,
+  },
+  iconSlot: {
+    width:          ICON_SLOT,
+    height:         ICON_SLOT,
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexShrink:     0,
   },
   label: {
     flex:       1,

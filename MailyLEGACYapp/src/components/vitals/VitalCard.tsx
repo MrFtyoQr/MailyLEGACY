@@ -11,6 +11,7 @@ import { IconBadge } from '@components/ui/IconBadge'
 import type { AppIconName } from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
 import type { VitalEntry } from '@hooks/useVitals'
+import { formatVitalValue } from '@lib/vitals/formatValue'
 
 interface VitalCardProps {
   entry: VitalEntry
@@ -52,21 +53,21 @@ export function VitalCard({ entry }: VitalCardProps) {
 
       <View style={styles.grid}>
         {entry.glucose_mgdl != null && (
-          <VitalItem icon="syringe" label="Glucosa" value={`${entry.glucose_mgdl}`} unit="mg/dL" />
+          <VitalItem icon="syringe" label="Glucosa" value={formatVitalValue('GLUCOSE', entry.glucose_mgdl)} unit="mg/dL" />
         )}
         {entry.heart_rate != null && (
-          <VitalItem icon="heart" label="Frec. cardíaca" value={`${entry.heart_rate}`} unit="lpm" />
+          <VitalItem icon="heart" label="Frec. cardíaca" value={formatVitalValue('HEART_RATE', entry.heart_rate)} unit="lpm" />
         )}
         {entry.systolic_bp != null && entry.diastolic_bp != null && (
           <VitalItem
             icon="heart"
             label="Presión"
-            value={`${entry.systolic_bp}/${entry.diastolic_bp}`}
+            value={formatVitalValue('BLOOD_PRESSURE', entry.systolic_bp, entry.diastolic_bp)}
             unit="mmHg"
           />
         )}
         {entry.weight_kg != null && (
-          <VitalItem icon="scale" label="Peso" value={`${entry.weight_kg}`} unit="kg" />
+          <VitalItem icon="scale" label="Peso" value={formatVitalValue('WEIGHT', entry.weight_kg)} unit="kg" />
         )}
       </View>
 

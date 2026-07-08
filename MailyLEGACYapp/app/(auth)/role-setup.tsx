@@ -391,9 +391,9 @@ export default function RoleSetupScreen() {
 
           {/* Nota para médicos/especialistas */}
           {(selectedRole === 'DOCTOR' || selectedRole === 'SPECIALIST') && (
-            <InfoCard style={styles.infoBox}>
+            <InfoCard style={styles.infoBox} padding={14}>
               <View style={styles.infoBoxInner}>
-                <IconBadge name="bulb" size={18} />
+                <IconBadge name="bulb" size={18} style={{ flexShrink: 0 }} />
                 <Text style={styles.infoText}>
                   Los médicos y especialistas pasan por un proceso de verificación antes de unirse al equipo. Te contactaremos en breve.
                 </Text>
@@ -535,9 +535,11 @@ const styles = StyleSheet.create({
     gap:           10,
   },
   infoText: {
+    flex:       1,
+    flexShrink: 1,
     fontSize:   13,
     color:      Colors.light.textSecondary,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   back: {
     marginBottom: 16,

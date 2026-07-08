@@ -3,29 +3,58 @@
  * Perfil del médico con cerrar sesión.
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
-  StyleSheet,
   Alert,
 } from 'react-native'
-import { router } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
-import { Avatar } from '@components/ui/Avatar'
 import { Card } from '@components/ui/Card'
-import { Badge } from '@components/ui/Badge'
 import { InfoRow } from '@components/ui/InfoRow'
+import { ProfileAvatarHeader } from '@components/profile/ProfileAvatarHeader'
+import { ProfileSignOutButton } from '@components/profile/ProfileSignOutButton'
+import { profileStyles } from '@components/profile/profileStyles'
+import { uploadProfilePhoto } from '@components/profile/uploadProfilePhoto'
 import { Colors } from '@constants/colors'
 import { useAuthStore } from '@store/auth.store'
+import { EP } from '@lib/api/endpoints'
 
 export default function DoctorProfileScreen() {
-  const user    = useAuthStore((s) => s.user)
-  const signOut = useAuthStore((s) => s.signOut)
+  const user       = useAuthStore((s) => s.user)
+  const signOut    = useAuthStore((s) => s.signOut)
+  const updateUser = useAuthStore((s) => s.updateUser)
+  const [photoLoading, setPhotoLoading] = useState(false)
 
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Mi Perfil'
+  const fullName     = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Mi Perfil'
+  const displayName  = `Dr. ${fullName}`
+
+  async function handlePickPhoto() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para cambiar la foto de perfil.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+    if (result.canceled) return
+
+    setPhotoLoading(true)
+    try {
+      const photoUrl = await uploadProfilePhoto(EP.profileDoctorPhoto, result.assets[0])
+      updateUser({ photoUrl })
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar la foto. Intenta de nuevo.')
+    } finally {
+      setPhotoLoading(false)
+    }
+  }
 
   function handleSignOut() {
     Alert.alert(
@@ -50,91 +79,33 @@ export default function DoctorProfileScreen() {
 
   return (
     <ScreenWrapper noPadding edges={['top', 'left', 'right']}>
-      {/* Header con avatar */}
-      <View style={styles.profileHeader}>
-        <Avatar
-          uri={user?.photoUrl}
-          name={fullName}
-          size={88}
-          bgColor={Colors.role.doctor}
-        />
-        <Text style={styles.name}>Dr. {fullName}</Text>
-        {user?.email && <Text style={styles.email}>{user.email}</Text>}
-        <Badge label="Médico" variant="info" size="sm" />
-      </View>
+      <ProfileAvatarHeader
+        fullName={displayName}
+        email={user?.email}
+        photoUrl={user?.photoUrl}
+        roleLabel="Médico"
+        roleBadge="info"
+        avatarColor={Colors.role.doctor}
+        onPickPhoto={handlePickPhoto}
+        photoLoading={photoLoading}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={profileStyles.content}
       >
-        <Text style={styles.sectionTitle}>Información</Text>
+        <Text style={profileStyles.sectionTitle}>Información</Text>
         <Card>
-          <InfoRow icon="user" label="Nombre" value={`Dr. ${fullName}`} />
+          <InfoRow icon="user" label="Nombre" value={displayName} />
           {user?.email && <InfoRow icon="mail" label="Email" value={user.email} divider />}
           <InfoRow icon="tag" label="Rol" value="Médico" divider />
         </Card>
 
-        <TouchableOpacity
-          style={styles.signOutBtn}
-          onPress={handleSignOut}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.signOutText}>Cerrar sesión</Text>
-        </TouchableOpacity>
+        <ProfileSignOutButton onPress={handleSignOut} />
 
-        <Text style={styles.version}>MailyT-Cuida v1.0</Text>
+        <Text style={profileStyles.version}>MailyT-Cuida v1.0</Text>
         <View style={{ height: 80 }} />
       </ScrollView>
     </ScreenWrapper>
   )
 }
-
-const styles = StyleSheet.create({
-  profileHeader: {
-    alignItems:        'center',
-    paddingTop:        24,
-    paddingBottom:     20,
-    gap:               8,
-    backgroundColor:   Colors.light.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  name: {
-    fontSize:   22,
-    fontWeight: '700',
-    color:      Colors.light.textPrimary,
-    marginTop:  4,
-  },
-  email: {
-    fontSize: 14,
-    color:    Colors.light.textSecondary,
-  },
-  content: {
-    gap:           16,
-    padding:       20,
-    paddingBottom: 24,
-  },
-  sectionTitle: {
-    fontSize:      14,
-    fontWeight:    '700',
-    color:         Colors.light.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  signOutBtn: {
-    backgroundColor: Colors.semantic.errorBg,
-    borderRadius:    12,
-    paddingVertical: 14,
-    alignItems:      'center',
-  },
-  signOutText: {
-    fontSize:   15,
-    fontWeight: '600',
-    color:      Colors.semantic.error,
-  },
-  version: {
-    fontSize:  12,
-    color:     Colors.light.textMuted,
-    textAlign: 'center',
-  },
-})

@@ -8,30 +8,29 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
-  StyleSheet,
   Alert,
-  ActivityIndicator,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { router } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { ScreenWrapper } from '@components/layout/ScreenWrapper'
-import { Avatar } from '@components/ui/Avatar'
 import { Card } from '@components/ui/Card'
-import { Badge } from '@components/ui/Badge'
+import { Capsule3D } from '@components/ui/Capsule3D'
 import { InfoCard } from '@components/ui/InfoCard'
 import { InfoRow } from '@components/ui/InfoRow'
 import { MenuRow } from '@components/ui/MenuRow'
 import { IconBadge } from '@components/ui/IconBadge'
-import { PointsCoin } from '@components/ui/PointsCoin'
-import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
+import { PointsIconBadge } from '@components/ui/PointsCoin'
+import { ProfileAvatarHeader } from '@components/profile/ProfileAvatarHeader'
+import { ProfileSignOutButton } from '@components/profile/ProfileSignOutButton'
+import { profileStyles } from '@components/profile/profileStyles'
+import { uploadProfilePhoto } from '@components/profile/uploadProfilePhoto'
+import type { AppIconName } from '@components/ui/AppIcon'
 import { Colors } from '@constants/colors'
+import { shadeColor } from '@constants/duoTheme'
 import { useAuthStore } from '@store/auth.store'
 import { get } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
-import { API_URL } from '@constants/config'
-import { getAccessToken } from '@lib/auth/session'
 
 interface Subscription {
   plan: { name: string; tier: 'FREE' | 'SILVER' | 'GOLD' | 'PLATINUM' } | null
@@ -50,8 +49,8 @@ const PLAN_ICONS: Record<string, AppIconName> = {
 }
 
 export default function PatientProfileScreen() {
-  const user      = useAuthStore((s) => s.user)
-  const signOut   = useAuthStore((s) => s.signOut)
+  const user       = useAuthStore((s) => s.user)
+  const signOut    = useAuthStore((s) => s.signOut)
   const updateUser = useAuthStore((s) => s.updateUser)
   const [photoLoading, setPhotoLoading] = useState(false)
 
@@ -69,25 +68,10 @@ export default function PatientProfileScreen() {
     })
     if (result.canceled) return
 
-    const asset = result.assets[0]
     setPhotoLoading(true)
     try {
-      const token = await getAccessToken()
-      const form  = new FormData()
-      form.append('photo', {
-        uri:  asset.uri,
-        name: 'profile.jpg',
-        type: asset.mimeType ?? 'image/jpeg',
-      } as unknown as Blob)
-
-      const res = await fetch(`${API_URL}${EP.profilePatientPhoto}`, {
-        method:  'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body:    form,
-      })
-      if (!res.ok) throw new Error('Upload failed')
-      const data = await res.json() as { photo_url: string }
-      updateUser({ photoUrl: data.photo_url })
+      const photoUrl = await uploadProfilePhoto(EP.profilePatientPhoto, result.assets[0])
+      updateUser({ photoUrl })
     } catch {
       Alert.alert('Error', 'No se pudo actualizar la foto. Intenta de nuevo.')
     } finally {
@@ -132,48 +116,45 @@ export default function PatientProfileScreen() {
 
   return (
     <ScreenWrapper noPadding edges={['top', 'left', 'right']}>
-      {/* Header con avatar */}
-      <View style={styles.profileHeader}>
-        <TouchableOpacity onPress={handlePickPhoto} activeOpacity={0.8} disabled={photoLoading}>
-          <View style={styles.avatarWrap}>
-            <Avatar uri={user?.photoUrl} name={fullName} size={88} bgColor={Colors.role.patient} />
-            {photoLoading
-              ? <View style={styles.avatarOverlay}><ActivityIndicator color="#fff" /></View>
-              : <View style={styles.avatarEditBadge}><AppIcon name="camera" size={11} color="#fff" /></View>
-            }
-          </View>
-        </TouchableOpacity>
-        <Text style={styles.name}>{fullName}</Text>
-        {user?.email && (
-          <Text style={styles.email}>{user.email}</Text>
-        )}
-        <Badge label="Paciente" variant="warning" size="sm" />
-      </View>
+      <ProfileAvatarHeader
+        fullName={fullName}
+        email={user?.email}
+        photoUrl={user?.photoUrl}
+        roleLabel="Paciente"
+        roleBadge="warning"
+        avatarColor={Colors.role.patient}
+        onPickPhoto={handlePickPhoto}
+        photoLoading={photoLoading}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={profileStyles.content}
       >
-        {/* Plan de suscripción */}
-        <InfoCard style={styles.planCard}>
-          <View style={styles.planCardInner}>
+        <InfoCard style={profileStyles.planCard}>
+          <View style={profileStyles.planCardInner}>
             <IconBadge name={planIcon} size={20} accent={planColor} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.planLabel}>Plan activo</Text>
-              <Text style={[styles.planName, { color: planColor }]}>{planName}</Text>
+              <Text style={profileStyles.planLabel}>Plan activo</Text>
+              <Text style={[profileStyles.planName, { color: planColor }]}>{planName}</Text>
             </View>
-            <TouchableOpacity
-              style={[styles.upgradeBtn, { backgroundColor: tier === 'FREE' ? PLAN_COLORS.GOLD : PLAN_COLORS[tier] }]}
-              activeOpacity={0.8}
+            <Capsule3D
+              pressable
               onPress={() => router.push('/(patient)/plans')}
+              faceColor={tier === 'FREE' ? PLAN_COLORS.GOLD : planColor}
+              shadowColor={shadeColor(tier === 'FREE' ? PLAN_COLORS.GOLD : planColor, 0.18)}
+              depth="sm"
+              borderRadius={12}
+              faceStyle={profileStyles.upgradeBtnFace}
             >
-              <Text style={styles.upgradeBtnText}>{tier === 'FREE' ? 'Mejorar' : 'Ver plan'}</Text>
-            </TouchableOpacity>
+              <Text style={profileStyles.upgradeBtnText}>
+                {tier === 'FREE' ? 'Mejorar' : 'Ver plan'}
+              </Text>
+            </Capsule3D>
           </View>
         </InfoCard>
 
-        {/* Info personal */}
-        <Text style={styles.sectionTitle}>Información</Text>
+        <Text style={profileStyles.sectionTitle}>Información</Text>
         <Card>
           <InfoRow icon="user" label="Nombre" value={fullName} />
           {user?.email && <InfoRow icon="mail" label="Email" value={user.email} divider />}
@@ -181,27 +162,26 @@ export default function PatientProfileScreen() {
           <InfoRow icon={planIcon} label="Plan" value={planName} divider />
         </Card>
 
-        {/* Opciones */}
-        <Text style={styles.sectionTitle}>Configuración</Text>
+        <Text style={profileStyles.sectionTitle}>Configuración</Text>
         <Card style={{ padding: 0 }}>
           <MenuRow
             icon="card"
             label="Planes y suscripción"
             onPress={() => router.push('/(patient)/plans')}
           />
-          <View style={styles.menuDivider} />
+          <View style={profileStyles.menuDivider} />
           <MenuRow
             icon="bell"
             label="Notificaciones"
             onPress={() => router.push('/(patient)/notifications')}
           />
-          <View style={styles.menuDivider} />
+          <View style={profileStyles.menuDivider} />
           <MenuRow
-            leftIcon={<PointsCoin size={22} />}
+            leftIcon={<PointsIconBadge size={22} />}
             label="Mis puntos y logros"
             onPress={() => router.push('/(patient)/gamification')}
           />
-          <View style={styles.menuDivider} />
+          <View style={profileStyles.menuDivider} />
           <MenuRow
             icon="folder"
             label="Mis documentos"
@@ -209,105 +189,11 @@ export default function PatientProfileScreen() {
           />
         </Card>
 
-        {/* Cerrar sesión */}
-        <TouchableOpacity
-          style={styles.signOutBtn}
-          onPress={handleSignOut}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.signOutText}>Cerrar sesión</Text>
-        </TouchableOpacity>
+        <ProfileSignOutButton onPress={handleSignOut} />
 
-        <Text style={styles.version}>MailyT-Cuida v1.0</Text>
-
+        <Text style={profileStyles.version}>MailyT-Cuida v1.0</Text>
         <View style={{ height: 80 }} />
       </ScrollView>
     </ScreenWrapper>
   )
 }
-
-const styles = StyleSheet.create({
-  avatarWrap: { position: 'relative' },
-  avatarOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: 44, backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarEditBadge: {
-    position: 'absolute', bottom: 0, right: 0,
-    backgroundColor: Colors.brand.primary, borderRadius: 12,
-    width: 24, height: 24, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#fff',
-  },
-  profileHeader: {
-    alignItems:        'center',
-    paddingTop:        24,
-    paddingBottom:     20,
-    gap:               8,
-    backgroundColor:   Colors.light.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  name: {
-    fontSize:   22,
-    fontWeight: '700',
-    color:      Colors.light.textPrimary,
-    marginTop:  4,
-  },
-  email: {
-    fontSize: 14,
-    color:    Colors.light.textSecondary,
-  },
-  content: {
-    gap:           16,
-    padding:       20,
-    paddingBottom: 24,
-  },
-  sectionTitle: {
-    fontSize:      14,
-    fontWeight:    '700',
-    color:         Colors.light.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  signOutBtn: {
-    backgroundColor: Colors.semantic.errorBg,
-    borderRadius:    12,
-    paddingVertical: 14,
-    alignItems:      'center',
-  },
-  signOutText: {
-    fontSize:   15,
-    fontWeight: '600',
-    color:      Colors.semantic.error,
-  },
-  version: {
-    fontSize:  12,
-    color:     Colors.light.textMuted,
-    textAlign: 'center',
-  },
-
-  menuDivider: {
-    height: 1,
-    backgroundColor: Colors.light.border,
-    marginLeft: 52,
-  },
-
-  // Plan card
-  planCard: {
-    marginBottom: 0,
-  },
-  planCardInner: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    gap:            12,
-  },
-  planLabel: { fontSize: 12, color: Colors.light.textMuted, marginBottom: 2 },
-  planName:  { fontSize: 16, fontWeight: '700' },
-  upgradeBtn: {
-    paddingHorizontal: 14,
-    paddingVertical:    8,
-    borderRadius:      10,
-  },
-  upgradeBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
-})

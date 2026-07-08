@@ -136,3 +136,88 @@ RESUMEN:
                   no valida Content-Type ni res.ok antes de parsear.
   Cómo arreglar-> URL correcta + parseo seguro (Content-Type/HTML) + mensaje
                   amigable + envío a Sentry.
+
+================================================================================
+BUG #2 — Foto de perfil: subida sin error pero imagen no se muestra
+================================================================================
+
+ESTADO:        Documentado (pendiente backend/infra)
+SEVERIDAD:     Media
+PANTALLA:      Perfil paciente → cambiar foto de avatar
+FECHA:         2026-07-07
+REPORTADO POR: Madeline (frontend)
+
+SÍNTOMA VISIBLE:
+  - Usuario elige imagen de galería (probado 2 veces, imágenes distintas).
+  - No aparece alerta de error.
+  - El avatar sigue con iniciales / foto anterior.
+  - Tras recargar la app, la foto tampoco aparece.
+
+DÓNDE (FRONTEND):
+  Archivo:  MailyLEGACYapp/app/(patient)/profile.tsx
+  Flujo:    POST multipart a /auth/profiles/patient/photo/
+            → espera { photo_url } → updateUser({ photoUrl })
+            → Avatar renderiza user.photoUrl
+
+BACKEND INVOLUCRADO:
+  POST /api/v1/auth/profiles/patient/photo/
+  apps/accounts/views.py → PatientPhotoView, helper _upload_photo()
+  PatientProfile.photo_url
+
+HIPÓTESIS:
+  a) photo_url guardada no es públicamente accesible (R2 privado, ACL public-read).
+  b) URL mal construida (endpoint S3 API vs CDN/custom domain).
+  c) auth/me no devuelve photo_url actualizado tras guardar.
+  d) CORS o dominio custom (AWS_S3_CUSTOM_DOMAIN) mal configurado.
+
+CRITERIO DE ACEPTACIÓN:
+  - POST devuelve photo_url que abre en navegador (curl -I → 200 image/*).
+  - GET /auth/me/ trae el mismo photo_url.
+  - App muestra la imagen en perfil y home.
+
+DOCUMENTO DETALLADO:
+  MailyLEGACYapp/docs/backend-bugs-pendientes.md (Bug #2)
+
+================================================================================
+BUG #3 — Mis documentos: subida OK, abrir/descargar falla (Cloudflare)
+================================================================================
+
+ESTADO:        Documentado (pendiente backend/infra)
+SEVERIDAD:     Alta
+PANTALLA:      Mis documentos → Abrir / Descargar
+FECHA:         2026-07-07
+REPORTADO POR: Madeline (frontend)
+
+SÍNTOMA VISIBLE:
+  - Subir documento (PDF/imagen) funciona; aparece en el listado.
+  - Al abrir o descargar, redirige a página Cloudflare.
+  - Mensaje: argumento de autorización inválido (o similar).
+  - No se visualiza ni descarga el archivo.
+
+DÓNDE (FRONTEND):
+  Archivo:  MailyLEGACYapp/app/(patient)/documents/index.tsx
+  Subida:   POST /documents/upload-url/ → PUT a R2 → POST /documents/
+  Lectura:  Linking.openURL(doc.file_url) en botones Abrir y Descargar
+
+BACKEND INVOLUCRADO:
+  apps/documents/storage.py → generate_presigned_upload()
+  Si NO hay AWS_S3_CUSTOM_DOMAIN, file_url es presigned GET (7 días).
+  Si hay custom domain, file_url es URL pública https://{domain}/{key}
+
+HIPÓTESIS:
+  a) file_url presigned expirada, truncada o inválida al abrir.
+  b) AWS_S3_CUSTOM_DOMAIN sin lectura pública en bucket.
+  c) Bucket privado sin endpoint de descarga autenticado on-demand.
+  d) Cloudflare/WAF altera query params de firma (X-Amz-*).
+
+SOLUCIÓN SUGERIDA:
+  - Opción A: bucket público + CDN/custom domain estable.
+  - Opción B (recomendada): GET /documents/{id}/download/ con presigned GET fresco.
+  - Opción C: proxy Django autenticado por ownership.
+
+CRITERIO DE ACEPTACIÓN:
+  - file_url de documento recién subido abre en navegador sin error.
+  - Abrir/Descargar funciona desde app móvil y web.
+
+DOCUMENTO DETALLADO:
+  MailyLEGACYapp/docs/backend-bugs-pendientes.md (Bug #3)

@@ -28,6 +28,7 @@ import {
   type VitalLatest, type VitalType,
 } from '@hooks/useVitals'
 import { getStatusBadge, getVitalStatus, getBmiStatus } from '@lib/vitals/statusColors'
+import { formatVitalValue } from '@lib/vitals/formatValue'
 
 const { width } = Dimensions.get('window')
 const CARD_W    = (width - 48 - 10) / 2  // 2 columnas con padding + gap
@@ -36,7 +37,7 @@ const CARD_W    = (width - 48 - 10) / 2  // 2 columnas con padding + gap
 function BmiCard({ weight, height }: { weight?: number; height?: number }) {
   const hasBoth = weight != null && height != null && height > 0
   const bmi     = hasBoth ? weight! / Math.pow(height! / 100, 2) : null
-  const bmiStr  = bmi != null ? bmi.toFixed(1) : '—'
+  const bmiStr  = bmi != null ? formatVitalValue('BMI', bmi) : '—'
 
   let status = getBmiStatus(bmi)
   let label  = 'Sin datos'
@@ -67,17 +68,13 @@ function BmiCard({ weight, height }: { weight?: number; height?: number }) {
 // ── Componente tarjeta de un signo ────────────────────────────────────────────
 function VitalSignCard({ type, latest }: { type: VitalType; latest?: VitalLatest }) {
   const meta      = VITAL_META[type]
-  const hasValue  = !!latest
+  const valueStr  = formatVitalValue(type, latest?.value, latest?.secondary_value)
+  const hasValue  = valueStr !== '—'
   const status    = hasValue
-    ? getVitalStatus(type, latest!.value, latest!.secondary_value)
+    ? getVitalStatus(type, Number(latest!.value), latest!.secondary_value)
     : 'muted' as const
   const badge     = getStatusBadge(status)
   const color     = badge.color
-  const valueStr  = hasValue
-    ? type === 'BLOOD_PRESSURE' && latest!.secondary_value != null
-      ? `${latest!.value}/${latest!.secondary_value}`
-      : `${latest!.value}`
-    : '—'
 
   return (
     <TouchableOpacity
@@ -253,9 +250,7 @@ export default function VitalsScreen() {
               const meta = VITAL_META[r.vital_type]
               const status = getVitalStatus(r.vital_type, r.value, r.secondary_value)
               const badge = getStatusBadge(status)
-              const valStr = r.vital_type === 'BLOOD_PRESSURE' && r.secondary_value != null
-                ? `${r.value}/${r.secondary_value}`
-                : `${r.value}`
+              const valStr = formatVitalValue(r.vital_type, r.value, r.secondary_value)
               return (
                 <View key={r.id} style={styles.historyRow}>
                   <IconBadge name={meta?.icon ?? 'chart'} size={16} color={badge.color} bgColor={badge.bg} />

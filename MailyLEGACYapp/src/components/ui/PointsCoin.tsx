@@ -3,7 +3,7 @@
  */
 
 import React from 'react'
-import { Image, StyleSheet, type ImageStyle, type StyleProp } from 'react-native'
+import { Image, View, StyleSheet, type ImageStyle, type StyleProp } from 'react-native'
 
 const COIN = require('../../../assets/images/cuida-coin.png')
 
@@ -22,6 +22,23 @@ export function PointsCoin({ size = 20, style }: PointsCoinProps) {
   )
 }
 
+/** Moneda dentro de recuadro pastel, alineado con IconBadge del menú */
+export function PointsIconBadge({ size = 22 }: { size?: number }) {
+  return (
+    <View style={styles.badge}>
+      <PointsCoin size={size} />
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   coin: { aspectRatio: 1 },
+  badge: {
+    width:           38,
+    height:          38,
+    borderRadius:    12,
+    backgroundColor: '#FFF8EB',
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
 })
