@@ -3,6 +3,7 @@ Gamification API.
 
   GET  /api/v1/gamification/me/              — my PlayerProfile (points, level, streak, badges)
   GET  /api/v1/gamification/me/transactions/ — point history (paginated)
+  GET  /api/v1/gamification/me/redemptions/  — redemption history (paginated)
   GET  /api/v1/gamification/badges/          — all available badges
   GET  /api/v1/gamification/leaderboard/     — top patients (anonymous names optional)
 
@@ -17,7 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.accounts.models import PatientProfile, DoctorPatient
 from . import engine
-from .models import PlayerProfile, PointTransaction, Badge, RewardProduct
+from .models import PlayerProfile, PointTransaction, Badge, RewardProduct, RedemptionRecord
 from .serializers import (
     PlayerProfileSerializer, PointTransactionSerializer,
     BadgeSerializer, LeaderboardEntrySerializer, RewardProductSerializer,
@@ -51,6 +52,25 @@ class MyTransactionsView(generics.ListAPIView):
         patient = _get_patient(self.request)
         player  = _get_or_create_player(patient)
         return PointTransaction.objects.filter(player=player)
+
+
+class MyRedemptionsView(generics.ListAPIView):
+    """
+    GET /gamification/me/redemptions/ — historial paginado de canjes del
+    paciente autenticado, más reciente primero (Actividad 7).
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class   = RedemptionSerializer
+
+    def get_queryset(self):
+        patient = _get_patient(self.request)
+        player  = _get_or_create_player(patient)
+        return (
+            RedemptionRecord.objects
+            .filter(player=player)
+            .select_related('reward')   # evita N+1 en reward_name / reward_image
+            .order_by('-created_at')
+        )
 
 
 class BadgeListView(generics.ListAPIView):

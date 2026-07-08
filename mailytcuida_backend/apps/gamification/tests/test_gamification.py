@@ -517,3 +517,81 @@ class TestRedemptionFlow(TestCase):
         self.assertEqual(
             player.total_points, sum(t.points for t in txns if t.points > 0)
         )
+
+
+@pytest.mark.django_db
+class TestRedemptionHistory(TestCase):
+    """
+    Actividad 7: historial paginado de canjes vía GET /me/redemptions/.
+    """
+
+    URL = '/api/v1/gamification/me/redemptions/'
+
+    def setUp(self):
+        self.user, self.patient = _patient()
+        self.client = _jwt_client(self.user)
+        self.reward = RewardProduct.objects.create(
+            name='Cupón 10% farmacia', points_cost=100, stock=0, is_active=True,
+        )
+
+    def _give_balance(self, amount):
+        player, _ = PlayerProfile.objects.get_or_create(patient=self.patient)
+        player.balance      = amount
+        player.total_points = amount
+        player.save(update_fields=['balance', 'total_points'])
+        return player
+
+    def test_history_empty(self):
+        self._give_balance(0)
+        resp = self.client.get(self.URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['count'], 0)
+        self.assertEqual(resp.data['results'], [])
+
+    def test_history_lists_redemptions_newest_first(self):
+        self._give_balance(1000)
+        for _ in range(3):
+            redeem_reward(self.patient, self.reward.id)
+
+        resp = self.client.get(self.URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['count'], 3)
+
+        results = resp.data['results']
+        self.assertEqual(len(results), 3)
+        # Orden -created_at: cada elemento es >= al siguiente.
+        fechas = [r['created_at'] for r in results]
+        self.assertEqual(fechas, sorted(fechas, reverse=True))
+        # Campos del serializer presentes.
+        self.assertEqual(results[0]['reward_name'], self.reward.name)
+        self.assertEqual(results[0]['points_spent'], 100)
+        self.assertTrue(results[0]['code'].startswith('RDM-'))
+
+    def test_history_isolated_between_patients(self):
+        # Paciente A canjea.
+        self._give_balance(300)
+        redeem_reward(self.patient, self.reward.id)
+
+        # Paciente B no debe ver los canjes de A.
+        user_b, patient_b = _patient(email='b@test.com', clerk_id='pat_002')
+        client_b = _jwt_client(user_b)
+        PlayerProfile.objects.get_or_create(patient=patient_b)
+
+        resp = client_b.get(self.URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['count'], 0)
+
+    def test_history_pagination(self):
+        self._give_balance(10000)
+        for _ in range(25):
+            redeem_reward(self.patient, self.reward.id)
+
+        resp = self.client.get(self.URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['count'], 25)          # total real
+        self.assertEqual(len(resp.data['results']), 20)   # PAGE_SIZE
+        self.assertIsNotNone(resp.data['next'])           # hay página siguiente
+
+    def test_history_requires_auth(self):
+        resp = APIClient().get(self.URL)
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
