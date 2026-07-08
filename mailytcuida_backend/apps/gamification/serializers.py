@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import PlayerProfile, PointTransaction, Badge, PlayerBadge, RewardProduct
+from .models import (
+    PlayerProfile, PointTransaction, Badge, PlayerBadge,
+    RewardProduct, RedemptionRecord,
+)
 
 
 class BadgeSerializer(serializers.ModelSerializer):
@@ -41,7 +44,7 @@ class PlayerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model  = PlayerProfile
         fields = [
-            'id', 'total_points', 'level',
+            'id', 'total_points', 'balance', 'level',
             'current_streak', 'longest_streak',
             'last_activity_date', 'multiplier',
             'badges', 'created_at', 'updated_at',
@@ -62,6 +65,21 @@ class RewardProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'image_url',
             'points_cost', 'stock', 'is_active',
+        ]
+
+
+class RedemptionSerializer(serializers.ModelSerializer):
+    """Salida de un canje — usada por POST /redeem/ y (Actividad 7) el historial."""
+    reward_name  = serializers.CharField(source='reward.name', read_only=True)
+    reward_image = serializers.CharField(source='reward.image_url', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model  = RedemptionRecord
+        fields = [
+            'id', 'code', 'status', 'status_display',
+            'reward', 'reward_name', 'reward_image',
+            'points_spent', 'note', 'created_at',
         ]
 
 
