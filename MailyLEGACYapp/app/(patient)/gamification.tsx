@@ -17,6 +17,7 @@ import { StreakFlame, StreakTrophy } from '@components/ui/StreakIcons'
 import { InfoCard }       from '@components/ui/InfoCard'
 import { EmptyState }     from '@components/ui/EmptyState'
 import { LevelBadgeDisplay } from '@components/gamification/LevelBadgeDisplay'
+import { BadgeImage } from '@components/gamification/BadgeImage'
 import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors }         from '@constants/colors'
 import { MAX_LEVEL, getLevelProgress } from '@constants/levelBadges'
@@ -68,27 +69,26 @@ function fmtDate(iso: string) {
 // ── Subcomponentes ────────────────────────────────────────────────────────────
 
 function BadgeChip({ item, locked }: { item: EarnedBadge | null; locked?: Badge }) {
-  if (locked) {
-    return (
-      <View style={[styles.badgeChip, styles.badgeLocked]}>
-        <IconBadge name="lock-closed" size={22} style={{ opacity: 0.35 }} />
-        <Text style={[styles.badgeName, { opacity: 0.4 }]} numberOfLines={2}>{locked.name}</Text>
-        <Text style={[styles.badgeDate, { opacity: 0.4 }]}>
-          {locked.threshold} {BADGE_CATEGORY_HINT[locked.category] ?? 'para desbloquear'}
-        </Text>
-      </View>
-    )
-  }
-  if (!item) return null
+  const code = locked?.code ?? item?.badge.code ?? ''
+  const name = locked?.name ?? item?.badge.name ?? ''
+  const isLocked = Boolean(locked)
+
+  if (isLocked && !locked) return null
+  if (!isLocked && !item) return null
+
   return (
-    <View style={styles.badgeChip}>
-      {item.badge.icon_url ? (
-        <Image source={{ uri: item.badge.icon_url }} style={styles.badgeIcon} />
+    <View style={[styles.badgeChip, isLocked && styles.badgeLocked]}>
+      <BadgeImage code={code} size={52} locked={isLocked} />
+      <Text style={[styles.badgeName, isLocked && styles.badgeNameLocked]} numberOfLines={2}>
+        {name}
+      </Text>
+      {isLocked ? (
+        <Text style={[styles.badgeDate, styles.badgeDateLocked]}>
+          {locked!.threshold} {BADGE_CATEGORY_HINT[locked!.category] ?? 'para desbloquear'}
+        </Text>
       ) : (
-        <IconBadge name="medal" size={22} />
+        <Text style={styles.badgeDate}>{fmtDate(item!.earned_at)}</Text>
       )}
-      <Text style={styles.badgeName} numberOfLines={2}>{item.badge.name}</Text>
-      <Text style={styles.badgeDate}>{fmtDate(item.earned_at)}</Text>
     </View>
   )
 }
@@ -286,7 +286,7 @@ export default function GamificationScreen() {
               {earnedBadges.map((eb) => (
                 <BadgeChip key={eb.id} item={eb} />
               ))}
-              {locked.slice(0, 5).map((b) => (
+              {locked.map((b) => (
                 <BadgeChip key={b.id} item={null} locked={b} />
               ))}
             </ScrollView>
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   // Badges
   badgesRow: { flexDirection: 'row' },
   badgeChip: {
-    width:           88,
+    width:           96,
     backgroundColor: Colors.light.surface,
     borderRadius:    12,
     padding:         10,
@@ -502,8 +502,9 @@ const styles = StyleSheet.create({
     borderWidth:     1,
     borderColor:     Colors.light.border,
   },
-  badgeLocked: { opacity: 0.7 },
-  badgeIcon:   { width: 36, height: 36, borderRadius: 8 },
+  badgeLocked: { opacity: 0.92 },
+  badgeNameLocked: { opacity: 0.55 },
+  badgeDateLocked: { opacity: 0.5 },
   badgeName:   {
     fontSize:   11,
     fontWeight: '600',

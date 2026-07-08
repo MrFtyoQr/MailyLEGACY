@@ -54,6 +54,7 @@ export function useTakeMedication() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['medications', 'today'] })
       qc.invalidateQueries({ queryKey: ['patient-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['player-profile'] })
     },
   })
 }

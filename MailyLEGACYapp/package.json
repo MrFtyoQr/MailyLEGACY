@@ -10,6 +10,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "type-check": "tsc --noEmit",
     "test:levels": "npx tsx scripts/test-level-badges.ts",
+    "process:badges": "python3 scripts/process-badge-images.py",
     "postinstall": "node scripts/patch-expo-modules-core.js"
   },
   "dependencies": {

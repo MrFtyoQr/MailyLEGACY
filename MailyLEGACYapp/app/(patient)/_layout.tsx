@@ -5,6 +5,7 @@ import React from 'react'
 import { Tabs } from 'expo-router'
 import { TabIcon, useTabBarStyle } from '@components/layout/TabIcon'
 import { LevelUpWatcher } from '@components/gamification/LevelUpWatcher'
+import { BadgeUnlockWatcher } from '@components/gamification/BadgeUnlockWatcher'
 
 export default function PatientLayout() {
   const tabBarStyle = useTabBarStyle()
@@ -12,6 +13,7 @@ export default function PatientLayout() {
   return (
     <>
       <LevelUpWatcher />
+      <BadgeUnlockWatcher />
       <Tabs
       screenOptions={{
         headerShown:     false,

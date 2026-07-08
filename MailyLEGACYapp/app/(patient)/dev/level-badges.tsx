@@ -20,7 +20,16 @@ import { Input } from '@components/ui/Input'
 import { Card } from '@components/ui/Card'
 import { LevelBadgeDisplay } from '@components/gamification/LevelBadgeDisplay'
 import { LevelUpModal } from '@components/gamification/LevelUpModal'
+import { BadgeUnlockedModal } from '@components/gamification/BadgeUnlockedModal'
+import { BadgeImage } from '@components/gamification/BadgeImage'
 import { Colors } from '@constants/colors'
+import {
+  BADGE_CATALOG,
+  getBadgeAccent,
+  getBadgeUnlockReason,
+  BADGE_CATEGORY_LABEL,
+  type BadgeCategory,
+} from '@constants/badgeImages'
 import {
   MAX_LEVEL,
   LEVEL_META,
@@ -29,9 +38,10 @@ import {
 } from '@constants/levelBadges'
 import { formatEarnedDate } from '@lib/gamification/formatEarnedDate'
 import { PREVIEW_EARNED_DATES } from '@lib/gamification/levelCelebrationLogic'
+import type { BadgeCelebrationPayload } from '@lib/gamification/badgeCelebrationLogic'
 import { useAuthStore } from '@store/auth.store'
 
-type PreviewState = {
+type LevelPreviewState = {
   level:    number
   earnedAt: string
 } | null
@@ -41,7 +51,8 @@ export default function LevelBadgesDevLab() {
 
   const [previewName, setPreviewName] = useState(authFirstName ?? 'María')
   const [earnedAt, setEarnedAt] = useState(PREVIEW_EARNED_DATES.today())
-  const [preview, setPreview] = useState<PreviewState>(null)
+  const [preview, setPreview] = useState<LevelPreviewState>(null)
+  const [badgePreview, setBadgePreview] = useState<BadgeCelebrationPayload | null>(null)
   const [storedLevel, setStoredLevel] = useState<string | null>(null)
 
   useEffect(() => {
@@ -60,6 +71,18 @@ export default function LevelBadgesDevLab() {
   }, [refreshStoredLevel])
 
   if (!__DEV__) return null
+
+  function openBadgeModal(code: string) {
+    const entry = BADGE_CATALOG.find((b) => b.code === code)
+    if (!entry) return
+    setBadgePreview({
+      code:     entry.code,
+      name:     entry.name,
+      reason:   getBadgeUnlockReason(entry.code),
+      category: entry.category,
+      earnedAt,
+    })
+  }
 
   function openModal(level: number) {
     setPreview({ level, earnedAt })
@@ -107,7 +130,41 @@ export default function LevelBadgesDevLab() {
         </Card>
 
         <Card variant="outlined" padding={16}>
-          <Text style={styles.sectionTitle}>Modal de celebración</Text>
+          <Text style={styles.sectionTitle}>Tarjetas de insignias (19)</Text>
+          <Text style={styles.hint}>
+            Abre la tarjeta compartible de logro para cualquier insignia.
+          </Text>
+          {(Object.keys(BADGE_CATEGORY_LABEL) as BadgeCategory[]).map((category) => {
+            const items = BADGE_CATALOG.filter((b) => b.category === category)
+            if (items.length === 0) return null
+            return (
+              <View key={category} style={styles.achievementGroup}>
+                <Text style={styles.achievementGroupTitle}>{BADGE_CATEGORY_LABEL[category]}</Text>
+                <View style={styles.levelGrid}>
+                  {items.map((badge) => {
+                    const accent = getBadgeAccent(badge.code)
+                    return (
+                      <TouchableOpacity
+                        key={badge.code}
+                        style={[styles.badgeTile, { borderColor: accent }]}
+                        onPress={() => openBadgeModal(badge.code)}
+                        activeOpacity={0.8}
+                      >
+                        <BadgeImage code={badge.code} size={40} />
+                        <Text style={[styles.badgeTileName, { color: accent }]} numberOfLines={2}>
+                          {badge.name}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              </View>
+            )
+          })}
+        </Card>
+
+        <Card variant="outlined" padding={16}>
+          <Text style={styles.sectionTitle}>Modal de nivel</Text>
           <Text style={styles.hint}>
             Abre la tarjeta completa con confeti para cualquier nivel, sin ganar puntos.
           </Text>
@@ -130,7 +187,40 @@ export default function LevelBadgesDevLab() {
         </Card>
 
         <Card variant="outlined" padding={16}>
-          <Text style={styles.sectionTitle}>Galería de insignias</Text>
+          <Text style={styles.sectionTitle}>Catálogo de insignias</Text>
+          <Text style={styles.hint}>
+            Vista detallada con código y requisito para desbloquear.
+          </Text>
+          {(Object.keys(BADGE_CATEGORY_LABEL) as BadgeCategory[]).map((category) => {
+            const items = BADGE_CATALOG.filter((b) => b.category === category)
+            if (items.length === 0) return null
+            return (
+              <View key={category} style={styles.achievementGroup}>
+                <Text style={styles.achievementGroupTitle}>{BADGE_CATEGORY_LABEL[category]}</Text>
+                {items.map((badge) => (
+                  <TouchableOpacity
+                    key={badge.code}
+                    style={styles.achievementRow}
+                    onPress={() => openBadgeModal(badge.code)}
+                    activeOpacity={0.8}
+                  >
+                    <BadgeImage code={badge.code} size={56} />
+                    <View style={styles.achievementInfo}>
+                      <Text style={styles.achievementName}>{badge.name}</Text>
+                      <Text style={styles.achievementCode}>{badge.code}</Text>
+                      <Text style={styles.achievementDesc} numberOfLines={2}>
+                        {getBadgeUnlockReason(badge.code)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )
+          })}
+        </Card>
+
+        <Card variant="outlined" padding={16}>
+          <Text style={styles.sectionTitle}>Niveles (1–10)</Text>
           {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((level) => {
             const meta = LEVEL_META[level]
             return (
@@ -183,6 +273,15 @@ export default function LevelBadgesDevLab() {
           earnedAt={preview.earnedAt}
           visible
           onClose={() => setPreview(null)}
+        />
+      )}
+
+      {badgePreview && (
+        <BadgeUnlockedModal
+          badge={badgePreview}
+          firstName={previewName.trim() || null}
+          visible
+          onClose={() => setBadgePreview(null)}
         />
       )}
     </ScreenWrapper>
@@ -309,6 +408,24 @@ const styles = StyleSheet.create({
     color:      Colors.light.textSecondary,
     marginTop:  2,
   },
+  badgeTile: {
+    width:           '47%',
+    minWidth:        140,
+    flexGrow:        1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius:    14,
+    borderWidth:     2,
+    alignItems:      'center',
+    gap:             6,
+    backgroundColor: Colors.light.surface,
+  },
+  badgeTileName: {
+    fontSize:   11,
+    fontWeight: '700',
+    textAlign:  'center',
+    lineHeight: 14,
+  },
   galleryRow: {
     flexDirection: 'row',
     alignItems:    'center',
@@ -330,4 +447,40 @@ const styles = StyleSheet.create({
   swatchLabel: { fontSize: 11, color: Colors.light.textMuted },
   mono: { fontFamily: 'Menlo', fontWeight: '700' },
   toolActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  achievementGroup: {
+    marginBottom: 14,
+    gap:          8,
+  },
+  achievementGroupTitle: {
+    fontSize:     13,
+    fontWeight:   '800',
+    color:        Colors.brand.primary,
+    marginBottom: 4,
+    marginTop:    4,
+  },
+  achievementRow: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               12,
+    paddingVertical:   8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  achievementInfo: { flex: 1, gap: 2 },
+  achievementName: {
+    fontSize:   14,
+    fontWeight: '700',
+    color:      Colors.light.textPrimary,
+  },
+  achievementCode: {
+    fontSize:   11,
+    fontWeight: '600',
+    color:      Colors.light.textMuted,
+    fontFamily: 'Menlo',
+  },
+  achievementDesc: {
+    fontSize:   12,
+    color:      Colors.light.textSecondary,
+    lineHeight: 17,
+  },
 })
