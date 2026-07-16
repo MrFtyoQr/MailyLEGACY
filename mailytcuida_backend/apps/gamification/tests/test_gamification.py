@@ -696,3 +696,95 @@ class TestRewardCatalog(TestCase):
         self.assertEqual(redeem_resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(redeem_resp.data['redemption']['points_spent'], 1000)
         self.assertEqual(redeem_resp.data['balance'], 1000)
+
+
+@pytest.mark.django_db
+class TestLeveling(TestCase):
+    """
+    Progresión de nivel con reinicio por nivel y arrastre del excedente:
+    el progreso dentro del nivel inicia en 0 al subir, el excedente se arrastra,
+    y el nivel es función pura de total_points. El canje no afecta nivel ni
+    progreso (solo debita balance).
+    """
+
+    def setUp(self):
+        self.user, self.patient = _patient()
+
+    def _profile(self, total_points):
+        player, _ = PlayerProfile.objects.get_or_create(patient=self.patient)
+        player.total_points = total_points
+        player.balance      = total_points
+        player.level        = player.compute_level()
+        player.save(update_fields=['total_points', 'balance', 'level'])
+        return player
+
+    def test_thresholds_are_partial_sums_of_costs(self):
+        # Umbrales acumulados = sumas parciales de [200, 500, 1000, 2000, ...].
+        self.assertEqual(
+            PlayerProfile.LEVEL_THRESHOLDS,
+            [0, 200, 700, 1700, 3700, 7700, 15700, 30700, 60700, 110700],
+        )
+
+    def test_level_one_progress(self):
+        p = self._profile(150)
+        self.assertEqual(p.level, 1)
+        self.assertEqual(p.level_points, 150)
+        self.assertEqual(p.level_points_required, 200)
+
+    def test_level_up_resets_progress_to_zero(self):
+        # Al alcanzar exactamente 200 → nivel 2, progreso 0/500.
+        p = self._profile(200)
+        self.assertEqual(p.level, 2)
+        self.assertEqual(p.level_points, 0)
+        self.assertEqual(p.level_points_required, 500)
+
+    def test_surplus_carries_over(self):
+        # 250 puntos desde 0: nivel 2, con 50 excedentes arrastrados → 50/500.
+        p = self._profile(250)
+        self.assertEqual(p.level, 2)
+        self.assertEqual(p.level_points, 50)
+        self.assertEqual(p.level_points_required, 500)
+
+    def test_reach_level_3_needs_500_within_level_2(self):
+        # 700 total = 200 (para nivel 2) + 500 → nivel 3, progreso 0/1000.
+        p = self._profile(700)
+        self.assertEqual(p.level, 3)
+        self.assertEqual(p.level_points, 0)
+        self.assertEqual(p.level_points_required, 1000)
+
+    def test_max_level_caps(self):
+        p = self._profile(200000)
+        self.assertEqual(p.level, 10)
+        self.assertEqual(p.level_points, 200000 - 110700)
+        self.assertEqual(p.level_points_required, 0)  # no hay nivel siguiente
+
+    def test_award_flow_updates_level_and_progress(self):
+        # A través del flujo real de award: 10 × 20 pts = 200 → nivel 2, 0/500.
+        for i in range(10):
+            award_points(self.patient, PointSource.APPOINTMENT_KEPT, ref_id=f'appt-{i}')
+        p = PlayerProfile.objects.get(patient=self.patient)
+        self.assertEqual(p.total_points, 200)
+        self.assertEqual(p.level, 2)
+        self.assertEqual(p.level_points, 0)
+        self.assertEqual(p.level_points_required, 500)
+
+    def test_redeem_does_not_change_level_or_progress(self):
+        p = self._profile(700)  # nivel 3, progreso 0/1000
+        reward = RewardProduct.objects.create(
+            name='Cupón', points_cost=300, stock=0, is_active=True,
+        )
+        redeem_reward(self.patient, reward.id)
+        p.refresh_from_db()
+        self.assertEqual(p.level, 3)            # nivel intacto
+        self.assertEqual(p.total_points, 700)   # XP de por vida intacta
+        self.assertEqual(p.level_points, 0)     # progreso de nivel intacto
+        self.assertEqual(p.balance, 400)        # solo baja el saldo gastable
+
+    def test_serializer_exposes_level_progress(self):
+        self._profile(250)  # nivel 2, 50/500
+        client = _jwt_client(self.user)
+        resp = client.get('/api/v1/gamification/me/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['level'], 2)
+        self.assertEqual(resp.data['level_points'], 50)
+        self.assertEqual(resp.data['level_points_required'], 500)

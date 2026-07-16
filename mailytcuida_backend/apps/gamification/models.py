@@ -124,21 +124,46 @@ class PlayerProfile(models.Model):
     def __str__(self):
         return f'{self.patient} — {self.total_points}pts (streak {self.current_streak}d)'
 
+    # XP de por vida acumulada necesaria para ALCANZAR cada nivel (1..10).
+    # Derivada de los costos incrementales por nivel [200, 500, 1000, 2000,
+    # 4000, 8000, 15000, 30000, 50000] mediante sumas parciales. El progreso
+    # dentro de un nivel "inicia en 0" y el excedente se arrastra al subir,
+    # por lo que el nivel es función pura de total_points (sin campo extra).
+    LEVEL_THRESHOLDS = [0, 200, 700, 1700, 3700, 7700, 15700, 30700, 60700, 110700]
+    MAX_LEVEL = len(LEVEL_THRESHOLDS)  # 10
+
     def compute_level(self) -> int:
-        """Level thresholds: 1=0 … 10=50000 pts."""
-        thresholds = [0, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 50000]
+        """Nivel según la XP de por vida acumulada (total_points)."""
         level = 1
-        for i, t in enumerate(thresholds):
+        for i, t in enumerate(self.LEVEL_THRESHOLDS):
             if self.total_points >= t:
                 level = i + 1
-        return min(level, 10)
+        return min(level, self.MAX_LEVEL)
+
+    @property
+    def level_points(self) -> int:
+        """Puntos acumulados dentro del nivel actual (inicia en 0 al subir)."""
+        return self.total_points - self.LEVEL_THRESHOLDS[self.compute_level() - 1]
+
+    @property
+    def level_points_required(self) -> int:
+        """
+        Puntos necesarios para completar el nivel actual (costo incremental).
+        En el nivel máximo devuelve 0 (no hay siguiente nivel).
+        """
+        lvl = self.compute_level()
+        if lvl >= self.MAX_LEVEL:
+            return 0
+        return self.LEVEL_THRESHOLDS[lvl] - self.LEVEL_THRESHOLDS[lvl - 1]
 
 
 class PointTransaction(models.Model):
     """
-    Immutable ledger of every point award/deduction.
-    The running balance is stored on PlayerProfile.total_points for
-    fast access; this table is the authoritative audit trail.
+    Immutable ledger of every point award/deduction; the authoritative
+    audit trail. PlayerProfile caches two running totals derived from it:
+    total_points (lifetime XP — sum of positive entries; drives level and
+    leaderboard) and balance (spendable — sum of all entries, awards minus
+    redemptions).
     """
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     player      = models.ForeignKey(
