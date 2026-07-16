@@ -119,9 +119,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   couponImage: {
-    width:     '100%',
-    height:    140,
-    marginTop: 4,
+    width:           '100%',
+    height:          140,
+    marginTop:       4,
+    backgroundColor: Colors.light.surface,
   },
   rewardName: {
     fontSize:   15,

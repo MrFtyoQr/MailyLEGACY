@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
   couponImage: {
     width:           '100%',
     height:          120,
-    backgroundColor: 'transparent',
+    backgroundColor: Colors.light.surface,
   },
   couponImagePlaceholder: {
     alignItems:     'center',
