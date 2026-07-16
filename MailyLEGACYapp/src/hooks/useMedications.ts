@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { get, post } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
+import type { PlayerProfile } from '@hooks/useGamification'
+import { refreshProfileAndCelebrate } from '@lib/gamification/refreshProfileAndCelebrate'
+import { getLastKnownProfile } from '@lib/gamification/playerProfileTracker'
 
 export interface Medication {
   id:           string
@@ -51,10 +54,13 @@ export function useTakeMedication() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (historyId: string) => post(EP.medicationTake(historyId), {}),
-    onSuccess: () => {
+    onMutate: () => ({
+      prev: getLastKnownProfile() ?? qc.getQueryData<PlayerProfile>(['player-profile']) ?? null,
+    }),
+    onSuccess: async (_data, _vars, context) => {
       qc.invalidateQueries({ queryKey: ['medications', 'today'] })
       qc.invalidateQueries({ queryKey: ['patient-dashboard'] })
-      qc.invalidateQueries({ queryKey: ['player-profile'] })
+      await refreshProfileAndCelebrate(qc, context?.prev)
     },
   })
 }

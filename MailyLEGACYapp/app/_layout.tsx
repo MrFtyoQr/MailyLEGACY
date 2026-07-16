@@ -21,6 +21,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Slot, SplashScreen } from 'expo-router'
 import { StyleSheet } from 'react-native'
 
+import { GamificationCelebrationHost } from '@components/gamification/GamificationCelebrationHost'
 import { initSentry, SentryErrorBoundary } from '@lib/sentry'
 import * as Sentry from '@sentry/react-native'
 import { setTokenGetter } from '@lib/api/client'
@@ -28,6 +29,10 @@ import { getAccessToken } from '@lib/auth/session'
 import { notificationSocket } from '@lib/ws/NotificationSocket'
 import { useWsStore }   from '@store/ws.store'
 import { useAuthStore } from '@store/auth.store'
+import { get } from '@lib/api/client'
+import { EP } from '@lib/api/endpoints'
+import type { MeResponse } from '@/types/api.types'
+import { fetchPlayerProfile } from '@hooks/useGamification'
 
 // Inicializar Sentry lo antes posible
 initSentry()
@@ -61,6 +66,7 @@ function NativeAuthInit() {
   const isSignedIn      = useAuthStore((s) => s.isSignedIn)
   const setSignedIn     = useAuthStore((s) => s.setSignedIn)
   const setLoaded       = useAuthStore((s) => s.setLoaded)
+  const setUser         = useAuthStore((s) => s.setUser)
   const setNotifStatus  = useWsStore((s) => s.setNotifStatus)
   const incrementUnread = useWsStore((s) => s.incrementUnread)
 
@@ -69,11 +75,32 @@ function NativeAuthInit() {
     setTokenGetter(getAccessToken)
 
     // Verificar si hay token en SecureStore → actualizar estado de auth
-    getAccessToken().then((token) => {
+    getAccessToken().then(async (token) => {
       setSignedIn(!!token)
+      if (token) {
+        try {
+          const me = await get<MeResponse>(EP.authMe)
+          setUser({
+            id:        me.user.id,
+            email:     me.user.email,
+            role:      me.user.role ?? null,
+            firstName: (me.profile as { first_name?: string } | null)?.first_name ?? null,
+            lastName:  (me.profile as { last_name?: string }  | null)?.last_name  ?? null,
+            photoUrl:  (me.profile as { photo_url?: string }  | null)?.photo_url  ?? null,
+          })
+          if (me.user.role === 'PATIENT') {
+            queryClient.prefetchQuery({
+              queryKey: ['player-profile'],
+              queryFn:  fetchPlayerProfile,
+            })
+          }
+        } catch {
+          // El splash/index.tsx reintentará cargar el perfil.
+        }
+      }
       setLoaded(true)
     })
-  }, [setSignedIn, setLoaded])
+  }, [setSignedIn, setLoaded, setUser])
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -115,6 +142,7 @@ export default function RootLayout() {
         <GestureHandlerRootView style={styles.flex}>
           <SafeAreaProvider>
             <NativeAuthInit />
+            <GamificationCelebrationHost />
             <Slot />
           </SafeAreaProvider>
         </GestureHandlerRootView>

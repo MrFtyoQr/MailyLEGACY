@@ -4,26 +4,33 @@
  * progreso de nivel, próximas insignias y catálogo de productos canjeables.
  */
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Image,
+  StyleSheet, ActivityIndicator, Image, Alert, RefreshControl,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { refreshProfileAndCelebrate } from '@lib/gamification/refreshProfileAndCelebrate'
 import { ScreenWrapper }  from '@components/layout/ScreenWrapper'
 import { IconBadge }      from '@components/ui/IconBadge'
 import { PointsCoin }     from '@components/ui/PointsCoin'
+import { Button }         from '@components/ui/Button'
 import { StreakFlame, StreakTrophy } from '@components/ui/StreakIcons'
 import { InfoCard }       from '@components/ui/InfoCard'
 import { EmptyState }     from '@components/ui/EmptyState'
 import { LevelBadgeDisplay } from '@components/gamification/LevelBadgeDisplay'
 import { BadgeImage } from '@components/gamification/BadgeImage'
+import { CouponRedeemedModal } from '@components/gamification/CouponRedeemedModal'
 import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors }         from '@constants/colors'
+import { getCouponImage, getCouponSubtitle } from '@constants/couponImages'
 import { MAX_LEVEL, getLevelProgress } from '@constants/levelBadges'
 import {
   usePlayerProfile, useTransactions, useAvailableBadges, useRewardProducts,
+  useRedeemReward, redeemErrorMessage,
   type EarnedBadge, type PointTransaction, type RewardProduct, type Badge,
+  type RedemptionRecord,
 } from '@hooks/useGamification'
 
 // ── Labels de fuente de puntos ────────────────────────────────────────────────
@@ -37,6 +44,7 @@ const SOURCE_LABEL: Record<string, string> = {
   PROFILE_COMPLETED:  'Perfil completado',
   MILESTONE:          'Hito desbloqueado',
   MANUAL_ADJUSTMENT:  'Ajuste manual',
+  REDEMPTION:         'Canje de cupón',
 }
 
 const SOURCE_ICON: Record<string, AppIconName> = {
@@ -49,6 +57,7 @@ const SOURCE_ICON: Record<string, AppIconName> = {
   PROFILE_COMPLETED:  'check',
   MILESTONE:          'trophy',
   MANUAL_ADJUSTMENT:  'cog',
+  REDEMPTION:         'gift',
 }
 
 // ── Hints de categoría de badge ───────────────────────────────────────────────
@@ -120,24 +129,64 @@ function TxRow({ item }: { item: PointTransaction }) {
   )
 }
 
-function RewardCard({ item }: { item: RewardProduct }) {
-  const stockLabel = item.stock === 0 ? 'Ilimitado' : `${item.stock} disponibles`
+function CouponCard({
+  item,
+  balance,
+  redeeming,
+  onRedeem,
+}: {
+  item:      RewardProduct
+  balance:   number
+  redeeming: boolean
+  onRedeem:  (item: RewardProduct) => void
+}) {
+  const localImage = getCouponImage(item.points_cost)
+  const subtitle   = getCouponSubtitle(item.points_cost) ?? item.description
+  const canAfford  = balance >= item.points_cost
+
   return (
-    <View style={styles.rewardCard}>
-      {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={styles.rewardImage} />
+    <View style={styles.couponCard}>
+      {localImage ? (
+        <Image source={localImage} style={styles.couponImage} resizeMode="contain" />
+      ) : item.image_url ? (
+        <Image source={{ uri: item.image_url }} style={styles.couponImage} resizeMode="contain" />
       ) : (
-        <View style={[styles.rewardImage, styles.rewardImagePlaceholder]}>
-          <IconBadge name="gift" size={24} />
+        <View style={[styles.couponImage, styles.couponImagePlaceholder]}>
+          <IconBadge name="gift" size={28} />
         </View>
       )}
-      <View style={styles.rewardInfo}>
-        <Text style={styles.rewardName} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.rewardStock}>{stockLabel}</Text>
-        <View style={styles.rewardCostRow}>
-          <PointsCoin size={14} />
-          <Text style={styles.rewardCost}>{item.points_cost} pts</Text>
+
+      <View style={styles.couponBody}>
+        <Text style={styles.couponName}>{item.name}</Text>
+        {subtitle ? (
+          <Text style={styles.couponSubtitle} numberOfLines={2}>{subtitle}</Text>
+        ) : null}
+
+        <View style={styles.couponFooter}>
+          <View style={styles.rewardCostRow}>
+            <PointsCoin size={16} />
+            <Text style={styles.rewardCost}>
+              {item.points_cost.toLocaleString('es-MX')} pts
+            </Text>
+          </View>
+
+          <View style={styles.redeemBtnWrap}>
+            <Button
+              label={redeeming ? 'Canjeando…' : 'Canjear'}
+              variant="primary"
+              size="sm"
+              loading={redeeming}
+              disabled={!canAfford || redeeming}
+              onPress={() => onRedeem(item)}
+            />
+          </View>
         </View>
+
+        {!canAfford ? (
+          <Text style={styles.couponHint}>
+            Te faltan {(item.points_cost - balance).toLocaleString('es-MX')} pts
+          </Text>
+        ) : null}
       </View>
     </View>
   )
@@ -146,17 +195,32 @@ function RewardCard({ item }: { item: RewardProduct }) {
 // ── Pantalla principal ────────────────────────────────────────────────────────
 
 export default function GamificationScreen() {
+  const qc = useQueryClient()
   const { data: profile, isLoading: loadingProfile } = usePlayerProfile()
   const { data: txPage,  isLoading: loadingTx }      = useTransactions()
   const { data: badges }                             = useAvailableBadges()
-  const { data: rewards }                            = useRewardProducts()
+  const {
+    data: rewards,
+    isLoading: loadingRewards,
+    isError: rewardsError,
+    refetch: refetchRewards,
+    isRefetching: refetchingRewards,
+  } = useRewardProducts()
+  const redeemMutation                               = useRedeemReward()
 
   const [showAllTx, setShowAllTx] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [redeemingId, setRedeemingId] = useState<string | null>(null)
+  const [couponModal, setCouponModal] = useState<{
+    reward:     RewardProduct
+    redemption: RedemptionRecord
+  } | null>(null)
 
   const transactions = txPage?.results ?? []
   const visibleTx    = showAllTx ? transactions : transactions.slice(0, 10)
   const earnedBadges = profile?.badges ?? []
   const rewardList   = rewards?.results ?? []
+  const balance      = profile?.balance ?? 0
 
   const earnedCodes = useMemo(() => new Set(earnedBadges.map((eb) => eb.badge.code)), [earnedBadges])
   const allBadges   = badges?.results ?? []
@@ -166,6 +230,51 @@ export default function GamificationScreen() {
     if (!profile) return null
     return getLevelProgress(profile.total_points, profile.level)
   }, [profile])
+
+  const confirmRedeem = useCallback((item: RewardProduct) => {
+    Alert.alert(
+      'Confirmar canje',
+      `¿Canjear "${item.name}" por ${item.points_cost.toLocaleString('es-MX')} puntos?\n\nRecibirás un código único para usar tu descuento.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Canjear',
+          onPress: async () => {
+            setRedeemingId(item.id)
+            try {
+              const result = await redeemMutation.mutateAsync(item)
+              setCouponModal({ reward: item, redemption: result.redemption })
+            } catch (err) {
+              Alert.alert('No se pudo canjear', redeemErrorMessage(err))
+            } finally {
+              setRedeemingId(null)
+            }
+          },
+        },
+      ],
+    )
+  }, [redeemMutation])
+
+  const refreshGamification = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await Promise.all([
+        refreshProfileAndCelebrate(qc),
+        refetchRewards(),
+        qc.invalidateQueries({ queryKey: ['gamification-transactions'] }),
+        qc.invalidateQueries({ queryKey: ['badges'] }),
+      ])
+    } finally {
+      setRefreshing(false)
+    }
+  }, [qc, refetchRewards])
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfileAndCelebrate(qc)
+      refetchRewards()
+    }, [qc, refetchRewards]),
+  )
 
   return (
     <ScreenWrapper noPadding edges={['top', 'left', 'right']}>
@@ -181,6 +290,13 @@ export default function GamificationScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing || refetchingRewards}
+            onRefresh={refreshGamification}
+            tintColor={Colors.brand.primary}
+          />
+        }
       >
         {/* ── Hero ── */}
         {loadingProfile ? (
@@ -195,7 +311,16 @@ export default function GamificationScreen() {
                 <Text style={styles.heroPointsLabel}>Puntos totales</Text>
                 <View style={styles.heroPointsRow}>
                   <PointsCoin size={24} />
-                  <Text style={styles.heroPoints}>{profile.total_points.toLocaleString('es-MX')}</Text>
+                  <Text style={styles.heroPoints}>
+                    {profile.total_points.toLocaleString('es-MX')}
+                  </Text>
+                </View>
+                <Text style={styles.heroBalanceLabel}>Saldo canjeable</Text>
+                <View style={styles.heroBalanceRow}>
+                  <PointsCoin size={16} />
+                  <Text style={styles.heroBalance}>
+                    {balance.toLocaleString('es-MX')} pts
+                  </Text>
                 </View>
               </View>
               <LevelBadgeDisplay
@@ -320,17 +445,40 @@ export default function GamificationScreen() {
           )}
         </View>
 
-        {/* ── Productos canjeables ── */}
+        {/* ── Cupones canjeables ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Canjea tus puntos</Text>
-          {rewardList.length === 0 ? (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Canjea tus puntos</Text>
+            {rewardList.length > 0 && (
+              <Text style={styles.sectionSub}>
+                Saldo: {balance.toLocaleString('es-MX')} pts
+              </Text>
+            )}
+          </View>
+          {loadingRewards ? (
+            <ActivityIndicator color={Colors.brand.primary} style={{ marginTop: 12 }} />
+          ) : rewardsError ? (
             <EmptyState
               icon="gift"
-              title="Próximamente"
-              subtitle="Podrás canjear tus puntos por productos y beneficios de salud."
+              title="No se pudieron cargar los cupones"
+              subtitle="Verifica tu conexión e intenta de nuevo. Si el problema continúa, el catálogo puede no estar configurado en el servidor."
+            />
+          ) : rewardList.length === 0 ? (
+            <EmptyState
+              icon="gift"
+              title="Sin cupones disponibles"
+              subtitle="Desliza hacia abajo para actualizar. Si acabas de instalar la app, los cupones se cargan al abrir esta pantalla."
             />
           ) : (
-            rewardList.map((r) => <RewardCard key={r.id} item={r} />)
+            rewardList.map((r) => (
+              <CouponCard
+                key={r.id}
+                item={r}
+                balance={balance}
+                redeeming={redeemingId === r.id}
+                onRedeem={confirmRedeem}
+              />
+            ))
           )}
         </View>
 
@@ -346,6 +494,14 @@ export default function GamificationScreen() {
 
         <View style={{ height: 60 }} />
       </ScrollView>
+
+      <CouponRedeemedModal
+        visible={couponModal !== null}
+        reward={couponModal?.reward ?? null}
+        redemption={couponModal?.redemption ?? null}
+        image={couponModal ? getCouponImage(couponModal.reward.points_cost) : null}
+        onClose={() => setCouponModal(null)}
+      />
     </ScreenWrapper>
   )
 }
@@ -395,6 +551,23 @@ const styles = StyleSheet.create({
     fontSize:   28,
     fontWeight: '800',
     color:      '#FFFFFF',
+  },
+  heroBalanceLabel: {
+    fontSize:   11,
+    color:      'rgba(255,255,255,0.65)',
+    fontWeight: '500',
+    marginTop:  10,
+    marginBottom: 2,
+  },
+  heroBalanceRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           5,
+  },
+  heroBalance: {
+    fontSize:   16,
+    fontWeight: '700',
+    color:      '#FFE066',
   },
 
   // Level progress
@@ -564,38 +737,61 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
 
-  // Rewards
-  rewardCard: {
-    flexDirection:   'row',
+  // Cupones
+  couponCard: {
     backgroundColor: Colors.light.surface,
     borderRadius:    16,
     overflow:        'hidden',
     borderWidth:     1,
     borderColor:     Colors.light.border,
-    marginBottom:    10,
+    marginBottom:    12,
   },
-  rewardImage:            { width: 88, height: 88 },
-  rewardImagePlaceholder: {
+  couponImage: {
+    width:           '100%',
+    height:          120,
+    backgroundColor: 'transparent',
+  },
+  couponImagePlaceholder: {
+    alignItems:     'center',
+    justifyContent: 'center',
     backgroundColor: Colors.light.border,
-    alignItems:      'center',
-    justifyContent:  'center',
   },
-  rewardInfo:  { flex: 1, padding: 12, gap: 4 },
-  rewardName:  {
-    fontSize:   14,
-    fontWeight: '700',
+  couponBody: {
+    padding: 14,
+    gap:     6,
+  },
+  couponName: {
+    fontSize:   15,
+    fontWeight: '800',
     color:      Colors.light.textPrimary,
   },
-  rewardStock: { fontSize: 12, color: Colors.light.textSecondary },
+  couponSubtitle: {
+    fontSize:   12,
+    color:      Colors.light.textSecondary,
+    lineHeight: 17,
+  },
+  couponFooter: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    marginTop:      6,
+  },
+  couponHint: {
+    fontSize:  11,
+    color:     Colors.semantic.warning,
+    marginTop: 2,
+  },
+  redeemBtnWrap: {
+    minWidth: 108,
+  },
   rewardCostRow: {
     flexDirection: 'row',
     alignItems:    'center',
     gap:           4,
-    marginTop:     4,
   },
   rewardCost:  {
-    fontSize:   14,
-    fontWeight: '700',
+    fontSize:   15,
+    fontWeight: '800',
     color:      Colors.brand.primary,
   },
 

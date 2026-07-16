@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LAST_SEEN_LEVEL_KEY } from '@constants/levelBadges'
 import { decideLevelCelebration } from '@lib/gamification/levelCelebrationLogic'
@@ -14,6 +14,8 @@ export interface LevelCelebration {
 
 export function useLevelUpCelebration(currentLevel: number | undefined) {
   const [celebration, setCelebration] = useState<LevelCelebration | null>(null)
+  /** Evita condición de carrera mientras AsyncStorage persiste el init. */
+  const seenLevelRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (currentLevel == null || currentLevel < 1) return
@@ -28,11 +30,19 @@ export function useLevelUpCelebration(currentLevel: number | undefined) {
       const decision = decideLevelCelebration(level, stored)
 
       if (decision.action === 'init') {
+        if (seenLevelRef.current != null && level > seenLevelRef.current) {
+          seenLevelRef.current = level
+          await AsyncStorage.setItem(LAST_SEEN_LEVEL_KEY, String(level))
+          setCelebration({ level, earnedAt: new Date().toISOString() })
+          return
+        }
+        seenLevelRef.current = decision.level
         await AsyncStorage.setItem(LAST_SEEN_LEVEL_KEY, String(decision.level))
         return
       }
 
       if (decision.action === 'celebrate') {
+        seenLevelRef.current = decision.level
         setCelebration({ level: decision.level, earnedAt: new Date().toISOString() })
       }
     }
@@ -43,6 +53,7 @@ export function useLevelUpCelebration(currentLevel: number | undefined) {
 
   const dismissCelebration = useCallback(async () => {
     if (currentLevel != null) {
+      seenLevelRef.current = currentLevel
       await AsyncStorage.setItem(LAST_SEEN_LEVEL_KEY, String(currentLevel))
     }
     setCelebration(null)

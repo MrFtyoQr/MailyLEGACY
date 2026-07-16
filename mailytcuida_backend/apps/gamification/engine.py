@@ -257,7 +257,8 @@ def _check_badges(player: PlayerProfile):
                     points      = badge.points_reward,
                     note        = f'Badge: {badge.code}',
                 )
-                player.save(update_fields=['total_points', 'balance'])
+                player.level = player.compute_level()
+                player.save(update_fields=['total_points', 'balance', 'level'])
 
             # Notify patient
             try:

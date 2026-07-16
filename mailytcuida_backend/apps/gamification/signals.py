@@ -18,7 +18,14 @@ logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender='medications.MedicationHistory')
 def _on_medication_taken(sender, instance, created, **kwargs):
-    if not created or instance.status != 'TAKEN':
+    """
+    Otorga puntos cuando la dosis queda en TAKEN.
+
+    El flujo normal crea la entrada como PENDING (tarea nocturna) y el paciente
+    la marca tomada vía POST /history/<id>/take/ (update, created=False).
+    award_points es idempotente por (player, source, ref_id).
+    """
+    if instance.status != 'TAKEN':
         return
     from .engine import award_points, PointSource
     award_points(

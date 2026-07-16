@@ -89,6 +89,8 @@ export const EP = {
   gamificationTransactions: '/gamification/me/transactions/',
   badges:                   '/gamification/badges/',
   gamificationRewards:      '/gamification/rewards/',
+  gamificationRedeem:       '/gamification/redeem/',
+  gamificationRedemptions:  '/gamification/me/redemptions/',
   leaderboard:              '/gamification/leaderboard/',
 
   // ── Family Care ───────────────────────────────────────────────────────────

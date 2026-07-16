@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { get, post, del } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
 import type { AppIconName } from '@components/ui/AppIcon'
+import type { PlayerProfile } from '@hooks/useGamification'
+import { refreshProfileAndCelebrate } from '@lib/gamification/refreshProfileAndCelebrate'
+import { getLastKnownProfile } from '@lib/gamification/playerProfileTracker'
 
 // ── Tipos que coinciden con el modelo real del backend ────────────────────────
 
@@ -171,9 +174,13 @@ export function useAddVital() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: AddVitalPayload) => post<VitalReading>(EP.vitals, data),
-    onSuccess: () => {
+    onMutate: () => ({
+      prev: getLastKnownProfile() ?? qc.getQueryData<PlayerProfile>(['player-profile']) ?? null,
+    }),
+    onSuccess: async (_data, _vars, context) => {
       qc.invalidateQueries({ queryKey: ['vitals'] })
       qc.invalidateQueries({ queryKey: ['patient-dashboard'] })
+      await refreshProfileAndCelebrate(qc, context?.prev)
     },
   })
 }
@@ -189,10 +196,13 @@ export function useAddVitals() {
       const failed = results.filter(r => r.status === 'rejected').length
       return { ok: payloads.length - failed, failed }
     },
-    onSuccess: () => {
+    onMutate: () => ({
+      prev: getLastKnownProfile() ?? qc.getQueryData<PlayerProfile>(['player-profile']) ?? null,
+    }),
+    onSuccess: async (_data, _vars, context) => {
       qc.invalidateQueries({ queryKey: ['vitals'] })
       qc.invalidateQueries({ queryKey: ['patient-dashboard'] })
-      qc.invalidateQueries({ queryKey: ['player-profile'] })
+      await refreshProfileAndCelebrate(qc, context?.prev)
     },
   })
 }

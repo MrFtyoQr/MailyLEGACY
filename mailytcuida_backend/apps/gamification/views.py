@@ -19,6 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.accounts.models import PatientProfile, DoctorPatient
 from . import engine
 from .models import PlayerProfile, PointTransaction, Badge, RewardProduct, RedemptionRecord
+from .rewards_catalog import ensure_default_rewards
 from .serializers import (
     PlayerProfileSerializer, PointTransactionSerializer,
     BadgeSerializer, LeaderboardEntrySerializer, RewardProductSerializer,
@@ -41,6 +42,11 @@ class MyPlayerProfileView(APIView):
     def get(self, request):
         patient = _get_patient(request)
         player  = _get_or_create_player(patient)
+        player  = (
+            PlayerProfile.objects
+            .prefetch_related('earned_badges__badge')
+            .get(pk=player.pk)
+        )
         return Response(PlayerProfileSerializer(player).data)
 
 
@@ -99,7 +105,10 @@ class RewardProductListView(generics.ListAPIView):
     """Active redeemable products — shown in the gamification screen."""
     permission_classes = [IsAuthenticated]
     serializer_class   = RewardProductSerializer
-    queryset           = RewardProduct.objects.filter(is_active=True)
+
+    def get_queryset(self):
+        ensure_default_rewards()
+        return RewardProduct.objects.filter(is_active=True)
 
 
 class RedeemView(APIView):
@@ -116,14 +125,36 @@ class RedeemView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        reward_id = request.data.get('reward_id')
-        if not reward_id:
+        reward_id    = request.data.get('reward_id')
+        points_cost  = request.data.get('points_cost')
+
+        if not reward_id and points_cost is None:
             return Response(
-                {'code': 'reward_id_required', 'detail': 'Falta reward_id.'},
+                {'code': 'reward_id_required', 'detail': 'Falta reward_id o points_cost.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         patient = _get_patient(request)
+        ensure_default_rewards()
+
+        if not reward_id:
+            try:
+                points_cost = int(points_cost)
+            except (TypeError, ValueError):
+                return Response(
+                    {'code': 'reward_not_found', 'detail': 'points_cost inválido.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            reward = RewardProduct.objects.filter(
+                points_cost=points_cost, is_active=True,
+            ).first()
+            if reward is None:
+                return Response(
+                    {'code': 'reward_not_found', 'detail': 'No hay cupón para ese costo.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            reward_id = reward.id
+
         try:
             redemption = engine.redeem_reward(patient, reward_id)
         except RewardProduct.DoesNotExist:

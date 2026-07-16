@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LAST_SEEN_BADGE_CODES_KEY } from '@constants/badgeImages'
 import {
@@ -21,6 +21,8 @@ function toCelebrationPayload(eb: EarnedBadge): BadgeCelebrationPayload {
 export function useBadgeUnlockCelebration(earnedBadges: EarnedBadge[] | undefined) {
   const [queue, setQueue] = useState<BadgeCelebrationPayload[]>([])
   const current = queue[0] ?? null
+  /** Evita condición de carrera: init en AsyncStorage es async. */
+  const seenCacheRef = useRef<Set<string> | null>(null)
 
   const payloads = useMemo(
     () => (earnedBadges ?? []).map(toCelebrationPayload),
@@ -36,16 +38,20 @@ export function useBadgeUnlockCelebration(earnedBadges: EarnedBadge[] | undefine
       const stored = await AsyncStorage.getItem(LAST_SEEN_BADGE_CODES_KEY)
       if (cancelled) return
 
-      const seen = parseSeenBadgeCodes(stored)
+      let seen = seenCacheRef.current ?? parseSeenBadgeCodes(stored)
       const { init, celebrations } = findNewBadgeCelebrations(payloads, seen)
 
       if (init) {
+        seen = new Set(payloads.map((p) => p.code))
+        seenCacheRef.current = seen
         await AsyncStorage.setItem(
           LAST_SEEN_BADGE_CODES_KEY,
-          JSON.stringify(payloads.map((p) => p.code)),
+          JSON.stringify([...seen]),
         )
         return
       }
+
+      seenCacheRef.current = seen
 
       if (celebrations.length > 0) {
         setQueue((prev) => {
@@ -64,8 +70,9 @@ export function useBadgeUnlockCelebration(earnedBadges: EarnedBadge[] | undefine
     if (!current) return
 
     const stored = await AsyncStorage.getItem(LAST_SEEN_BADGE_CODES_KEY)
-    const seen = parseSeenBadgeCodes(stored) ?? new Set<string>()
+    const seen = seenCacheRef.current ?? parseSeenBadgeCodes(stored) ?? new Set<string>()
     seen.add(current.code)
+    seenCacheRef.current = seen
     await AsyncStorage.setItem(LAST_SEEN_BADGE_CODES_KEY, JSON.stringify([...seen]))
 
     setQueue((prev) => prev.slice(1))

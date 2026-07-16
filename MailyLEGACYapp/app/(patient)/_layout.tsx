@@ -4,16 +4,14 @@
 import React from 'react'
 import { Tabs } from 'expo-router'
 import { TabIcon, useTabBarStyle } from '@components/layout/TabIcon'
-import { LevelUpWatcher } from '@components/gamification/LevelUpWatcher'
-import { BadgeUnlockWatcher } from '@components/gamification/BadgeUnlockWatcher'
+import { PatientGamificationInit } from '@components/gamification/PatientGamificationInit'
 
 export default function PatientLayout() {
   const tabBarStyle = useTabBarStyle()
 
   return (
     <>
-      <LevelUpWatcher />
-      <BadgeUnlockWatcher />
+      <PatientGamificationInit />
       <Tabs
       screenOptions={{
         headerShown:     false,

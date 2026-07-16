@@ -1,5 +1,6 @@
 import pytest
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -595,3 +596,103 @@ class TestRedemptionHistory(TestCase):
     def test_history_requires_auth(self):
         resp = APIClient().get(self.URL)
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+@pytest.mark.django_db
+class TestMedicationTakeAwardsPoints(TestCase):
+    """Integración: marcar dosis como tomada debe disparar gamificación."""
+
+    def setUp(self):
+        self.user, self.patient = _patient()
+        self.client = _jwt_client(self.user)
+        from apps.medications.models import Medication, MedicationHistory
+        self.med = Medication.objects.create(patient=self.patient, name='Metformina')
+        self.entry = MedicationHistory.objects.create(
+            patient=self.patient,
+            medication=self.med,
+            medication_name=self.med.name,
+            scheduled_at=timezone.now(),
+            status=MedicationHistory.Status.PENDING,
+        )
+
+    def test_take_endpoint_awards_points(self):
+        resp = self.client.post(
+            f'/api/v1/medications/history/{self.entry.id}/take/',
+            {},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        player = PlayerProfile.objects.get(patient=self.patient)
+        self.assertEqual(player.total_points, 10)
+        self.assertEqual(player.balance, 10)
+        self.assertTrue(
+            PointTransaction.objects.filter(
+                player=player, source=PointSource.MEDICATION_TAKEN,
+            ).exists()
+        )
+
+    def test_take_endpoint_is_idempotent(self):
+        self.client.post(f'/api/v1/medications/history/{self.entry.id}/take/', {}, format='json')
+        self.entry.refresh_from_db()
+        self.entry.notes = 'segunda edición'
+        self.entry.save()
+
+        player = PlayerProfile.objects.get(patient=self.patient)
+        self.assertEqual(player.total_points, 10)
+        self.assertEqual(
+            PointTransaction.objects.filter(
+                player=player, source=PointSource.MEDICATION_TAKEN,
+            ).count(),
+            1,
+        )
+
+
+@pytest.mark.django_db
+class TestRewardCatalog(TestCase):
+    """Catálogo de cupones: auto-seed al listar y canje end-to-end."""
+
+    REWARDS_URL = '/api/v1/gamification/rewards/'
+    REDEEM_URL  = '/api/v1/gamification/redeem/'
+
+    def setUp(self):
+        self.user, self.patient = _patient()
+        self.client = _jwt_client(self.user)
+        RewardProduct.objects.all().delete()
+
+    def test_rewards_list_auto_seeds_default_catalog(self):
+        resp = self.client.get(self.REWARDS_URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['count'], 4)
+        costs = sorted(r['points_cost'] for r in resp.data['results'])
+        self.assertEqual(costs, [500, 1000, 1500, 2000])
+
+    def test_redeem_returns_code_and_updates_balance(self):
+        list_resp = self.client.get(self.REWARDS_URL)
+        reward_id = list_resp.data['results'][0]['id']
+
+        player, _ = PlayerProfile.objects.get_or_create(patient=self.patient)
+        player.balance = 1000
+        player.total_points = 1000
+        player.save(update_fields=['balance', 'total_points'])
+
+        redeem_resp = self.client.post(self.REDEEM_URL, {
+            'reward_id': reward_id,
+        }, format='json')
+        self.assertEqual(redeem_resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(redeem_resp.data['redemption']['code'].startswith('RDM-'))
+        self.assertEqual(redeem_resp.data['balance'], 500)
+
+    def test_redeem_by_points_cost(self):
+        self.client.get(self.REWARDS_URL)
+        player, _ = PlayerProfile.objects.get_or_create(patient=self.patient)
+        player.balance = 2000
+        player.total_points = 2000
+        player.save(update_fields=['balance', 'total_points'])
+
+        redeem_resp = self.client.post(self.REDEEM_URL, {
+            'points_cost': 1000,
+        }, format='json')
+        self.assertEqual(redeem_resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(redeem_resp.data['redemption']['points_spent'], 1000)
+        self.assertEqual(redeem_resp.data['balance'], 1000)

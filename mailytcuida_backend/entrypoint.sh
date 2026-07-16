@@ -31,6 +31,9 @@ python manage.py collectstatic --noinput --clear
 echo "==> Seeding badges (idempotent)..."
 python manage.py seed_badges || true
 
+echo "==> Seeding reward coupons (idempotent)..."
+python manage.py seed_rewards || true
+
 echo "==> Creating dev seed data..."
 python manage.py seed_dev_data || true
 

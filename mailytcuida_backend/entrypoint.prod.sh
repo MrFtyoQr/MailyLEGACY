@@ -38,6 +38,9 @@ python manage.py collectstatic --noinput --clear
 echo "==> Seeding badges (idempotent)..."
 python manage.py seed_badges || true
 
+echo "==> Seeding reward coupons (idempotent)..."
+python manage.py seed_rewards || true
+
 echo "==> Notifying Sentry of deployment start..."
 python -c "
 import django, os
