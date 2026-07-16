@@ -40,11 +40,16 @@ class PointTransactionSerializer(serializers.ModelSerializer):
 class PlayerProfileSerializer(serializers.ModelSerializer):
     badges       = PlayerBadgeSerializer(source='earned_badges', many=True, read_only=True)
     multiplier   = serializers.SerializerMethodField()
+    # Progreso dentro del nivel actual (inicia en 0 al subir; el excedente se
+    # arrastra) y puntos necesarios para completarlo. Derivados de total_points.
+    level_points          = serializers.IntegerField(read_only=True)
+    level_points_required = serializers.IntegerField(read_only=True)
 
     class Meta:
         model  = PlayerProfile
         fields = [
             'id', 'total_points', 'balance', 'level',
+            'level_points', 'level_points_required',
             'current_streak', 'longest_streak',
             'last_activity_date', 'multiplier',
             'badges', 'created_at', 'updated_at',
