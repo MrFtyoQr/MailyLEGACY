@@ -112,7 +112,7 @@ export default function VitalsScreen() {
   const { data: playerProfile } = useQuery({
     queryKey:  ['player-profile'],
     staleTime: 5 * 60 * 1000,
-    queryFn:   () => get<{ total_points: number; level: number; current_streak: number }>(EP.gamification)
+    queryFn:   () => get<{ total_points: number; balance: number; level: number; level_points: number; current_streak: number }>(EP.gamification)
                        .catch(() => null),
   })
 
@@ -184,7 +184,7 @@ export default function VitalsScreen() {
               <View style={styles.pointsRow}>
                 <PointsCoin size={16} />
                 <Text style={[styles.statValue, { color: Colors.brand.primary }]}>
-                  {playerProfile.total_points}
+                  {playerProfile.level_points ?? playerProfile.total_points}
                 </Text>
               </View>
               <Text style={styles.statLabel}>pts · Nv.{playerProfile.level}</Text>

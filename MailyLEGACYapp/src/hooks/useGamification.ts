@@ -2,12 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { get, post } from '@lib/api/client'
 import { EP } from '@lib/api/endpoints'
 import { ApiError } from '@lib/api/errors'
+import { LOCAL_COUPONS_ENABLED } from '@constants/config'
 import { useAuthStore } from '@store/auth.store'
 import {
-  COUPON_CATALOG,
-  CATALOG_COUPON_PREFIX,
-  isCatalogCouponId,
-} from '@constants/couponImages'
+  buildLocalCouponCatalog,
+  getAvailableLocalCoupons,
+  getLocalRedemptions,
+  redeemLocalCoupon,
+  computeEffectiveBalance,
+} from '@lib/gamification/localCoupons'
 import { normalizePlayerProfile } from '@lib/gamification/normalizePlayerProfile'
 import { setLastKnownProfile } from '@lib/gamification/playerProfileTracker'
 import { resolveRewardForRedeem } from '@lib/gamification/resolveRewardForRedeem'
@@ -33,17 +36,19 @@ export interface EarnedBadge {
 }
 
 export interface PlayerProfile {
-  id:                 string
-  total_points:       number
-  balance:            number
-  level:              number
-  current_streak:     number
-  longest_streak:     number
-  last_activity_date: string | null
-  multiplier:         number
-  badges:             EarnedBadge[]
-  created_at:         string
-  updated_at:         string
+  id:                    string
+  total_points:          number
+  balance:               number
+  level:                 number
+  level_points:          number
+  level_points_required: number
+  current_streak:        number
+  longest_streak:        number
+  last_activity_date:    string | null
+  multiplier:            number
+  badges:                EarnedBadge[]
+  created_at:            string
+  updated_at:            string
 }
 
 export interface PointTransaction {
@@ -97,8 +102,14 @@ function normalizePaginated<T>(data: Paginated<T> | T[]): Paginated<T> {
   }
 }
 
-async function fetchRewardProducts(): Promise<Paginated<RewardProduct>> {
-  const fallback = buildFallbackCoupons()
+async function fetchRewardProducts(userId?: string | null): Promise<Paginated<RewardProduct>> {
+  const fallback = buildLocalCouponCatalog()
+  if (LOCAL_COUPONS_ENABLED) {
+    const results = userId
+      ? await getAvailableLocalCoupons(userId)
+      : fallback
+    return { results, count: results.length }
+  }
   try {
     const data = await get<Paginated<RewardProduct> | RewardProduct[]>(EP.gamificationRewards)
     const page = normalizePaginated(data)
@@ -113,23 +124,6 @@ async function fetchRewardProducts(): Promise<Paginated<RewardProduct>> {
 }
 
 export { fetchRewardProducts }
-
-function buildFallbackCoupons(): RewardProduct[] {
-  return Object.entries(COUPON_CATALOG)
-    .map(([cost, meta]) => {
-      const pointsCost = Number(cost)
-      return {
-        id:          `${CATALOG_COUPON_PREFIX}${pointsCost}`,
-        name:        `Cupón ${pointsCost / 100}% OFF`,
-        description: meta.subtitle,
-        image_url:   '',
-        points_cost: pointsCost,
-        stock:       0,
-        is_active:   true,
-      }
-    })
-    .sort((a, b) => a.points_cost - b.points_cost)
-}
 
 export async function fetchPlayerProfile(): Promise<PlayerProfile> {
   const data = await get<PlayerProfile>(EP.gamification)
@@ -176,19 +170,52 @@ export function useAvailableBadges() {
 
 export function useRewardProducts() {
   const isSignedIn = useAuthStore((s) => s.isSignedIn)
+  const userId     = useAuthStore((s) => s.user?.id)
   return useQuery<Paginated<RewardProduct>>({
-    queryKey: ['reward-products'],
-    queryFn:  fetchRewardProducts,
+    queryKey: ['reward-products', userId ?? 'guest'],
+    queryFn:  () => fetchRewardProducts(userId),
     enabled:  isSignedIn,
-    staleTime: 30_000,
+    staleTime: 0,
     refetchOnMount: 'always',
   })
 }
 
+export function useLocalCouponRedemptions() {
+  const userId = useAuthStore((s) => s.user?.id)
+  return useQuery({
+    queryKey: ['local-coupon-redemptions', userId],
+    queryFn:  () => (userId ? getLocalRedemptions(userId) : []),
+    enabled:  LOCAL_COUPONS_ENABLED && !!userId,
+    staleTime: 0,
+  })
+}
+
+/** Saldo canjeable visible = balance del servidor − canjes locales en este dispositivo. */
+export function useEffectiveRedeemableBalance(serverBalance: number | undefined) {
+  const userId = useAuthStore((s) => s.user?.id)
+  const { data: localList } = useLocalCouponRedemptions()
+  if (!LOCAL_COUPONS_ENABLED || !userId) {
+    return serverBalance ?? 0
+  }
+  const spent = localList?.reduce((sum, r) => sum + r.points_spent, 0) ?? 0
+  return computeEffectiveBalance(serverBalance ?? 0, spent)
+}
+
 export function useRedeemReward() {
   const qc = useQueryClient()
+  const userId = useAuthStore((s) => s.user?.id)
+
   return useMutation({
     mutationFn: async (item: RewardProduct) => {
+      if (LOCAL_COUPONS_ENABLED) {
+        if (!userId) {
+          throw new ApiError(401, 'Debes iniciar sesión para canjear.')
+        }
+        const profile = qc.getQueryData<PlayerProfile>(['player-profile'])
+        const serverBalance = profile?.balance ?? 0
+        return redeemLocalCoupon(userId, item, serverBalance)
+      }
+
       const resolved = await resolveRewardForRedeem(item)
       const body: Record<string, string | number> = {}
       if (resolved.reward_id) body.reward_id = resolved.reward_id
@@ -201,8 +228,9 @@ export function useRedeemReward() {
     onSuccess: async () => {
       await Promise.all([
         qc.fetchQuery({ queryKey: ['player-profile'], queryFn: fetchPlayerProfile }),
-        qc.fetchQuery({ queryKey: ['reward-products'], queryFn: fetchRewardProducts }),
+        qc.fetchQuery({ queryKey: ['reward-products', userId ?? 'guest'], queryFn: () => fetchRewardProducts(userId) }),
         qc.invalidateQueries({ queryKey: ['gamification-transactions'] }),
+        qc.invalidateQueries({ queryKey: ['local-coupon-redemptions'] }),
       ])
     },
   })
@@ -216,7 +244,7 @@ export function redeemErrorMessage(error: unknown): string {
       case 'insufficient_balance':
         return 'No tienes puntos suficientes para este cupón.'
       case 'reward_unavailable':
-        return raw.detail ?? 'Este cupón ya no está disponible.'
+        return raw.detail ?? 'Este cupón ya no está disponible o ya lo canjeaste.'
       case 'reward_not_found':
         return 'El cupón no existe o fue retirado del catálogo.'
       case 'reward_id_required':

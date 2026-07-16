@@ -25,10 +25,12 @@ import { CouponRedeemedModal } from '@components/gamification/CouponRedeemedModa
 import { AppIcon, type AppIconName } from '@components/ui/AppIcon'
 import { Colors }         from '@constants/colors'
 import { getCouponImage, getCouponSubtitle } from '@constants/couponImages'
-import { MAX_LEVEL, getLevelProgress } from '@constants/levelBadges'
+import { MAX_LEVEL, getLevelProgressFromProfile } from '@constants/levelBadges'
+import { LOCAL_COUPONS_ENABLED } from '@constants/config'
 import {
   usePlayerProfile, useTransactions, useAvailableBadges, useRewardProducts,
-  useRedeemReward, redeemErrorMessage,
+  useRedeemReward, redeemErrorMessage, useEffectiveRedeemableBalance,
+  useLocalCouponRedemptions,
   type EarnedBadge, type PointTransaction, type RewardProduct, type Badge,
   type RedemptionRecord,
 } from '@hooks/useGamification'
@@ -216,11 +218,31 @@ export default function GamificationScreen() {
     redemption: RedemptionRecord
   } | null>(null)
 
-  const transactions = txPage?.results ?? []
+  const { data: localRedemptions = [] } = useLocalCouponRedemptions()
+
+  const transactions = useMemo(() => {
+    const serverTx = txPage?.results ?? []
+    if (!LOCAL_COUPONS_ENABLED || localRedemptions.length === 0) {
+      return serverTx
+    }
+    const localTx: PointTransaction[] = localRedemptions.map((r) => ({
+      id:             `local-${r.id}`,
+      source:         'REDEMPTION',
+      source_display: 'Canje de cupón',
+      base_points:    -r.points_spent,
+      multiplier:     1,
+      points:         -r.points_spent,
+      note:           `Canje ${r.code}: ${r.reward_name}`,
+      created_at:     r.created_at,
+    }))
+    return [...localTx, ...serverTx].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
+  }, [txPage?.results, localRedemptions])
   const visibleTx    = showAllTx ? transactions : transactions.slice(0, 10)
   const earnedBadges = profile?.badges ?? []
   const rewardList   = rewards?.results ?? []
-  const balance      = profile?.balance ?? 0
+  const balance      = useEffectiveRedeemableBalance(profile?.balance)
 
   const earnedCodes = useMemo(() => new Set(earnedBadges.map((eb) => eb.badge.code)), [earnedBadges])
   const allBadges   = badges?.results ?? []
@@ -228,7 +250,7 @@ export default function GamificationScreen() {
 
   const levelProgress = useMemo(() => {
     if (!profile) return null
-    return getLevelProgress(profile.total_points, profile.level)
+    return getLevelProgressFromProfile(profile)
   }, [profile])
 
   const confirmRedeem = useCallback((item: RewardProduct) => {
@@ -308,11 +330,16 @@ export default function GamificationScreen() {
             {/* Fila principal: puntos + nivel */}
             <View style={styles.heroMainRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.heroPointsLabel}>Puntos totales</Text>
+                <Text style={styles.heroPointsLabel}>Progreso de nivel</Text>
                 <View style={styles.heroPointsRow}>
                   <PointsCoin size={24} />
                   <Text style={styles.heroPoints}>
-                    {profile.total_points.toLocaleString('es-MX')}
+                    {profile.level_points.toLocaleString('es-MX')}
+                    {profile.level < MAX_LEVEL && profile.level_points_required > 0 ? (
+                      <Text style={styles.heroPointsTotal}>
+                        {' '}/ {profile.level_points_required.toLocaleString('es-MX')}
+                      </Text>
+                    ) : null}
                   </Text>
                 </View>
                 <Text style={styles.heroBalanceLabel}>Saldo canjeable</Text>
@@ -457,7 +484,7 @@ export default function GamificationScreen() {
           </View>
           {loadingRewards ? (
             <ActivityIndicator color={Colors.brand.primary} style={{ marginTop: 12 }} />
-          ) : rewardsError ? (
+          ) : rewardsError && !LOCAL_COUPONS_ENABLED ? (
             <EmptyState
               icon="gift"
               title="No se pudieron cargar los cupones"
@@ -466,8 +493,12 @@ export default function GamificationScreen() {
           ) : rewardList.length === 0 ? (
             <EmptyState
               icon="gift"
-              title="Sin cupones disponibles"
-              subtitle="Desliza hacia abajo para actualizar. Si acabas de instalar la app, los cupones se cargan al abrir esta pantalla."
+              title={LOCAL_COUPONS_ENABLED ? 'Ya canjeaste todos tus cupones' : 'Sin cupones disponibles'}
+              subtitle={
+                LOCAL_COUPONS_ENABLED
+                  ? 'Cada cupón solo se puede canjear una vez. Revisa tu historial para ver los códigos obtenidos.'
+                  : 'Desliza hacia abajo para actualizar. Si acabas de instalar la app, los cupones se cargan al abrir esta pantalla.'
+              }
             />
           ) : (
             rewardList.map((r) => (
@@ -551,6 +582,11 @@ const styles = StyleSheet.create({
     fontSize:   28,
     fontWeight: '800',
     color:      '#FFFFFF',
+  },
+  heroPointsTotal: {
+    fontSize:   18,
+    fontWeight: '600',
+    color:      'rgba(255,255,255,0.75)',
   },
   heroBalanceLabel: {
     fontSize:   11,

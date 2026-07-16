@@ -5,6 +5,7 @@ import {
   LEVEL_META_TEXT,
   clampLevel,
   getLevelProgress,
+  getLevelProgressFromProfile,
   LAST_SEEN_LEVEL_KEY,
   type LevelMetaText,
 } from './levelBadgeData'
@@ -13,6 +14,7 @@ export {
   MAX_LEVEL,
   LEVEL_THRESHOLDS,
   getLevelProgress,
+  getLevelProgressFromProfile,
   LAST_SEEN_LEVEL_KEY,
 }
 

@@ -5,10 +5,12 @@
 
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useAuthStore } from '@store/auth.store'
 import { fetchPlayerProfile, fetchRewardProducts } from '@hooks/useGamification'
 
 export function PatientGamificationInit() {
-  const qc = useQueryClient()
+  const qc     = useQueryClient()
+  const userId = useAuthStore((s) => s.user?.id)
 
   useEffect(() => {
     let cancelled = false
@@ -21,8 +23,8 @@ export function PatientGamificationInit() {
         })
         if (cancelled) return
         await qc.prefetchQuery({
-          queryKey: ['reward-products'],
-          queryFn:  fetchRewardProducts,
+          queryKey: ['reward-products', userId ?? 'guest'],
+          queryFn:  () => fetchRewardProducts(userId),
         })
       } catch {
         // Sin bloquear navegación si el API falla.
@@ -31,7 +33,7 @@ export function PatientGamificationInit() {
 
     warmUp()
     return () => { cancelled = true }
-  }, [qc])
+  }, [qc, userId])
 
   return null
 }

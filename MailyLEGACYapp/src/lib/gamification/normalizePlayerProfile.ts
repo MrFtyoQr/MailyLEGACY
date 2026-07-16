@@ -1,16 +1,26 @@
 import type { EarnedBadge, PlayerProfile } from '@hooks/useGamification'
+import { getLevelProgressFromProfile } from '@constants/levelBadgeData'
 
 export function normalizePlayerProfile(raw: PlayerProfile): PlayerProfile {
   const badges = Array.isArray(raw.badges) ? raw.badges : []
   const balance = typeof raw.balance === 'number'
     ? raw.balance
     : (raw.total_points ?? 0)
+  const level = typeof raw.level === 'number' && raw.level >= 1 ? raw.level : 1
+  const progress = getLevelProgressFromProfile({
+    total_points:          raw.total_points ?? 0,
+    level,
+    level_points:          raw.level_points,
+    level_points_required: raw.level_points_required,
+  })
 
   return {
     ...raw,
     badges,
     balance,
-    level: typeof raw.level === 'number' && raw.level >= 1 ? raw.level : 1,
+    level,
+    level_points:          progress.current,
+    level_points_required: progress.required,
   }
 }
 

@@ -1,7 +1,10 @@
 export const MAX_LEVEL = 10
 
-/** Umbrales de puntos por nivel (sincronizado con backend + nivel 10) */
-export const LEVEL_THRESHOLDS = [0, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 50000]
+/** Costos incrementales por nivel (referencia; sincronizado con backend). */
+export const LEVEL_INCREMENTAL_COSTS = [200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 50000]
+
+/** Umbrales acumulados de XP — sincronizado con PlayerProfile.LEVEL_THRESHOLDS (backend). */
+export const LEVEL_THRESHOLDS = [0, 200, 700, 1700, 3700, 7700, 15700, 30700, 60700, 110700]
 
 export interface LevelMetaText {
   level:       number
@@ -30,16 +33,59 @@ export function clampLevel(level: number): number {
 }
 
 export function getLevelProgress(totalPoints: number, level: number) {
-  const currentThreshold = LEVEL_THRESHOLDS[level - 1] ?? 0
-  const nextThreshold    = LEVEL_THRESHOLDS[level] ?? LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]
-  if (level >= MAX_LEVEL) return { pct: 1, current: totalPoints, needed: 0 }
+  const lvl = clampLevel(level)
+  const currentThreshold = LEVEL_THRESHOLDS[lvl - 1] ?? 0
+  const nextThreshold    = LEVEL_THRESHOLDS[lvl] ?? LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]
+  if (lvl >= MAX_LEVEL) {
+    const current = totalPoints - currentThreshold
+    return { pct: 1, current, needed: 0, required: 0 }
+  }
   const range = nextThreshold - currentThreshold
   const done  = totalPoints - currentThreshold
   return {
-    pct:     Math.min(Math.max(done / range, 0), 1),
-    current: done,
-    needed:  nextThreshold - totalPoints,
+    pct:      range > 0 ? Math.min(Math.max(done / range, 0), 1) : 1,
+    current:  done,
+    needed:   Math.max(nextThreshold - totalPoints, 0),
+    required: range,
   }
+}
+
+export interface LevelProgressView {
+  pct:      number
+  current:  number
+  needed:   number
+  required: number
+}
+
+/** Usa level_points del API o calcula desde total_points como respaldo. */
+export function getLevelProgressFromProfile(
+  profile: Pick<PlayerProfileLike, 'total_points' | 'level' | 'level_points' | 'level_points_required'>,
+): LevelProgressView {
+  const level = clampLevel(profile.level)
+  if (
+    typeof profile.level_points === 'number'
+    && typeof profile.level_points_required === 'number'
+  ) {
+    const required = profile.level_points_required
+    const current  = profile.level_points
+    if (level >= MAX_LEVEL) {
+      return { pct: 1, current, needed: 0, required: 0 }
+    }
+    return {
+      pct:      required > 0 ? Math.min(current / required, 1) : 1,
+      current,
+      needed:   Math.max(required - current, 0),
+      required,
+    }
+  }
+  return getLevelProgress(profile.total_points, level)
+}
+
+interface PlayerProfileLike {
+  total_points:            number
+  level:                   number
+  level_points?:           number
+  level_points_required?:  number
 }
 
 export const LAST_SEEN_LEVEL_KEY = '@maily_last_seen_level'

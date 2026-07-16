@@ -54,3 +54,10 @@ export const USER_ROLES = {
 } as const
 
 export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]
+
+/**
+ * Cupones canjeables solo en la app (AsyncStorage), sin catálogo en el backend.
+ * Pon EXPO_PUBLIC_LOCAL_COUPONS=false cuando el canje en servidor esté listo.
+ */
+export const LOCAL_COUPONS_ENABLED: boolean =
+  (process.env.EXPO_PUBLIC_LOCAL_COUPONS ?? 'true') === 'true'
