@@ -1,4 +1,4 @@
-# 🩺 MailyT-Cuida (CAMSA)
+# MailyT-Cuida (CAMSA)
 ### *Ecosistema Empresarial de Salud Digital, Telemedicina y Telemetría Predictiva impulsado por Inteligencia Artificial Multicanal*
 
 ---
@@ -7,7 +7,7 @@
 
 ---
 
-## 📖 El Arte de Entender antes de Construir: El Origen
+## El Arte de Entender antes de Construir: El Origen
 
 > *"Detrás de cada lectura de presión arterial, de cada dosis de medicamento y de cada alerta de frecuencia cardíaca, no hay simplemente datos... hay historias humanas, familias y momentos insustituibles que merecen ser protegidos."*
 
@@ -19,7 +19,31 @@ Esta es la historia de cómo convertimos la tecnología médica en una herramien
 
 ---
 
-## 📊 Benchmarking: La Evolución de la Salud Digital
+## Stack Tecnológico
+
+### Languages
+<p>
+  <img src="https://skillicons.dev/icons?i=python,ts,js,kotlin" alt="Languages" />
+</p>
+
+### Frontend and Mobile
+<p>
+  <img src="https://skillicons.dev/icons?i=react,next,tailwind,android" alt="Frontend and Mobile" />
+</p>
+
+### Backend and Databases
+<p>
+  <img src="https://skillicons.dev/icons?i=django,postgres,redis" alt="Backend and Databases" />
+</p>
+
+### Cloud, DevOps and Tooling
+<p>
+  <img src="https://skillicons.dev/icons?i=docker,nginx,git,github" alt="Cloud, DevOps and Tooling" />
+</p>
+
+---
+
+## Benchmarking: La Evolución de la Salud Digital
 
 Para construir una solución líder, analizamos las limitaciones del monitoreo remoto de pacientes (RPM) tradicional y diseñamos **MailyT-Cuida** como una respuesta de nueva generación:
 
@@ -35,7 +59,7 @@ Para construir una solución líder, analizamos las limitaciones del monitoreo r
 
 ---
 
-## 🎨 Rediseño UX/UI & Pantallas Inteligentes
+## Rediseño UX/UI & Pantallas Inteligentes
 
 El compromiso del paciente con su tratamiento depende directamente de la simplicidad de la interfaz. **MailyT-Cuida** introduce un diseño centrado en el ser humano donde la información crítica se presenta de forma clara y accesible para usuarios de todas las edades.
 
@@ -45,20 +69,61 @@ El compromiso del paciente con su tratamiento depende directamente de la simplic
 * **Dashboard Dinámico Contextual**: Adapta los elementos visibles según la hora del día (medicamentos de la mañana, tomas de signos vitales, resumen de hábitos).
 * **Asistente Clínico Multimodal con Voz**: Interfaz de chat conversacional con activación de micrófono (`expo-av`), indicador visual de pulso auditivo y sintaxis adaptada para respuestas en audio (Text-To-Speech).
 * **Visualización Intuitiva de Tendencias**: Gráficas de signos vitales con código de colores instantáneo (Verde: Rango Óptimo, Amarillo: Atención, Rojo: Anomalía).
-* **Acceso Multiol**: Vistas optimizadas según el rol de la persona que inicia sesión (**Paciente**, **Doctor**, **Especialista/Nutriólogo**, **Partner Corporativo** o **Administrador**).
+* **Acceso Multi-Rol**: Vistas optimizadas según el rol de la persona que inicia sesión (**Paciente**, **Doctor**, **Especialista/Nutriólogo**, **Partner Corporativo** o **Administrador**).
 
 ---
 
-## ⚙️ Arquitectura Backend & Ingeniería de Software (Clean Architecture)
+## Arquitectura Backend & Ingeniería de Software (Clean Architecture)
 
 El core del sistema está desarrollado sobre **Python 3.12 y Django 5.x**, estructurado bajo los principios de **Clean Architecture y Dominio Modular**. La infraestructura garantiza bajo costo operativo, tolerancia a fallos y alta escalabilidad horizontal.
 
 ![Arquitectura Backend de Salud Digital](docs/assets/Arquitectura_backend_de_salud_digital.png)
 
+### Diagrama de Flujo del Ecosistema
+
+```mermaid
+flowchart LR
+    subgraph Clients ["Clientes Multicanal"]
+        Mobile["App Móvil (Expo/React Native)"]
+        Watch["SmartWatch (Wear OS)"]
+        AdminWeb["Admin Portal (Next.js 16)"]
+    end
+
+    subgraph Backend ["Backend Core (Django 5 / DRF)"]
+        API["API Gateway & Auth (Clerk JWT)"]
+        WS["WebSockets (Django Channels)"]
+        Celery["Celery Workers & Beat"]
+        AI["AI Engine & PII Middleware"]
+    end
+
+    subgraph Storage ["Persistencia & Cache"]
+        TSDB[("TimescaleDB (Hypertables)")]
+        Redis[("Redis 7 Cache")]
+    end
+
+    subgraph AI_Models ["Modelos LLM"]
+        OpenAI["OpenAI GPT-4o"]
+        Claude["Anthropic Claude 3.5"]
+    end
+
+    Watch -->|Sync HTTP / WorkManager| API
+    Mobile -->|REST API| API
+    Mobile -->|Alerta Tiempo Real| WS
+    AdminWeb -->|Admin REST API| API
+    API --> TSDB
+    API --> Redis
+    API --> Celery
+    API --> AI
+    AI -->|Free / Silver / Gold| OpenAI
+    AI -->|Platinum Tier| Claude
+```
+
+### Estructura Modular del Backend (`mailytcuida_backend`)
+
 ```text
 mailytcuida_backend/
 ├── config/                  # Ajustes Django, Celery, WebSockets (Channels) y URLs
-├── core/                    # Permisos por Rol (RBAC), Pagina, Excepciones, Throttling
+├── core/                    # Permisos por Rol (RBAC), Paginación, Excepciones, Throttling
 └── apps/
     ├── accounts/            # Perfiles Paciente/Doctor, Vinculación y Sync Clerk Auth
     ├── vitals/              # Signos Vitales + Hypertables TimescaleDB + Tareas Celery
@@ -85,28 +150,32 @@ mailytcuida_backend/
 
 ### Principios de Ingeniería Aplicados:
 1. **Series de Tiempo con TimescaleDB**: Los signos vitales se almacenan en *Hypertables* particionadas automáticamente por tiempo, permitiendo analizar millones de lecturas de presión arterial y frecuencia cardíaca en milisegundos.
-2. **Procesamiento Asíncrono con Celery & Redis**: Las tareas pesadas (envío de notificaciones push, análisis de anomalías en vitales, generación de resúmenes semanales) se delegan a workers en segundo plano para mantener la API REST en tiempos de respuesta `< 50ms`.
-3. **Control Atómico de Transacciones en Gamificación**: El canje de puntos por recompensas utiliza bloqueo pesimista en base de datos (`select_for_update`) para prevenir *race conditions* o fraudes de saldo.
+2. **Procesamiento Asíncrono con Celery & Redis**: Las tareas pesadas (envío de notificaciones push, análisis de anomalías en vitales, generación de resúmenes semanales) se delegan a workers en segundo plano para mantener la API REST en tiempos de respuesta inferiores a 50ms.
+3. **Control Atómico de Transacciones en Gamificación**: El canje de puntos por recompensas utiliza bloqueo pesimista en base de datos (`select_for_update`) para prevenir condiciones de carrera (*race conditions*) o fraudes de saldo.
 
 ---
 
-## 🤖 Motor de Inteligencia Artificial & Privacidad de Datos
+## Motor de Inteligencia Artificial & Privacidad de Datos
 
 La IA de **MailyT-Cuida** no solo responde preguntas; actúa como un **guardián preventivo de salud** configurado bajo estrictas reglas éticas y de privacidad médica.
 
-```text
-┌────────────────────────┐      ┌─────────────────────────┐      ┌────────────────────────┐
-│   App Móvil Paciente   │─────▶│ Middleware Backend      │─────▶│ LLM Provider External  │
-│  (Mensaje / Texto/Voz) │      │ build_safe_context()    │      │ (OpenAI / Claude)      │
-└────────────────────────┘      └─────────────────────────┘      └────────────────────────┘
-                                            │
-                                            ▼
-                              ┌───────────────────────────┐
-                              │ Purificación PII Stripping│
-                              │ - Elimina Nombres y CURP  │
-                              │ - Convierte a Rangos      │
-                              │ - Solo Numéricos y Vitales│
-                              └───────────────────────────┘
+### Pipeline de Anonimización de Datos (PII Stripping)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Paciente / App Móvil
+    participant B as Backend Django REST
+    participant M as Middleware build_safe_context
+    participant L as Provider LLM (OpenAI / Claude)
+
+    P->>B: Solicitud de Consulta de Salud (Texto / Audio)
+    B->>M: Extraer contexto clínico del paciente
+    Note over M: Purificación de PII<br/>REMOVER: Nombre, CURP, RFC, Dirección<br/>CONSERVAR: Edad en rango, Vitales numéricos, Adherencia %
+    M->>B: Contexto Anónimo Seguro
+    B->>L: Consulta con System Prompts (OMS / AHA / ADA)
+    L-->>B: Respuesta Orientativa Estructurada
+    B-->>P: Respuesta en Pantalla + Audio TTS (expo-speech)
 ```
 
 ### Características de la Capa de IA:
@@ -114,14 +183,14 @@ La IA de **MailyT-Cuida** no solo responde preguntas; actúa como un **guardián
   * **Planes FREE / SILVER / GOLD**: Enrutados a **OpenAI GPT-4o-mini**, optimizando costes operativos.
   * **Plan PLATINUM**: Enrutado a **Anthropic Claude 3.5 Sonnet**, ofreciendo la máxima capacidad de razonamiento sintomático.
 * **Capa de Anonimización de Datos (PII Stripping)**: La función `build_safe_context()` purifica la información antes de salir del servidor:
-  * ❌ **NUNCA se envían**: Nombres, apellidos, identificadores oficiales (CURP/RFC), direcciones, correos ni notas en texto libre.
-  * ✅ **ÚNICAMENTE se envían**: Rango de edad (ej. "Adulto 30-40 años"), categoría genérica de medicamentos, porcentaje de adherencia y últimas 3 lecturas numéricas de vitales.
+  * **Información Excluida**: Nombres, apellidos, identificadores oficiales (CURP/RFC), direcciones, correos ni notas en texto libre.
+  * **Información Permitida**: Rango de edad (ej. "Adulto 30-40 años"), categoría genérica de medicamentos, porcentaje de adherencia y últimas 3 lecturas numéricas de vitales.
 * **Protocolo de Emergencias Auto-Detectadas**: Si el usuario menciona síntomas graves (dolor en el pecho, falta de aire), la IA suspende cualquier análisis y emite inmediatamente la orden de contactar a los servicios de emergencia (911).
 * **Cumplimiento Médico**: Alineado con guías de salud oficiales de la **OMS, AHA, ADA y la Secretaría de Salud de México**.
 
 ---
 
-## ⌚ Ecosistema SmartWatch / Wear OS (`MailyAssist`)
+## Ecosistema SmartWatch / Wear OS (`MailyAssist`)
 
 Para lograr una telemetría sin fricción, el proyecto incluye una aplicación nativa completa para relojes inteligentes Wear OS (**MailyAssist**), ubicada en `C:\Users\josep\StudioProjects\MailyAssist`.
 
@@ -130,15 +199,15 @@ Para lograr una telemetría sin fricción, el proyecto incluye una aplicación n
 ### Arquitectura Técnica Wear OS:
 * **Lenguaje & Framework**: Kotlin 2.0 con **Jetpack Compose for Wear OS**.
 * **Captura Pasiva de Sensores**: Integración con **Android Health Services Client** (`HealthPassiveService.kt`) para capturar en segundo plano:
-  * ❤️ Frecuencia Cardíaca en tiempo real (BPM).
-  * 🩸 Saturación de Oxígeno en Sangre (SpO2 %).
-  * 👟 Conteo diario de Pasos (Papeleo / Podómetro).
+  * Frecuencia Cardíaca en tiempo real (BPM).
+  * Saturación de Oxígeno en Sangre (SpO2 %).
+  * Conteo diario de Pasos (Podómetro).
 * **Sincronización Offline-First con WorkManager**: `SyncWorker.kt` empaqueta las lecturas cada 15 minutos (o de forma inmediata al detectar cambios bruscos) y las envía vía HTTP POST a la API de Django (`/api/v1/vitals/`). Si el reloj pierde conexión, los datos se conservan de forma segura en `DataStore` local.
 * **UI Optimizada para Pantallas Circulares**: Pantallas nativas para visualización de Signos Vitales, Racha Actual y Billetera de Puntos de Gamificación.
 
 ---
 
-## 🖥️ Portal Web de Administración (`admin-portal`)
+## Portal Web de Administración (`admin-portal`)
 
 Diseñado específicamente para el rol `ADMIN` de la plataforma, el portal web permite a la dirección médica de **CAMSA** supervisar la operación global en tiempo real.
 
@@ -149,7 +218,7 @@ Diseñado específicamente para el rol `ADMIN` de la plataforma, el portal web p
 
 ---
 
-## 💰 Modelo de Negocio, Membresías y Gamificación
+## Modelo de Negocio, Membresías y Gamificación
 
 El sistema integra un esquema de sostenibilidad comercial mediante pagos recurrentes procesados por **Stripe**:
 
@@ -167,7 +236,7 @@ El sistema integra un esquema de sostenibilidad comercial mediante pagos recurre
 
 ---
 
-## 🛠️ Guía de Instalación y Despliegue Local
+## Guía de Instalación y Despliegue Local
 
 ### Requisitos Previos
 * Docker Engine 24+ & Docker Compose v2+
@@ -209,8 +278,8 @@ npx expo start
 
 ---
 
-## 📜 Licencia y Propiedad intelectual
+## Licencia y Propiedad Intelectual
 
 Este proyecto fue desarrollado bajo los requerimientos corporativos de **CAMSA (Corporativo Médico Intermediario)**. Todos los derechos reservados.
 
-*“La tecnología avanzada solo alcanza su verdadero valor cuando se pone al servicio de la salud y la vida humana.”*
+*"La tecnología avanzada solo alcanza su verdadero valor cuando se pone al servicio de la salud y la vida humana."*
