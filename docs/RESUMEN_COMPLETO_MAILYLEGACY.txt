@@ -1,0 +1,345 @@
+================================================================================
+           DOCUMENTACIÓN TÉCNICA EXHAUSTIVA Y DETALLADA DEL PROYECTO
+                         MAILYT-CUIDA (CAMSA ECOSISTEMA)
+================================================================================
+FECHA DE COMPILACIÓN: 2026-07-19
+VERSIÓN DE REPOSITORIO: MailyT-CuidaLEGACY (Monorepo Producción v1.0)
+PROPIETARIO / ORGANIZACIÓN: CAMSA (Corporativo Médico Intermediario)
+
+================================================================================
+1. VISIÓN GENERAL Y ARQUITECTURA GENERAL DEL SISTEMA
+================================================================================
+
+MailyT-Cuida es una plataforma monorepo de nivel empresarial para la gestión
+integral de salud digital, telemedicina, seguimiento de signos vitales en tiempo
+real, gamificación de adherencia a tratamientos y asistencia clínica impulsada
+por Inteligencia Artificial (IA) generativa y predictiva.
+
+El ecosistema está compuesto por 4 capas principales interconectadas:
+1. BACKEND API REST & WEBSOCKETS: Django 5 + DRF + Celery + TimescaleDB.
+2. FRONTEND MÓVIL (iOS / Android): Expo / React Native + Jetpack Compose/Kotlin.
+3. FRONTEND PORTAL ADMINISTRATIVO WEB: Next.js 16 + React 19 + Tailwind CSS v4.
+4. SMARTWATCH / WEAR OS APP: Android Wear OS nativo en Kotlin + Health Services.
+
+--------------------------------------------------------------------------------
+TECNOLOGÍAS GLOBALES Y INFRAESTRUCTURA DE DESPLIEGUE
+--------------------------------------------------------------------------------
+• Lenguajes de Programación: Python 3.12, TypeScript 5, Kotlin 2.x, SQL.
+• Frameworks Principales: Django 5.x, DRF 3.15, Expo 51+, Next.js 16 (App Router).
+• Base de Datos Principal: PostgreSQL 16 con extensión TimescaleDB (Hypertables).
+• Memoria Cache & Cola de Mensajes: Redis 7.
+• Procesamiento Asíncrono: Celery 5.x + Celery Beat (tareas programadas).
+• Autenticación & Usuarios: Clerk Auth (JWT con tokens RSA, SSO Google/Apple).
+• Servidores & Orquestación: Docker, Docker Compose, Nginx, Gunicorn.
+• Almacenamiento de Archivos: Cloudflare R2 / AWS S3 (Prescripciones, PDFs, Labs).
+• Monitoreo & Logs: Sentry SDK, Audit Log inmutable customizado.
+• Pasarela de Pagos: Stripe API (Suscripciones recurrentes México e Internacional).
+
+================================================================================
+2. INTEGRACIÓN COMPLETA DE INTELIGENCIA ARTIFICIAL (AI ENGINE & ASISTENTE M24)
+================================================================================
+
+El subsistema de Inteligencia Artificial en MailyT-Cuida es una solución de
+salud digital multicapa diseñada bajo rigurosos criterios de privacidad,
+seguridad médica y enrutamiento inteligente según el plan comercial del usuario.
+
+--------------------------------------------------------------------------------
+A. ENRUTAMIENTO MULTI-TIER DE MODELOS LLM (OPENAI & ANTHROPIC CLAUDE)
+--------------------------------------------------------------------------------
+• Planes FREE, SILVER y GOLD:
+  - Enrutamiento hacia modelos OpenAI (GPT-4o / GPT-4o-mini).
+  - Optimizado para latencia baja y respuestas de orientación general.
+• Plan PLATINUM:
+  - Enrutamiento hacia Anthropic Claude 3.5 Sonnet.
+  - Capacidades superiores de razonamiento sintomático, lectura contextualizada de
+    patrones de signos vitales e instrucciones médicas estructuradas.
+
+--------------------------------------------------------------------------------
+B. CAPA DE ANONIMIZACIÓN Y PRIVACIDAD DE DATOS CLÍNICOS (PII STRIPPING)
+--------------------------------------------------------------------------------
+Antes de enviar cualquier solicitud a los proveedores externos de IA (OpenAI / Anthropic),
+el backend ejecuta la función purificadora `build_safe_context(patient)`:
+• DATOS QUE NUNCA SE ENVÍAN (Información Personal Identificable - PII):
+  - Nombres, apellidos, correo electrónico, teléfono.
+  - Claves de identificación oficial (CURP, RFC, DNI).
+  - Dirección física o de laboratorio.
+  - Transcripciones o notas en texto libre del médico.
+  - Identificadores únicos de base de datos (UUIDs de paciente).
+• DATOS PERMITIDOS Y ANONIMIZADOS (Solo numéricos y relativos):
+  - Últimos 3 registros de signos vitales (tipo de vital + valor + fecha relativa).
+  - Rango de edad aproximado (ej. "Adulto 30-40 años").
+  - Categorías genéricas de medicamentos (sin nombres comerciales de marcas).
+  - Porcentaje de adherencia al tratamiento de los últimos 30 días.
+  - Alineación con LGPDPPSO (México) y principios internacionales de HIPAA.
+
+--------------------------------------------------------------------------------
+C. ASISTENTE CONVERSACIONAL DE SALUD (MÓDULO M24)
+--------------------------------------------------------------------------------
+• Interfaz de Usuario: Pantalla `ai-chat.tsx` con componentes de chat fluidos.
+• Entrada por Voz Multimodal: Integración con `expo-av` para captura y audio en
+  tiempo real + soporte de Text-to-Speech (TTS) con `expo-speech`.
+• Barandillas de Seguridad Médica (System Prompts Guardrails):
+  1. Prohibición estricta de emitir diagnósticos médicos definitivos o prescribir.
+  2. Recomendación obligatoria de consultar al médico tratante.
+  3. Redirección automática de Emergencias: Si el usuario describe síntomas de
+     gravedad (dolor opresivo de pecho, dificultad respiratoria, pérdida de
+     conocimiento), la IA responde exclusivamente indicando llamar al 911.
+  4. Citas Oficiales de Salud: Respuestas fundamentadas en guías clínicas oficiales
+     (Organización Mundial de la Salud - OMS, AHA, ADA, Secretaría de Salud México).
+
+--------------------------------------------------------------------------------
+D. ANÁLISIS PREDICTIVO DE SIGNOS VITALES Y ALERTAS ASÍNCRONAS
+--------------------------------------------------------------------------------
+• Worker Celery (`check_abnormal_vitals`): Se dispara automáticamente ante cada
+  nuevo registro de signo vital. Compara el valor ingresado contra las metas del
+  paciente (`VitalGoal`). Si detecta una desviación (hipertensión, taquicardia,
+  hipoglucemia), genera una alerta inmediata en el dashboard médico y envía una
+  notificación Push al usuario y médico.
+
+================================================================================
+3. DETALLE MINUCIOSO DEL BACKEND (mailytcuida_backend)
+================================================================================
+
+El backend está desarrollado sobre Python 3.12 y Django 5.x, organizado en 21
+aplicaciones modulares independientes con arquitectura limpia.
+
+--------------------------------------------------------------------------------
+LISTADO Y DETALLE DE CADA UNA DE LAS 21 APLICACIONES BACKEND:
+--------------------------------------------------------------------------------
+
+1. `apps.accounts`:
+   - Gestión de perfiles de usuario divididos en `PatientProfile` y `DoctorProfile`.
+   - Modelo relacional `DoctorPatient` para vinculación y permisos de acceso.
+   - Sincronización automática de usuarios desde webhooks de Clerk Auth.
+   - Vistas administrativas para el portal web (`admin_views.py`).
+
+2. `apps.vitals`:
+   - Gestión de registros de signos vitales (`VitalSign`): Presión arterial, glucosa,
+     frecuencia cardíaca, SpO2, temperatura, peso, frecuencia respiratoria.
+   - Hypertables en TimescaleDB para consultas ultrarrápidas de series de tiempo.
+   - Configuración de rangos objetivo personalizados por médico (`VitalGoal`).
+   - Tareas Celery para análisis de anomalías y resúmenes semanales automáticos.
+   - Soporte para adjuntar evidencia fotográfica (`photo_url`).
+
+3. `apps.chat`:
+   - Chat en tiempo real Doctor-Paciente mediante Django Channels (WebSockets).
+   - Endpoints REST para historial paginado, conteo de no leídos y marcado de lectura.
+   - Despacho automático de notificaciones Push cuando el receptor está desconectado.
+
+4. `apps.medications`:
+   - Catálogo de medicamentos, posología, horarios y frecuencias.
+   - Integración con horarios de comida (`meal_schedules`: antes, durante, después).
+   - Historial de tomas y registro de omisiones con cálculo de porcentaje de adherencia.
+
+5. `apps.lab_results`:
+   - Subida y almacenamiento de estudios de laboratorio (PDF/imágenes).
+   - Interpretación de rangos de referencia y estado de revisión médica.
+
+6. `apps.prescriptions`:
+   - Emisión de recetas médicas digitales firmadas por el profesional.
+   - Generación de códigos QR de verificación y consulta de recetas activas.
+
+7. `apps.appointments`:
+   - Sistema de agendamiento de citas presenciales y virtuales.
+   - Control de disponibilidad médica, bloques de horario y cancelación/reprogramación.
+
+8. `apps.telemedicine`:
+   - Generación de enlaces para teleconsultas externas (Zoom / Google Meet).
+   - Registro de inicio, fin y duración de sesiones médicas.
+
+9. `apps.nutrition`:
+   - Planes de alimentación personalizados diseñados por nutriólogos.
+   - Registro diario de comidas, cálculo de macronutrientes (carbohidratos, proteínas, grasas).
+
+10. `apps.wellness`:
+    - Seguimiento de hábitos de bienestar: Horas de sueño, consumo de agua (ml),
+      conteo de pasos diarios y registro del estado de ánimo (mood tracker).
+
+11. `apps.family_care`:
+    - Red de cuidado familiar: Permite a cuidadores o familiares monitorear los
+      signos vitales y adherencia de pacientes dependientes (ej. adultos mayores).
+
+12. `apps.gamification`:
+    - Motor de recompensas y puntos (`engine.py`).
+    - Puntos otorgados por cumplimiento (`MEDICATION_TAKEN`, `VITAL_LOGGED`, `STREAK_BONUS`).
+    - Multiplicadores por plan comercial (1x FREE, 2x SILVER, 3x GOLD, 5x PLATINUM).
+    - Rachas diarias (`_update_streak`) con bonos a los 7, 14, 30, 60 y 90 días.
+    - Sistema de insignias (`Badge` y `PlayerBadge`) por categorías.
+    - Canje de puntos por productos/servicios (`redeem_reward`) con transacciones
+      atómicas y bloqueo pesimista en base de datos (`select_for_update`).
+
+13. `apps.coupons`:
+    - Motor de cupones de descuento aplicables en clínicas y comercios asociados.
+
+14. `apps.partners`:
+    - Portal y API para empresas socias externas (Cinépolis, Cinemex, farmacias, etc.).
+
+15. `apps.store`:
+    - Tienda médica virtual de la clínica: Carrito de compras, productos y órdenes.
+
+16. `apps.specialists`:
+    - Directorio y contratación de especialistas (Nutriólogos, Fisioterapeutas, Psicólogos).
+
+17. `apps.payments`:
+    - Integración completa con Stripe API.
+    - Cobros recurrentes de planes de membresía y webhook handlers para sincronizar estados.
+
+18. `apps.notifications`:
+    - Centro unificado de notificaciones: Push (Expo Push / FCM / APNs), Email y SMS.
+
+19. `apps.analytics`:
+    - KPIs globales de la plataforma, métricas de retención y vistas materializadas en BD.
+
+20. `apps.audit`:
+    - Registro inmutable de auditoría (`AuditLog`): Captura IP, User-Agent, usuario,
+      acción realizada, timestamp y recurso modificado. Sincronizado con Sentry SDK.
+
+21. `apps.documents`:
+    - Gestión centralizada de documentos médicos del paciente con control de acceso.
+
+================================================================================
+4. DETALLE MINUCIOSO DEL FRONTEND MÓVIL (MailyLEGACYapp)
+================================================================================
+
+La aplicación móvil es un cliente de alto rendimiento desarrollado con Expo /
+React Native en TypeScript, incorporando código nativo en Kotlin.
+
+--------------------------------------------------------------------------------
+STACK & ESTRUCTURA DE LA APP MÓVIL:
+--------------------------------------------------------------------------------
+• Framework: Expo SDK 51+, React Native 0.74+, TypeScript 5.
+• Estilos: NativeWind / Tailwind CSS + componentes personalizados.
+• Enrutamiento: Expo Router (basado en archivos).
+• Autenticación: Clerk React Native SDK.
+
+--------------------------------------------------------------------------------
+PANTALLAS Y MÓDULOS DE LA APP MÓVIL:
+--------------------------------------------------------------------------------
+• Auth (`app/(auth)`): Pantallas de inicio de sesión, registro, recuperación y OAuth.
+• Paciente (`app/(patient)`):
+  - Dashboard Principal (`index.tsx`): Resumen de salud, próxima toma de medicamento,
+    banner de racha actual y accesos directos.
+  - Chat IA (`ai-chat.tsx`): Interfaz completa de chat con bot, botón de voz (🎙️)
+    con pulso animado, sugerencias rápidas e indicador de análisis.
+  - Vitales (`/vitals`): Gráficas dinámicas de tendencias, captura manual y subida
+    de fotos de glucómetros/baumanómetros.
+  - Gamificación (`gamification.tsx`): Billetera de puntos, visualización de nivel,
+    colección de medallas ganadas y catálogo de recompensas para canje.
+  - Planes (`plans.tsx`): Comparativa visual de membresías (FREE, SILVER, GOLD,
+    PLATINUM) e integración con checkout de Stripe.
+  - Cuidado Familiar (`/family-care`): Conmutación entre perfiles de familiares.
+  - Medicamentos & Alarmas (`/medications`): Notificaciones y confirmación de tomas.
+  - Nutrición & Bienestar (`/wellness`): Registro de agua, pasos, sueño y planes de comida.
+• Doctor (`app/(doctor)`): Lista de pacientes asignados, visor de alertas rojas de
+  vitales anormales y creador de recetas digitales.
+• Especialista (`app/(specialist)`): Agenda de citas y revisión de avances nutricionales.
+
+================================================================================
+5. DETALLE MINUCIOSO DEL FRONTEND WEB ADMIN (admin-portal)
+================================================================================
+
+El portal de administración es una aplicación web moderna orientada al rol ADMIN.
+
+--------------------------------------------------------------------------------
+STACK & CARACTERÍSTICAS DEL PORTAL ADMIN:
+--------------------------------------------------------------------------------
+• Framework: Next.js 16 (App Router), React 19, TypeScript 5.
+• Estilos: Tailwind CSS v4.
+• Autenticación & Seguridad: `@clerk/nextjs` v7. Servidor verifica que el usuario
+  tenga rol `ADMIN` en el backend (`GET /api/v1/auth/me/`) antes de dar acceso.
+• Estado & Visualización: TanStack Query v5 (React Query) y Recharts v3.
+
+--------------------------------------------------------------------------------
+SECCIONES Y RUTAS DEL PORTAL:
+--------------------------------------------------------------------------------
+• `/dashboard`: Métricas ejecutivas en tiempo real (Total usuarios, doctores activos,
+  ingresos por suscripciones, gráficos de distribución por Plan).
+• `/audit`: Visor del registro inmutable de auditoría con filtros por gravedad,
+  correo de usuario, tipo de acción y rango de fechas.
+• `/specialists`: Gestión de especialistas registrados con pestañas de estado
+  (Pendiente / Verificado / Rechazado) y flujo de aprobación.
+• `/users`: Directorio global de usuarios, asignación de roles y estatus de cuenta.
+
+================================================================================
+6. DETALLE MINUCIOSO DE LA APP SMARTWATCH / WEAR OS (MailyAssist)
+================================================================================
+
+Ubicación del repositorio: `C:\Users\josep\StudioProjects\MailyAssist`
+
+MailyAssist es una aplicación nativa para relojes inteligentes Android (Wear OS)
+diseñada para el monitoreo continuo y pasivo de salud en la muñeca del usuario.
+
+--------------------------------------------------------------------------------
+STACK TECNOLÓGICO DE WEAR OS:
+--------------------------------------------------------------------------------
+• Lenguaje: Kotlin 2.0.
+• SDK Objetivo: Android Wear OS (minSdk 30, targetSdk 36, compileSdk 36).
+• Interfaz de Usuario: Jetpack Compose for Wear OS (`libs.wear.tooling.preview`,
+  `libs.compose.material3`, `libs.wear.sdk`).
+• Captura de Sensores: Android Health Services Client (`libs.health.services.client`).
+• Tareas de Fondo: Android WorkManager (`libs.work.runtime.ktx`).
+• Almacenamiento Local: DataStore Preferences (`libs.datastore.preferences`).
+• Conectividad: Google Play Services Wearable (Sincronización Data Layer API).
+
+--------------------------------------------------------------------------------
+COMPONENTES Y ARQUITECTURA TÉCNICA DE WEAR OS:
+--------------------------------------------------------------------------------
+1. `MailyApplication.kt`:
+   - Clase Application que inicializa el repositorio de vitales y programa la
+     sincronización en segundo plano al arrancar el reloj.
+
+2. Captura Pasiva de Sensores (`data/health`):
+   - `HealthServicesManager.kt`: Conecta con los sensores ópticos del reloj inteligente.
+   - `HealthPassiveService.kt`: Servicio en segundo plano que escucha de forma continua:
+     * Frecuencia Cardíaca (BPM - Beats Per Minute).
+     * Saturación de Oxígeno en Sangre (SpO2 %).
+     * Conteo diario de Pasos (Pedometer).
+
+3. Sincronización Automática con la Nube (`data/sync`):
+   - `SyncWorker.kt`: Tarea programada mediante WorkManager que ejecuta un ciclo de
+     envío de datos cada 15 minutos o en tiempo real cuando la app pasa a primer plano.
+   - `VitalsApi.kt` / `StubVitalsApi`: Módulo encargo de empaquetar los signos vitales
+     recopilados por el reloj y enviarlos mediante peticiones POST al backend Django
+     (`/api/v1/vitals/`).
+   - `markSynced()`: Garantiza que las lecturas no se dupliquen ni se pierdan si el
+     reloj pierde conexión a Internet momentáneamente (soporte offline-first).
+
+4. Pantallas de Interfaz Wear OS (`presentation/screens`):
+   - `SplashScreen.kt`: Pantalla de bienvenida optimizada para pantallas circulares.
+   - `StatusScreen.kt`: Indicador de estado de conexión entre el reloj, el teléfono y la nube.
+   - `VitalsScreen.kt`: Muestra en tiempo real las pulsaciones por minuto, nivel de SpO2
+     y pasos caminados, con alertas visuales de colores según el rango del usuario.
+   - `RachaScreen.kt`: Muestra la racha actual de días cumplidos del paciente directamente
+     en la pantalla del reloj.
+   - `CoinsScreen.kt`: Muestra el saldo de puntos ganados de la billetera de gamificación.
+
+================================================================================
+7. ARQUITECTURA DE SEGURIDAD, AUDITORÍA Y CUMPLIMIENTO REGULATORIO
+================================================================================
+
+1. AUTENTICACIÓN Y AUTORIZACIÓN BASADA EN ROLES (RBAC):
+   - Tokens JWT firmados con llaves RSA administrados vía Clerk Auth.
+   - Verificación estricta de permisos en el Backend Django en cada endpoint:
+     `IsPatient`, `IsDoctor`, `IsDoctorOfPatient`, `IsAdmin`.
+
+2. ANONIMIZACIÓN DE DATOS (Capa PII Stripping):
+   - Eliminación total de datos personales antes de llamar a modelos de IA externos.
+   - Alineación estricta con LGPDPPSO (México) y estándares HIPAA de privacidad médica.
+
+3. AISLAMIENTO Y SEGURIDAD EN BASE DE DATOS:
+   - Base de datos PostgreSQL contenida dentro de una red privada Docker sin exposición pública.
+   - Uso exclusivo de ORM de Django para evitar cualquier riesgo de SQL Injection.
+   - Bloqueos pesimistas (`select_for_update`) en transacciones críticas financieras y de puntos.
+
+4. AUDITORÍA E INMUTABILIDAD DE EVENTOS:
+   - Registro centralizado en `apps.audit` de todas las acciones sensibles (modificación
+     de expedientes, canjes de puntos, logins, cambios de rol).
+   - Integración nativa con Sentry para captura proactiva de excepciones en producción.
+
+5. CUMPLIMIENTO PCI-DSS EN PAGOS:
+   - Todos los datos de tarjetas de crédito son procesados directamente por los servidores
+     certificados de Stripe. El backend solo almacena tokens seguros y IDs de suscripción.
+
+================================================================================
+                        FIN DEL DOCUMENTO TÉCNICO
+================================================================================
